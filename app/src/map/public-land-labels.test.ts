@@ -55,6 +55,40 @@ describe('publicLandLabelPoints', () => {
     expect(publicLandLabelPoints([closed]).features[0]!.properties?.['access']).toBe('closed');
   });
 
+  it('keeps the name on screen when only part of a large site is in view', () => {
+    // A site 10 wide and 2 tall. The view shows only its right end.
+    const wide: LabelSource = site('Long Site', 'M', [
+      [
+        [0, 0],
+        [10, 0],
+        [10, 2],
+        [0, 2],
+        [0, 0],
+      ],
+    ]);
+    const [x, y] = publicLandLabelPoints([wide], [8, -5, 20, 5]).features[0]!.geometry.coordinates;
+    expect(x).toBeGreaterThan(8);
+    expect(x).toBeLessThan(10);
+    expect(y).toBeGreaterThan(0);
+    expect(y).toBeLessThan(2);
+  });
+
+  it('prefers the piece that is on screen over a larger piece that is not', () => {
+    const big = square(0, 0, 4);
+    const small = square(10, 0, 1);
+    const out = publicLandLabelPoints([site('A', 'M', [big]), site('A', 'M', [small])], [9, -1, 12, 2]);
+    expect(out.features).toHaveLength(1);
+    expect(out.features[0]!.geometry.coordinates[0]).toBeGreaterThan(9);
+  });
+
+  it('falls back to the largest piece when the site is off screen', () => {
+    const out = publicLandLabelPoints([site('A', 'M', [square(0, 0, 1)])], [50, 50, 60, 60]);
+    expect(out.features).toHaveLength(1);
+    const [x, y] = out.features[0]!.geometry.coordinates;
+    expect(x).toBeGreaterThan(0);
+    expect(y).toBeGreaterThan(0);
+  });
+
   it('handles multipolygons', () => {
     const out = publicLandLabelPoints([
       { properties: { name: 'M', manager: '' }, geometry: { type: 'MultiPolygon', coordinates: [[square(0, 0, 0.1)], [square(3, 3, 1)]] } },

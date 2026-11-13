@@ -111,7 +111,16 @@ export class MapView {
   private refreshPublicLandLabels(): void {
     if (!this.map.getSource(PUBLIC_LAND_LAYER) || this.map.getZoom() < PUBLIC_LAND_LABEL_MINZOOM) return;
     const features = this.map.querySourceFeatures(PUBLIC_LAND_LAYER, { sourceLayer: PUBLIC_LAND_LAYER }) as unknown as LabelSource[];
-    const labels = publicLandLabelPoints(features);
+    // Keep names a little in from the edge of the screen.
+    const bounds = this.map.getBounds();
+    const padX = (bounds.getEast() - bounds.getWest()) * 0.08;
+    const padY = (bounds.getNorth() - bounds.getSouth()) * 0.08;
+    const labels = publicLandLabelPoints(features, [
+      bounds.getWest() + padX,
+      bounds.getSouth() + padY,
+      bounds.getEast() - padX,
+      bounds.getNorth() - padY,
+    ]);
     const key = JSON.stringify(labels);
     if (key === this.labelsKey) return;
     this.labelsKey = key;
