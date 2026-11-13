@@ -33,7 +33,7 @@
   "naip": {
     "name": "USDA NAIP {year}",
     "license": "Public domain",
-    "credit": "Imagery: USDA Farm Production and Conservation Business Center, NAIP {year}",
+    "credit": "Imagery: USDA NAIP {year}. USDA Farm Production and Conservation Business Center.",
     "url": "https://catalog.data.gov/dataset/national-agriculture-imagery-program-naip-imagery"
   },
   "census-tiger": {
