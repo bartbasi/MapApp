@@ -51,34 +51,56 @@
 
 <style>
   h3 {
-    margin: 8px 0 4px;
-    font-size: 1rem;
+    margin: 4px 0 4px;
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+
+  h3 + p {
+    margin-top: 0;
   }
 
   p {
-    margin: 4px 0 8px;
+    margin: 4px 0 10px;
   }
 
   .run {
     width: 100%;
-    min-height: var(--touch);
+    min-height: 56px;
     border: 0;
     border-radius: var(--radius);
     background: var(--accent);
     color: var(--accent-text);
-    font-weight: 600;
+    font-size: 1.05rem;
+    font-weight: 700;
     cursor: pointer;
   }
 
+  .run:active {
+    filter: brightness(1.2);
+  }
+
   .run:disabled {
-    opacity: 0.5;
+    background: #8a8478;
   }
 
   dl {
     display: grid;
     grid-template-columns: auto 1fr;
-    gap: 4px 12px;
-    margin: 12px 0 4px;
+    gap: 6px 12px;
+    margin: 14px 0 4px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--surface-alt);
+  }
+
+  dd {
+    font-weight: 600;
+  }
+
+  .run + p,
+  dl + p {
+    margin-bottom: 18px;
   }
 
   dt {

@@ -9,6 +9,7 @@
 <script lang="ts">
   import type { ArchiveEntry } from '../platform/archive-meta';
   import { formatBytes, formatDate } from './format';
+  import Icon from './Icon.svelte';
 
   interface Props {
     entries: ArchiveEntry[];
@@ -24,8 +25,8 @@
 
 {#each entries as entry (`${entry.county}/${entry.layer}`)}
   <article>
-    <h3>{entry.meta.title}, {entry.meta.countyName}</h3>
-    <p class="muted">Built {formatDate(entry.meta.buildDate)}, {formatBytes(entry.meta.bytes)}</p>
+    <h3>{entry.meta.title}</h3>
+    <p class="muted">{entry.meta.countyName}. Built {formatDate(entry.meta.buildDate)}, {formatBytes(entry.meta.bytes)}.</p>
     {#each entry.meta.sources as source, i (i)}
       <dl>
         <dt>Source</dt>
@@ -45,24 +46,29 @@
       </dl>
     {/each}
     {#if entry.meta.notes}
-      <p class="muted">{entry.meta.notes}</p>
+      <p class="notes">{entry.meta.notes}</p>
     {/if}
   </article>
 {/each}
 
-<p class="muted">Map fonts: Noto Sans, under the SIL Open Font License 1.1.</p>
+<p class="muted">Map fonts: Noto Sans, under the SIL Open Font License 1.1. Icons and map style: drawn for MapApp.</p>
 
-<button class="wide" onclick={onOpenDiagnostics}>Diagnostics</button>
+<button class="wide" onclick={onOpenDiagnostics}><span>Diagnostics</span><Icon name="chevron" /></button>
 
 <style>
   article {
-    padding: 8px 0 12px;
+    padding: 12px 0 14px;
     border-bottom: 1px solid var(--line);
+  }
+
+  article:first-child {
+    padding-top: 0;
   }
 
   h3 {
     margin: 0;
-    font-size: 1rem;
+    font-size: 1.05rem;
+    font-weight: 700;
   }
 
   dl {
@@ -99,13 +105,30 @@
     margin: 4px 0;
   }
 
-  .wide {
-    margin-top: 12px;
-    width: 100%;
-    min-height: var(--touch);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
+  .notes {
+    margin: 8px 0 0;
+    padding: 8px 10px;
+    border-radius: 8px;
     background: var(--surface-alt);
+    font-size: 0.9rem;
+  }
+
+  .wide {
+    margin-top: 14px;
+    width: 100%;
+    min-height: 52px;
+    padding: 0 8px 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    font-weight: 600;
     cursor: pointer;
+  }
+
+  .wide:active {
+    background: var(--surface-alt);
   }
 </style>

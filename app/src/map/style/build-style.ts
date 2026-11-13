@@ -29,7 +29,7 @@ import { tileUrlTemplate } from '../tile-protocol';
 import { aerialLayer } from './aerial';
 import { baseMapGroundLayers, baseMapLabelLayers, labelsOnImagery, labelsOnMap, plainBaseMapLayers } from './base-map';
 import { hybridLineLayers } from './hybrid';
-import { basePalette, imageryPalette } from './palette';
+import { basePalette, imageryPalette, plainPalette } from './palette';
 import { PUBLIC_LAND_LABELS_SOURCE, publicLandAreaLayers, publicLandLabelLayers, type PublicLandSelection } from './public-land';
 
 export const BASE_VIEWS = ['map', 'aerial', 'hybrid'] as const;
@@ -148,7 +148,7 @@ export function buildStyle(opts: StyleOptions): StyleSpecification {
     sources[PUBLIC_LAND_LAYER] = vectorSource(publicland, false);
     sources[PUBLIC_LAND_LABELS_SOURCE] = { type: 'geojson', data: opts.publicLandLabels ?? EMPTY_LABELS };
     overlayAreas.push(...publicLandAreaLayers(PUBLIC_LAND_LAYER, onImagery, opts.selection ?? null));
-    overlayLabels.push(...publicLandLabelLayers(PUBLIC_LAND_LABELS_SOURCE, onImagery ? labelsOnImagery : labelsOnMap));
+    overlayLabels.push(...publicLandLabelLayers(PUBLIC_LAND_LABELS_SOURCE, onImagery ? labelsOnImagery : labelsOnMap, onImagery));
   }
 
   return {
@@ -160,8 +160,8 @@ export function buildStyle(opts: StyleOptions): StyleSpecification {
       {
         id: 'background',
         type: 'background',
-        // With a base map under the imagery, its land color shows where nothing else does.
-        paint: { 'background-color': onImagery && !hasBase ? imageryPalette.background : basePalette.land },
+        // Under the imagery: the plain base map's land color, or a dark gray with no base map at all.
+        paint: { 'background-color': onImagery ? (hasBase ? plainPalette.land : imageryPalette.background) : basePalette.land },
       },
       ...ground,
       ...overlayAreas,

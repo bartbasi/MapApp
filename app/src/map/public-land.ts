@@ -11,13 +11,13 @@ export type PublicLandCategory = (typeof PUBLIC_LAND_CATEGORIES)[number];
 
 /** Plain labels for the legend and the details panel. */
 export const categoryLabels: Record<PublicLandCategory, string> = {
-  state: 'State land',
+  state: 'State',
   county_district: 'County forest preserve or conservation district',
   local: 'City, village, township or park district',
-  university: 'University land',
-  federal: 'Federal land',
-  ngo: 'Land trust or conservation group',
-  other: 'Other public or conservation land',
+  university: 'University',
+  federal: 'Federal',
+  ngo: 'Land trust (privately owned)',
+  other: 'Other public body',
 };
 
 export function isPublicLandCategory(v: unknown): v is PublicLandCategory {

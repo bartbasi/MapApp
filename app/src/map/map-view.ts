@@ -17,6 +17,7 @@ import { PUBLIC_LAND_LAYER, readPublicLandSite, type PublicLandSite } from './pu
 import { publicLandLabelPoints, type LabelSource } from './public-land-labels';
 import { revealOffset } from './reveal';
 import { buildStyle, type StyleOptions } from './style/build-style';
+import { styleImage } from './style/images';
 import { PUBLIC_LAND_FILL, PUBLIC_LAND_LABEL_MINZOOM } from './style/public-land';
 import { TILE_SCHEME, createTileLoader, newTileStats, type TileStats } from './tile-protocol';
 import { unionBounds, type Bounds } from './tile-math';
@@ -88,6 +89,14 @@ export class MapView {
       const hits = this.map.queryRenderedFeatures(e.point, { layers: [PUBLIC_LAND_FILL] });
       const hit = hits.find((f) => f.sourceLayer === PUBLIC_LAND_LAYER);
       events.onPublicLandTap(hit ? readPublicLandSite(hit.properties as Record<string, unknown>) : null, e.lngLat);
+    });
+
+    // The style's hatch and shield images are drawn in code (style/images.ts)
+    // and added the first time a layer asks for one.
+    this.map.setMissingStyleImageResolver((id) => {
+      if (this.map.hasImage(id)) return;
+      const img = styleImage(id, window.devicePixelRatio || 1);
+      if (img) this.map.addImage(id, img.data, img.options);
     });
 
     // Once tiles have loaded and the map is still, place one name per site.

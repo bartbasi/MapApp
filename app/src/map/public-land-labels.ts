@@ -115,7 +115,13 @@ export function publicLandLabelPoints(features: readonly LabelSource[]): Feature
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([, v]) => ({
       type: 'Feature',
-      properties: { name: v.props['name'], manager: v.props['manager'] ?? '', category: v.props['category'] ?? 'other' },
+      properties: {
+        name: v.props['name'],
+        manager: v.props['manager'] ?? '',
+        category: v.props['category'] ?? 'other',
+        access: v.props['access'] ?? 'unknown',
+        acres: typeof v.props['acres'] === 'number' ? v.props['acres'] : 0,
+      },
       geometry: { type: 'Point', coordinates: interiorPoint(v.poly).map((n) => +n.toFixed(6)) },
     }));
   return { type: 'FeatureCollection', features: out };

@@ -47,7 +47,12 @@ describe('publicLandLabelPoints', () => {
   it('skips shapes with no name and carries the category for the label color', () => {
     const out = publicLandLabelPoints([site('', 'M', [square(0, 0, 1)]), site('Named', 'M', [square(0, 0, 1)], 'ngo')]);
     expect(out.features).toHaveLength(1);
-    expect(out.features[0]!.properties).toEqual({ name: 'Named', manager: 'M', category: 'ngo' });
+    expect(out.features[0]!.properties).toEqual({ name: 'Named', manager: 'M', category: 'ngo', access: 'unknown', acres: 0 });
+  });
+
+  it('carries access, so a closed site can say so under its name', () => {
+    const closed: LabelSource = { properties: { name: 'Shut', manager: 'M', category: 'state', access: 'closed' }, geometry: { type: 'Polygon', coordinates: [square(0, 0, 1)] } };
+    expect(publicLandLabelPoints([closed]).features[0]!.properties?.['access']).toBe('closed');
   });
 
   it('handles multipolygons', () => {

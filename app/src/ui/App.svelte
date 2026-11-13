@@ -21,6 +21,7 @@
   import { availableBaseViews, effectiveBaseView, type BaseView, type StyleOptions } from '../map/style/build-style';
   import { glyphsUrl } from '../map/style/fonts';
   import BaseViewSwitch from './BaseViewSwitch.svelte';
+  import Icon from './Icon.svelte';
   import DiagnosticsScreen from './DiagnosticsScreen.svelte';
   import LayersPanel from './LayersPanel.svelte';
   import Panel from './Panel.svelte';
@@ -179,15 +180,14 @@
 
     <div class="top-right">
       <button class="round" onclick={() => (panel === 'layers' ? close() : open('layers'))} aria-label="Layers" aria-pressed={panel === 'layers'}>
-        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-          <path d="M12 3 2 8l10 5 10-5-10-5Zm-7.6 9L2 13.2l10 5 10-5-2.4-1.2L12 15.8 4.4 12Zm0 4L2 17.2l10 5 10-5-2.4-1.2L12 19.8 4.4 16Z" fill="currentColor" />
-        </svg>
+        <Icon name="layers" size={26} />
       </button>
       {#if Math.abs(bearing) > 0.5}
         <button class="round" onclick={() => mapView?.resetNorth()} aria-label="Point north up">
-          <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" style:transform={`rotate(${-bearing}deg)`}>
-            <path d="M12 2 7 12h10L12 2Z" fill="#b3261e" />
-            <path d="M12 22 7 12h10l-5 10Z" fill="#6b6b6b" />
+          <!-- A compass needle: the dark half with the N points north. -->
+          <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" style:transform={`rotate(${-bearing}deg)`}>
+            <path d="M12 1.5 16.5 12h-9z" fill="#14130f" />
+            <path d="M12 22.5 7.5 12h9z" fill="#ffffff" stroke="#14130f" stroke-width="1.4" stroke-linejoin="round" />
           </svg>
         </button>
       {/if}
@@ -276,15 +276,20 @@
   }
 
   .round {
-    width: var(--touch);
-    height: var(--touch);
+    width: 60px;
+    height: 60px;
     display: grid;
     place-items: center;
     border: 0;
     border-radius: var(--radius);
     background: var(--surface);
+    color: var(--text);
     box-shadow: var(--shadow);
     cursor: pointer;
+  }
+
+  .round:active {
+    background: var(--surface-alt);
   }
 
   .round[aria-pressed='true'] {

@@ -3,7 +3,11 @@
   Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE.
 */
 
-/* App-wide settings. Plain on purpose: the designer sets the look. */
+/*
+  App-wide settings. Built for a glance outdoors: large targets, strong
+  contrast, the system font for every word outside the map.
+  Contrast on --surface: --text 18.0, --text-muted 9.0, --accent 10.6.
+*/
 
 :root {
   /* Safe area insets. The Capacitor shell sets the --safe-area-inset-*
@@ -13,24 +17,29 @@
   --inset-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
   --inset-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
 
+  /* The smallest touch target. Map buttons are a little larger, for gloves. */
   --touch: 48px;
+  --touch-map: 52px;
   --gap: 12px;
-  --radius: 10px;
+  --radius: 12px;
 
   --surface: #ffffff;
-  --surface-alt: #f2f1ed;
-  --text: #1d1c1a;
-  --text-muted: #5b5852;
-  --line: #d6d3cc;
-  --accent: #2d5a3a;
+  --surface-alt: #f1efe8;
+  --text: #14130f;
+  --text-muted: #4a463e;
+  --line: #d4d0c6;
+  --line-strong: #8a8478;
+  --accent: #1f4d2e;
   --accent-text: #ffffff;
-  --shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+  --focus: #0b57d0;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.25), 0 4px 14px rgba(0, 0, 0, 0.18);
 
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: 16px;
   line-height: 1.4;
   color: var(--text);
   -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 * {
@@ -51,8 +60,15 @@ button {
   color: inherit;
 }
 
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
 a {
   color: var(--accent);
+  font-weight: 600;
+  text-underline-offset: 3px;
 }
 
 /* MapLibre's own controls: keep them clear of the system bars. */
@@ -66,4 +82,10 @@ a {
 }
 .maplibregl-ctrl-attrib {
   font-size: 11px;
+}
+.maplibregl-ctrl-scale {
+  border-color: #14130f;
+  color: #14130f;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.85);
 }

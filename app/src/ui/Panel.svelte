@@ -9,6 +9,7 @@
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import Icon from './Icon.svelte';
 
   interface Props {
     title: string;
@@ -23,10 +24,10 @@
 <aside class="panel" aria-label={title}>
   <header>
     {#if onBack}
-      <button class="icon" onclick={onBack} aria-label="Back">&#8592;</button>
+      <button class="icon" onclick={onBack} aria-label="Back"><Icon name="back" /></button>
     {/if}
     <h2>{title}</h2>
-    <button class="icon" onclick={onClose} aria-label="Close">&#10005;</button>
+    <button class="icon" onclick={onClose} aria-label="Close"><Icon name="close" /></button>
   </header>
   <div class="body">
     {@render children()}
@@ -43,8 +44,8 @@
     display: flex;
     flex-direction: column;
     background: var(--surface);
-    border-radius: var(--radius) var(--radius) 0 0;
-    box-shadow: var(--shadow);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.3);
     z-index: 10;
     padding-left: var(--inset-left);
     padding-right: var(--inset-right);
@@ -54,46 +55,48 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 4px 4px 4px 16px;
+    min-height: 60px;
+    padding: 6px 6px 6px 16px;
     border-bottom: 1px solid var(--line);
     flex: none;
   }
 
   header:has(.icon:first-child) {
-    padding-left: 4px;
+    padding-left: 6px;
   }
 
   h2 {
     flex: 1;
     margin: 0;
-    font-size: 1.1rem;
-    font-weight: 600;
+    font-size: 1.2rem;
+    font-weight: 700;
     overflow: hidden;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     line-clamp: 2;
-    line-height: 1.25;
+    line-height: 1.2;
   }
 
   .icon {
     flex: none;
     width: var(--touch);
     height: var(--touch);
+    display: grid;
+    place-items: center;
     border: 0;
     border-radius: 50%;
-    background: transparent;
-    font-size: 1.25rem;
+    background: var(--surface-alt);
     cursor: pointer;
   }
 
   .icon:active {
-    background: var(--surface-alt);
+    background: var(--line);
   }
 
   .body {
     overflow-y: auto;
-    padding: 12px 16px calc(16px + var(--inset-bottom));
+    padding: 14px 16px calc(20px + var(--inset-bottom));
     -webkit-overflow-scrolling: touch;
   }
 
@@ -106,7 +109,7 @@
       max-height: none;
       height: 100%;
       border-radius: 0;
-      border-left: 1px solid var(--line);
+      border-left: 1px solid var(--line-strong);
       box-shadow: none;
       padding-left: 0;
       padding-top: var(--inset-top);
