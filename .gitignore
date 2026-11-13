@@ -1,0 +1,27 @@
+# Local tools and caches (never committed)
+.tools/
+node_modules/
+dist/
+build/
+.gradle/
+*.apk
+*.aab
+local.properties
+
+# Map data: built or downloaded, never committed.
+# County data files must never be pushed (see docs/DECISIONS.md).
+data/
+*.pmtiles
+*.mbtiles
+*.tif
+*.gpkg
+*.shp
+*.dbf
+*.shx
+*.prj
+
+# OS / editor
+Thumbs.db
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,23 @@
+{
+  "name": "step0-map-proof",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Throwaway Step 0 test: MapLibre GL JS drawing a local PMTiles archive inside a Capacitor Android shell.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/core": "^8.6.2",
+    "@protomaps/basemaps": "^5.7.2",
+    "maplibre-gl": "^6.18.0",
+    "pmtiles": "^4.5.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  }
+}

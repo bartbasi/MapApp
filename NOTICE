@@ -1,0 +1,67 @@
+MapApp
+Copyright 2026 Play, Inc.
+
+Designed and written by Bart Basi, with assistance from Claude.
+
+MapApp is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License, version 3, as published by the Free
+Software Foundation, with the additional terms below. The full license is in
+the file LICENSE.
+
+MapApp is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+Land boundaries shown by MapApp come from public records. They are not a
+legal survey.
+
+Source code: https://github.com/bartbasi/MapApp
+Feedback: bartbasi@gmail.com
+
+
+Additional terms (GNU General Public License, version 3, section 7)
+
+These terms apply to MapApp's code, map styles, art, icons and documents.
+They do not apply to map data, which is covered under "Map data" below.
+
+1. Author attribution (section 7(b)). Any work based on MapApp, in whole or
+   in part, must keep this author attribution, which credits Bart Basi as
+   the creator of the original MapApp and Play, Inc. as its copyright
+   holder:
+
+       Based on MapApp, designed and written by Bart Basi, with assistance
+       from Claude. Copyright 2026 Play, Inc.
+
+   (a) in its source code, by keeping this NOTICE file or its full text; and
+   (b) if the work has an interactive user interface, among the Appropriate
+       Legal Notices it displays (for example on an About, Credits or License
+       screen), where its users can readily see it.
+
+2. Marking modified versions (sections 7(c) and 7(d)). A modified version
+   must be marked as changed from the original and must not be presented as
+   the original MapApp. Beyond the attribution in term 1, the names Play,
+   Inc. and Bart Basi may not be used to promote a modified version or to
+   suggest that it was made or endorsed by Play, Inc. or Bart Basi.
+
+3. Name and icon (sections 7(c) and 7(e)). This license grants no rights under
+   trademark law to the name "MapApp" or to the MapApp icon. A modified
+   version you distribute is marked as different from the original by using
+   its own name and icon instead of them. Saying that your work is "based on
+   MapApp" is allowed, and term 1 requires it.
+
+
+Map data
+
+The map data that MapApp displays is not part of the program and is not
+under the GNU General Public License. Each dataset keeps its own license.
+OpenStreetMap data is under the Open Database License (ODbL) 1.0. Data from
+United States federal agencies is in the public domain. The full list of
+sources, licenses and credits is in docs/DATA_SOURCES.md and on the app's
+attribution screen.
+
+
+Third-party software
+
+MapApp is built with MapLibre GL JS (BSD 3-Clause), PMTiles (BSD 3-Clause)
+and Capacitor (MIT). Their copyright notices, and those of the other
+components MapApp includes, are shown on MapApp's attribution screen.

@@ -1,0 +1,219 @@
+# Decisions
+
+Each decision has a number, the date it was made, what was decided and why. A later change gets a new entry that names the one it replaces. All entries below were made in Step 0 on 2026-11-12.
+
+Terms used in this file:
+
+- **Web map core**: the map drawn by a JavaScript library inside a browser engine, as opposed to a map drawn by a native Android library.
+- **Shell**: the thin native Android app that hosts the web app and gives it things a browser cannot do.
+- **Tile archive**: one PMTiles file holding all the map tiles for one layer and one county.
+- **Live lookup**: fetching parcel data from a county's own public map service at the moment the user views or taps it, with nothing fetched ahead of time.
+
+---
+
+## D1. License: GPL-3.0 with the Play, Inc. additional terms
+
+MapApp uses the same license as WoodLogic: the GNU General Public License version 3, plus the section 7 additional terms in `NOTICE` (keep the author credit, mark modified versions, use your own name and icon). The text was copied from the local WoodLogic repository and adapted. Map data is not under the GPL. Each dataset keeps its own license, and `NOTICE` says so.
+
+## D2. Map engine: MapLibre GL JS (a web map core)
+
+The map is drawn by MapLibre GL JS 6 running in the Android system WebView.
+
+Why:
+
+- **The iPhone goal with no Mac.** A web map core runs in mobile Safari. The map and most of the app can be tested on the owner's iPhone from a web page, with no Mac and no App Store. A native map engine cannot be tested on iOS at all without a Mac.
+- **One code base for every platform.** The same code serves Android, a later iPhone app, a later desktop app and a browser.
+- **3D terrain later.** MapLibre GL JS already draws 3D terrain and hillshade from elevation tiles. That keeps the later 3D phase open.
+- **Tile archives are first class.** The PMTiles library is written for this engine.
+
+What was checked:
+
+- The brief's statement about Flutter was confirmed. The `maplibre_gl` Flutter plugin lists Android, iOS and web only. The newer `maplibre` plugin reaches Windows and macOS by wrapping MapLibre GL JS in a web view. So a Flutter app would end up on the web map core on desktop anyway, with a second, different engine on phones.
+- The choice was proven with a test app on the emulator. See D5 and `docs/reports/step-0.md`.
+
+What was given up: a native engine would likely draw faster on weak phones. The frame rate on the real Galaxy Z Fold 5 is not measured yet. If it is poor, this decision is the one to revisit, and Step 1 is the place to do it, before features are built on it.
+
+## D3. App framework: Capacitor 8 shell, TypeScript web app
+
+- The shell is Capacitor 8 (MIT license). It is a standard Android project that hosts the web app in a WebView and lets the web app call native code through plugins.
+- The web app is TypeScript, built with Vite, with Svelte 5 for screens and panels.
+- Android-only abilities are written as small native plugins inside the Capacitor Android project. There are five: reading tile archives from storage (D5), downloading files with pause and resume, the foreground location service (D10), a true network state check (D12), and the weather request (D13).
+- Every one of those sits behind a TypeScript interface with a browser implementation beside it, so the app also runs in a plain browser.
+
+Why Capacitor and not Flutter with a web view: with the map in a web view, a Flutter app would have two user interface systems that must talk across a bridge. Putting the whole interface in the web app removes that seam, and the browser build for the iPhone comes for free.
+
+Why Svelte: it compiles to small, fast code with little runtime, which suits a WebView on a phone. This is the least important choice here and is easy to change before Step 1 ends.
+
+Toolchain facts: Capacitor 8 needs JDK 21, Node 22 or later, and Android SDK 36. The minimum Android version is 7.0 (API 24), which is Capacitor's own minimum. The owner has not been asked whether older phones matter. The versions checked are in `docs/research/engine-and-hosting-checks.md`. JDK 21 was installed inside the project at `.tools/`. Nothing system-wide was changed.
+
+## D4. Map data format: PMTiles archives, one per layer per county
+
+Every layer is built ahead of time into a PMTiles archive. Vector layers (base map, public land, crops, woodland) are vector tiles. Aerial imagery is raster tiles in WebP. There is no tile server. An archive is a single static file that can sit on any free file host or on the phone.
+
+One archive per layer per county keeps downloads small, lets a county be added without touching the others, and lets a layer be rebuilt alone.
+
+## D5. Reading archives on the phone: the shell serves byte ranges, with the range in the URL
+
+The web app asks the shell for "bytes at offset O, length N of archive A" with a plain request to `https://localhost/_tiles/<archive>?o=<offset>&n=<length>`. The shell reads exactly those bytes from app storage.
+
+Why not ordinary HTTP Range headers: this was found by testing. When a request carries a Range header, Android WebView applies the range itself to whatever stream the app returns, and it measures the stream with a 32-bit number. So returning the exact bytes fails for any offset above zero, and returning the whole file fails for archives over 2 GB. Capacitor's built-in file server has the same limit. Putting the range in the URL avoids both problems and has no size limit.
+
+In a browser, the same archive is read from a web server with ordinary Range requests. Both paths sit behind one "archive reader" interface.
+
+## D6. Base map: OpenStreetMap data in the Protomaps tile layout, with our own style
+
+- Roads, water, woodland and place names come from OpenStreetMap.
+- The tiles are cut from the public Protomaps daily build of the whole planet, using `pmtiles extract` with a county outline. Measured size for both counties, zoom 0 to 15: 16.7 MB.
+- The tile layout (which layers and fields a tile holds) is the Protomaps one. Its code is BSD licensed and it asks for no extra on-map credit. The OpenMapTiles layout was rejected because it requires its own visible credit.
+- The map style is written here from scratch. The test app used a stock Protomaps style, fonts and icons only to prove the engine. None of them is in the repository or the product.
+- **How this sits with the brief's rule against using another product's servers, layer names or data.** Protomaps is an open source mapping project, not a hunting map product. It publishes its planet build for reuse, the data in it is OpenStreetMap's, and its tile layout is BSD licensed. The pipeline downloads from its public build server once per build, on the development machine. The app never contacts it. The layer names inside the tiles are Protomaps' names. They are internal to the tile files and are not the layer names a user sees. This reading of the rule is the lead's, and it is put to the owner in the Step 0 report.
+- Protomaps keeps about 60 days of builds. The pipeline keeps a copy of the build date it used, so a build can be repeated.
+- If the Protomaps layout turns out to lack something a hunter needs (for example farm tracks or fence lines), the fallback is to build our own tiles from the Geofabrik Illinois extract (346 MB) with Planetiler. The pipeline step is written so that swap changes one script.
+- US Census TIGER/Line supplies county boundaries, which are also the hunting units (D11). It is in the public domain.
+
+## D7. Aerial imagery: NAIP 2025 by default, Illinois 2025 leaf-off imagery as the goal
+
+- **Default aerial view: USDA NAIP 2025**, 0.6 m, public domain. County mosaics are 1.62 GB to download. Built to zoom 16 as WebP, the two counties are an estimated 140 MB (plus or minus 40 percent). NAIP is flown in summer with leaves on.
+- **Better for hunters: the State of Illinois 2025 imagery**, 6 inch, flown with leaves off, stated as public domain in its metadata. Leaf-off imagery shows trails, creek bottoms and fence lines under the trees. The catch is delivery. No county download was found, and the state image service that covers most of Champaign County has downloads switched off. Getting it means asking the Illinois State Geological Survey for the two county image sets, which is an open question for the owner.
+- Until that is answered, Step 1 builds the aerial view from NAIP. The leaf-off imagery becomes a second, optional aerial layer when a source is settled. Nothing else in the app depends on which one is used.
+
+## D8. Parcels: one interface, live lookup for Macon County, nothing for Champaign County yet
+
+All parcel access goes through one `ParcelSource` interface with two operations: outlines for a map area, and the details of the parcel at a point. Each county has its own implementation. A county can later switch to bundled offline data by swapping its implementation, with no change elsewhere.
+
+**Macon County: live lookup, approved by default.**
+
+- The county publishes its parcels as a public ArcGIS feature service with query access, the same service its own public parcel viewer uses. It holds 57,096 parcels and was last edited 2026-10-28.
+- No terms of use or license is attached to the service, the map, the viewer or the county GIS page. The viewer's only statement is that the maps are based on assessment information and are not a legal survey. The county website's footer, on every page, reads "© 2010- Macon County, Illinois. All rights reserved."
+- Nothing forbids an app from querying the service the way the county's own viewer does. So the live lookup is allowed by default. Silence is not permission to copy the data, and the footer reserves all rights. So nothing is fetched in bulk, bundled, hosted or committed. The app requests only the map area in view at high zoom, and the one parcel tapped.
+- Saved results are the one place where the app keeps a copy: the record of a parcel the user tapped, on the user's own phone. The brief allows this. Macon County has given no permission for it and has not forbidden it. This is put to the owner in the Step 0 report. It can be switched off per county.
+- The app requests only these fields: parcel ID, acreage and owner name. The service also holds mailing and site addresses. The app never requests them.
+- The owner has asked the county for permission. If the county says no, the Macon implementation is switched off with one setting.
+- Addresses, metadata and every request made to the service in Step 0 are recorded in `docs/research/county-parcel-terms.md`.
+
+**Champaign County: no parcels until the owner decides.**
+
+- The county's public parcel map sits behind a page where the user must accept terms before entering. Those terms (Champaign County GIS Consortium, last updated 2013-06-17) cover the website, its sub-domains and associated applications. They allow "personal, non-commercial transitory viewing only". They forbid copying the materials, any "public display (commercial or non-commercial)", and transferring or mirroring them. They state that copying, redistribution, use or publication of any portion of the website is prohibited.
+- An app that queries that map service and shows the results is outside those terms, and saving tapped parcels on the phone is copying. So even the live lookup is not allowed.
+- The consortium sells data under a signed license agreement. Prices are not posted. A search result reported agreement wording that forbids redistribution outside the licensee's organization without written permission. That wording was not read directly. Buying data would cost money and would be unlikely to allow the app to ship it.
+- No openly licensed parcel dataset for Champaign County was found. The regional planning commission and City of Champaign open data portals were searched.
+- The Champaign map service itself was not probed, because it is behind the terms page.
+- Result: the Champaign implementation of `ParcelSource` reports "parcel data for Champaign County is not available yet" until the consortium grants permission or the owner decides otherwise.
+
+**Saved results.** Parcels the user has tapped are kept on the phone with the date they were fetched, and shown when offline, as the brief describes. Outlines are held in memory for the session only.
+
+## D9. User data: a native SQLite database in app storage
+
+Waypoints, tracks, saved parcel results and saved forecasts live in a SQLite file in the app's private storage, reached through one storage interface.
+
+Why not the WebView's own storage (IndexedDB or similar): a browser engine may clear its storage when the device is short of space. A hunter's marks must not be lost that way. A file in app storage is also something the native location service can write to while the web app is asleep.
+
+The library that connects the web app to SQLite is chosen at the start of Step 4. The decision made now is where the data lives. The data model must not depend on a particular library.
+
+Photos attached to waypoints are files in app storage, with the path in the database. Android backup settings are chosen in Step 4 so that the owner's data is not copied to a cloud without his choice.
+
+## D10. Background tracking: a native foreground service that writes points itself
+
+Track recording runs in a native Android foreground service with a visible notification. The service writes each GPS point to storage itself. It does not pass points to the web app, because Android pauses the WebView when the screen is off. The web app reads the points when it wakes. This is the only design that meets the check of a two-hour recording with the screen off and no gaps.
+
+## D11. Hunting units: the county is the unit
+
+Illinois issues firearm deer, muzzleloader deer, spring turkey and fall shotgun turkey permits by county, and each permit is valid only in that county. Archery deer and fall archery turkey permits are statewide. So no separate unit layer exists or is needed. The app shows the county boundary as the hunting unit and says so.
+
+Facts the app will state for these two counties, each with its source in `docs/DATA_SOURCES.md`:
+
+- Both are open for firearm deer, archery deer, spring turkey (Northern Zone) and fall archery turkey.
+- Both are closed to fall shotgun turkey.
+- Both are in the Restricted Archery Zone, where only antlered deer may be taken from October 1 to October 31.
+- Neither is in the chronic wasting disease season list or the late-winter antlerless list for 2026 to 2027.
+
+Rules change every licence year. The app shows the date of its rules and links to the Illinois Department of Natural Resources for the current ones.
+
+## D12. Network state comes from the shell, not the browser
+
+In the test, `navigator.onLine` reported "online" while the emulator was in airplane mode. The app asks the shell for the true network state. This matters for the "needs a connection" message on parcels.
+
+## D13. Wind: the National Weather Service API, called from the phone
+
+- The phone calls `api.weather.gov` directly. No key and no server are needed. It is public domain data.
+- The hourly text forecast has no gust field and gives direction only as a compass word. The app uses the raw forecast grid for the point, which has wind speed, direction in degrees and gusts.
+- The service rejects requests with an empty User-Agent. The request goes through the shell so that it carries an app name and the source code link, as the service asks. It carries no name, account or device identifier.
+- The request does carry a location, which is unavoidable for a point forecast. The forecast grid is 2.5 km, so the app sends the waypoint's coordinates rounded to two decimal places (about 1 km), not the exact spot. See D21.
+- The last forecast for each waypoint is saved with its fetch time and shown with its age when offline.
+- The service has said a key will be required in the future. The fetch sits behind one interface for that reason.
+
+## D14. Data pipeline: scripts in `pipeline/`, run in WSL Ubuntu, one county per run
+
+- One command builds one layer for one county: `pipeline/build <layer> <county>`. Counties are listed in one file with their FIPS code and name. The county outline comes from TIGER. Adding a county is one new line.
+- Tools: GDAL 3.12 and tippecanoe 2.53 from Ubuntu's own packages in WSL2, plus the PMTiles command line tool. All are open source. Docker is installed but not used, because Docker Desktop takes memory this machine does not have.
+- Every archive is written with a small metadata file: source, license, credit text, data date, build date. The app's attribution screen and layer legends read those files, so credits cannot drift from the data.
+- A contour layer later is one more layer script on the same pattern, fed by USGS 3DEP elevation.
+- Tools are installed at the start of Step 1, not in Step 0.
+
+## D15. Where map data is hosted: GitHub Releases, pending the owner's approval of the first push
+
+- Archives are not bundled in the APK. The APK stays small and the user downloads counties and layers.
+- Total size for both counties is estimated at 200 to 300 MB with NAIP imagery to zoom 16, and up to about 1 GB if leaf-off imagery to zoom 17 is added.
+- Archives are published as files attached to a GitHub release of the project's public repository. GitHub's documentation says each release file must be under 2 GiB and that there is no limit on total size or bandwidth. One byte range request against a public release file was tested and returned the requested 100 bytes. Pause and resume and area downloads both rely on that. Many range reads in a row are not tested yet, and release downloads pass through a short-lived redirect that the downloader must renew. Both are checked at the start of Step 2. An archive that would pass 2 GiB is split.
+- "Pick an area" downloads work by reading only the tiles for that area out of the hosted archive, by byte range, into an archive on the phone. "Whole county" is the same thing with the whole county as the area.
+- County parcel data is never hosted. This applies only to the base map, imagery, public land and habitat layers.
+- GitHub release downloads do not send the headers a web page needs to read them from another site. That affects only a browser build, not the Android app. If the iPhone browser test build needs hosted data, a second free host is chosen then.
+
+## D16. Public land: PAD-US and OpenStreetMap now, the state's hunting table if permission comes
+
+- Boundaries come from USGS PAD-US 4.1 (public domain), corrected with OpenStreetMap and the regional planning commission's open space dataset where PAD-US is out of date. Both corrections are under the Open Database License.
+- PAD-US has no hunting field. The Illinois Department of Natural Resources runs a live table with a hunting code for every species and season at every state site. It is exactly what feature 1 asks for, but it carries no license. It is not used until the department gives permission in writing. That is an open question for the owner.
+- Until then, "is hunting allowed" is shown only where a public rule can be cited, as a short hand-written note per managing body with a link to the rule:
+  - Champaign County Forest Preserve District: no hunting (district ordinance).
+  - Macon County Conservation District: archery deer by district lottery permit at four sites, with one turkey allowed at three of them.
+  - State sites: per the department's public site pages.
+- The app never implies that public land is open to hunting. "Public" and "huntable" are shown as different things.
+
+## D17. Woodland and likely oak: tree canopy for where, a modeled hint for what
+
+- The woodland layer is built from the USFS tree canopy cover data (2025, 30 m).
+- A "possible oak-hickory (modeled)" hint is added from LANDFIRE vegetation classes. LANDFIRE is a federal product, but no license statement was found on its website. Its license is confirmed before the hint is built in Step 5. If it cannot be confirmed, the hint is left out and the woodland layer ships without it.
+- The research found that no public dataset can tell an oak woodlot from a maple one at the size of the woods in these counties. The layer and its legend say plainly that it is an estimate.
+
+## D18. Crop types: USDA Cropland Data Layer 2025
+
+Public domain, 30 m, 5.5 MB for both counties from the per-county download. A 10 m version exists but only in a 9.8 GB national file. Start with 30 m.
+
+## D19. Repository layout
+
+```
+app/          the web app (TypeScript, Svelte, map styles, tests)
+android/      the Capacitor Android project and native plugins
+pipeline/     data build scripts
+docs/         decisions, data sources, step plan, status, reports, evidence
+spikes/       throwaway tests
+data/         downloads and built archives (ignored by git)
+.tools/       project-local tools such as JDK 21 (ignored by git)
+```
+
+The app's package ID follows WoodLogic's pattern: `io.github.bartbasi.mapapp`. The ID cannot change after a store release, and the name is a working title, so this is confirmed with the owner before the first release build in Step 5.
+
+## D20. Fold and unfold: no engine problem found
+
+The app must keep working across a fold or unfold. In the test, the web app saw the new screen size at once after a fold (412 by 732 on the folded screen) and the map canvas matched it.
+
+An earlier reading in Step 0 said the map failed to resize after a fold. That was wrong. The partly gray map in those screenshots was map tiles still loading on an emulator starved of memory. The evidence is in `docs/research/engine-and-hosting-checks.md`. The app still resizes the map when the viewport changes, as ordinary good practice.
+
+Layout rules for the two screen sizes are in `.claude/agents/ux-designer.md`.
+
+## D21. What leaves the phone
+
+The app has no accounts, analytics or crash reporting, and never sends the user's waypoints, tracks or photos anywhere. Three kinds of request do leave the phone, and each reveals something to the server that answers it. The About screen lists them in plain words.
+
+| Request | Goes to | What the server can see |
+|---|---|---|
+| Map data downloads | GitHub | The phone's network address and which county or area was downloaded |
+| Parcel lookup (Macon County) | The county's map service, hosted by Esri | The phone's network address, the map area being viewed at high zoom, and the ID of a tapped parcel |
+| Wind forecast | The National Weather Service | The phone's network address and the waypoint's position rounded to about 1 km |
+
+Rules that follow:
+
+- Parcel outlines are requested by fixed map tile areas, not by the exact screen position, so a request does not reveal exactly where the user is looking.
+- The parcel lookup never runs in the background. It runs only when the parcel layer is switched on and the map is zoomed in.
+- The parcel layer has a plain note that it contacts the county's server.
+- No request carries a name, an account or a device identifier.
