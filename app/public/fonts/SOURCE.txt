@@ -1,0 +1,24 @@
+Map label glyphs bundled with MapApp
+
+What: Noto Sans Regular, Noto Sans Medium and Noto Sans Italic, as MapLibre
+signed distance field glyph files (.pbf). Three Unicode ranges per style:
+  0-255       Basic Latin and Latin-1 Supplement
+  256-511     Latin Extended-A
+  8192-8447   General Punctuation (dashes, curly quotes, ellipsis)
+These cover United States English place and road names. A label character
+outside them is drawn without that character.
+
+Font: Noto Sans, Copyright 2022 The Noto Project Authors
+(https://github.com/notofonts). Licensed under the SIL Open Font License,
+Version 1.1. The license text is in OFL.txt in this folder.
+
+Where the files came from: downloaded on 2026-11-12 from
+https://protomaps.github.io/basemaps-assets/fonts/<font name>/<range>.pbf
+(repository https://github.com/protomaps/basemaps-assets, commit
+028c18f713baecad011301ff7a69acc39bcc2ae7). Those glyph files were made from
+the Noto Sans fonts with https://github.com/maplibre/font-maker. OFL.txt is
+that repository's fonts/OFL.txt. The files are unchanged. Only the folder names
+were changed, to lower case with no spaces, so that the URLs need no escaping.
+
+The app loads these files from its own bundle. It never fetches fonts from
+the network.

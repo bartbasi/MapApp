@@ -30,7 +30,7 @@ Last updated: 2026-11-12, start of Step 1.
 
 1. Read the owner's answers and update this file and `docs/DECISIONS.md`.
 2. Install GDAL and tippecanoe in WSL Ubuntu: `wsl -d Ubuntu -u root -- apt-get install -y gdal-bin python3-gdal tippecanoe`.
-3. Create the project skeleton (`app/`, `android/`, `pipeline/`). Carry over from the test app only the archive reader design (D5). Then delete `spikes/step0-map-proof`.
+3. Create the project skeleton (`app/`, `app/android/`, `pipeline/`). Carry over from the test app only the archive reader design (D5). The Step 0 test app has been deleted.
 4. Follow `docs/STEP_PLAN.md`, Step 1.
 
 ## Known defects and open risks
@@ -42,6 +42,6 @@ Last updated: 2026-11-12, start of Step 1.
 - **LANDFIRE license not confirmed.** The oak hint is blocked until it is.
 - **NAIP county mosaics** are on a USDA Box site with no stable direct link. The download may need one manual step by the owner. The image format inside the zip is not confirmed.
 - **The Illinois 2025 leaf-off imagery** has no complete download route. Macon County's service allows batch downloads. Champaign County's does not.
-- **The test app** has Capacitor template leftovers, including `allowBackup="true"` in its manifest. It is deleted in Step 1. The product sets its backup rules deliberately (D9).
+- **Backup rules.** The Step 0 test app is deleted. The product app has `allowBackup="false"` until Step 4 sets its backup rules deliberately (D9).
 - **The laptop runs out of memory with the emulator open.** The emulator's own interface stalled in every session. See CLAUDE.md for the rules that keep it working.
 - `MapApp-kickoff-prompt.md` is the brief. It is kept in the repository because the step-reviewer agent reads it. Whether it goes public is question 4.

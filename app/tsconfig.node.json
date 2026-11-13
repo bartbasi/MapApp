@@ -1,0 +1,22 @@
+// MapApp. Copyright 2026 Play, Inc.
+// Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE.
+
+// Type settings for build tooling that runs in Node: the Vite config and the
+// development server plugin that serves archives to the browser.
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["vite.config.ts", "vitest.config.ts", "vite-plugins/**/*.ts", "capacitor.config.ts"]
+}

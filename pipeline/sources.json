@@ -1,0 +1,39 @@
+{
+  "_license": [
+    "MapApp. Copyright 2026 Play, Inc.",
+    "Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE."
+  ],
+  "_about": "One entry per data source the pipeline uses. Name, license and credit text follow docs/DATA_SOURCES.md. Each layer's .meta.json copies the entries it used and adds the data date. Only sources marked Approved in docs/DATA_SOURCES.md may be listed here.",
+
+  "openstreetmap": {
+    "name": "OpenStreetMap",
+    "license": "Open Database License (ODbL) 1.0",
+    "credit": "© OpenStreetMap contributors. The tile files are offered under ODbL 1.0.",
+    "url": "https://www.openstreetmap.org/copyright"
+  },
+  "protomaps-basemap": {
+    "name": "Protomaps basemap tile layout, version 4",
+    "license": "BSD 3-Clause (tile layout code); the tile data is OpenStreetMap data under ODbL 1.0",
+    "credit": "Protomaps © OpenStreetMap",
+    "url": "https://github.com/protomaps/basemaps"
+  },
+  "padus": {
+    "name": "USGS PAD-US 4.1",
+    "license": "Public domain",
+    "credit": "U.S. Geological Survey Gap Analysis Project, 2024, Protected Areas Database of the United States (PAD-US) 4.1, doi.org/10.5066/P96WBCHS",
+    "url": "https://doi.org/10.5066/P96WBCHS",
+    "dataDate": "2025-03-31"
+  },
+  "ccrpc-greenways": {
+    "name": "Champaign County Regional Planning Commission, Champaign County Greenways",
+    "license": "Open Data Commons Open Database License (ODbL) 1.0",
+    "credit": "Champaign County Regional Planning Commission, Champaign County Greenways, ODbL",
+    "url": "https://data.ccrpc.org/dataset/champaign-county-greenways"
+  },
+  "census-tiger": {
+    "name": "US Census Bureau TIGER/Line county boundaries",
+    "license": "Public domain",
+    "credit": "U.S. Census Bureau, TIGER/Line Shapefiles 2026",
+    "url": "https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html"
+  }
+}

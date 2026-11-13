@@ -1,0 +1,118 @@
+{
+  "_license": [
+    "MapApp. Copyright 2026 Play, Inc.",
+    "Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE."
+  ],
+  "_about": [
+    "Mapping tables for the 'publicland' layer (pipeline/layers/publicland.py).",
+    "PAD-US fields: FeatClass, Pub_Access, Mang_Type (FED, STAT, DIST, LOC, NGO, PVT, JNT, UNK...), Mang_Name (a code such as CITY, REG, SDNR), Loc_Mang (the local manager name).",
+    "Manager name: managerNames[Loc_Mang] if listed (null means 'not a real manager name, use the code'), else managerNamePatterns, else Loc_Mang as given, and if that is empty or listed in unknownManagerValues, managerByCode[Mang_Name]. {stateName} is the county's state from counties.json.",
+    "Category: categoryByManager[clean name], else the first matching categoryByPattern, else categoryByMangType[Mang_Type], else 'other'.",
+    "A build prints every manager name that only reached the code fallback or was passed through unchanged, so new counties show what to add here."
+  ],
+
+  "categories": ["state", "county_district", "local", "university", "federal", "ngo", "other"],
+
+  "keepFeatClass": ["Fee", "Easement"],
+  "_keepFeatClass": "Every other PAD-US feature class (Proclamation, Designation, Marine...) is a planning or designation boundary, not land ownership, and is left out.",
+
+  "access": { "OA": "open", "RA": "restricted", "XA": "closed", "UK": "unknown" },
+
+  "publicOwnerTypes": ["FED", "STAT", "LOC", "DIST", "JNT"],
+  "_publicOwnerTypes": "PAD-US Own_Type values that mean public land. An easement closed to access whose Own_Type is anything else (PVT, NGO, UNK, DESG...) is an easement on private land and is left out. A closed easement on public land is kept unless it repeats a fee record.",
+
+  "unknownManagerValues": ["", "Unknown", "Private", "<Null>", "None"],
+
+  "managerNames": {
+    "City of Mahomet": "Village of Mahomet",
+    "Village of Mt Zion": "Village of Mount Zion",
+    "Village of Mt. Zion": "Village of Mount Zion",
+    "Champaign County Forest Preserve": "Champaign County Forest Preserve District",
+    "Champaign Comm Unit School": "Champaign Community Unit School District 4",
+    "Illinois Dept of Transportation": "Illinois Department of Transportation",
+    "Urbana and Champaign": "City of Urbana and City of Champaign",
+    "Mahomet Site": null,
+    "Roessler Memorial Park": null
+  },
+
+  "managerNamePatterns": [
+    { "pattern": "^(.+?) (city|village|town) of$", "replace": "{2} of {1}", "_example": "'Champaign city of' becomes 'City of Champaign'" },
+    { "pattern": "^County of (.+)$", "replace": "{1} County", "_example": "'County of Macon' becomes 'Macon County'" }
+  ],
+
+  "managerByCode": {
+    "NRCS": "USDA Natural Resources Conservation Service",
+    "DOD": "U.S. Department of Defense",
+    "FWS": "U.S. Fish and Wildlife Service",
+    "NPS": "National Park Service",
+    "USFS": "USDA Forest Service",
+    "USACE": "U.S. Army Corps of Engineers",
+    "BLM": "Bureau of Land Management",
+    "SDNR": "{stateName} Department of Natural Resources",
+    "SDC": "{stateName} state conservation agency",
+    "OTHS": "State of {stateName}",
+    "CITY": "City or village (name not recorded)",
+    "CNTY": "County government (name not recorded)",
+    "UNKL": "Local government (name not recorded)",
+    "REG": "Regional agency or district (name not recorded)",
+    "RWD": "Soil and water conservation district (name not recorded)",
+    "NGO": "Nonprofit organization (name not recorded)",
+    "PVT": "Private owner",
+    "JNT": "Joint management (names not recorded)",
+    "UNK": "Manager not recorded"
+  },
+
+  "categoryByManager": {
+    "Illinois Department of Transportation": "state",
+    "Champaign Community Unit School District 4": "local",
+    "City of Urbana and City of Champaign": "local"
+  },
+
+  "categoryByPattern": [
+    { "pattern": "Park District$", "category": "local" },
+    { "pattern": "^University of ", "category": "university" },
+    { "pattern": "(Forest Preserve|Conservation) District$", "category": "county_district" }
+  ],
+
+  "categoryByMangType": {
+    "FED": "federal",
+    "TRIB": "other",
+    "STAT": "state",
+    "DIST": "county_district",
+    "LOC": "local",
+    "NGO": "ngo",
+    "PVT": "other",
+    "JNT": "other",
+    "UNK": "other",
+    "TERR": "other"
+  },
+
+  "duplicateEasementOverlap": 0.5,
+  "_duplicateEasementOverlap": "An easement record is the duplicate of a fee record when at least this share of its area lies under kept fee shapes. The fee record is kept.",
+
+  "corrections": [
+    {
+      "source": "ccrpc-greenways",
+      "_why": "PAD-US has the Champaign County Forest Preserve District holdings badly wrong (Middle Fork River Forest Preserve at 38 acres; the real preserve is about 1,704). Where this dataset has land of a listed manager, its shapes replace the PAD-US shapes of that manager that they touch.",
+      "featureSource": "ccrpc",
+      "note": "Champaign County Forest Preserve District land is drawn from the regional planning commission's open spaces, because PAD-US is out of date there. This archive combines public domain and ODbL data and is offered under the ODbL 1.0.",
+      "ckanPackageApi": "https://data.ccrpc.org/api/3/action/package_show?id=champaign-county-greenways",
+      "resourceFormat": "GeoJSON",
+      "managerField": "agency_responsible",
+      "nameField": "name",
+      "idField": "objectid",
+      "managers": ["Champaign County Forest Preserve District"],
+      "accessBySpaceType": {
+        "Public Open Space": "open",
+        "Public Use Golf Course": "open",
+        "Public Use/Private Owned Recreation": "open",
+        "Private Use/Private Owned Recreation": "closed",
+        "Private Use Golf Course": "closed"
+      },
+      "replaceOverlap": 0.5,
+      "_replaceOverlap": "A PAD-US record of a listed manager is replaced when at least this share of it lies under this dataset's shapes. Otherwise it is kept and reported.",
+      "containedOverlap": 0.9,
+      "_containedOverlap": "A shape of this dataset that lies at least this much inside a larger shape of the same manager in the same dataset is a duplicate and is left out."
+    }
+  ]
+}

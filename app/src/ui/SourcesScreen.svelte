@@ -1,0 +1,111 @@
+<!--
+  MapApp. Copyright 2026 Play, Inc.
+  Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE.
+-->
+<!--
+  Every installed archive and every source in it, straight from the archives'
+  metadata files. Nothing here is written per source.
+-->
+<script lang="ts">
+  import type { ArchiveEntry } from '../platform/archive-meta';
+  import { formatBytes, formatDate } from './format';
+
+  interface Props {
+    entries: ArchiveEntry[];
+    onOpenDiagnostics: () => void;
+  }
+
+  let { entries, onOpenDiagnostics }: Props = $props();
+</script>
+
+{#if entries.length === 0}
+  <p>No map data is installed.</p>
+{/if}
+
+{#each entries as entry (`${entry.county}/${entry.layer}`)}
+  <article>
+    <h3>{entry.meta.title}, {entry.meta.countyName}</h3>
+    <p class="muted">Built {formatDate(entry.meta.buildDate)}, {formatBytes(entry.meta.bytes)}</p>
+    {#each entry.meta.sources as source, i (i)}
+      <dl>
+        <dt>Source</dt>
+        <dd>
+          {#if /^https:\/\//.test(source.url)}
+            <a href={source.url} target="_blank" rel="noopener noreferrer">{source.name}</a>
+          {:else}
+            {source.name}
+          {/if}
+        </dd>
+        <dt>License</dt>
+        <dd>{source.license}</dd>
+        <dt>Credit</dt>
+        <dd>{source.credit}</dd>
+        <dt>Data date</dt>
+        <dd>{formatDate(source.dataDate)}</dd>
+      </dl>
+    {/each}
+    {#if entry.meta.notes}
+      <p class="muted">{entry.meta.notes}</p>
+    {/if}
+  </article>
+{/each}
+
+<p class="muted">Map fonts: Noto Sans, under the SIL Open Font License 1.1.</p>
+
+<button class="wide" onclick={onOpenDiagnostics}>Diagnostics</button>
+
+<style>
+  article {
+    padding: 8px 0 12px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 12px;
+    margin: 8px 0 0;
+    font-size: 0.95rem;
+  }
+
+  dl + dl {
+    padding-top: 8px;
+    border-top: 1px dashed var(--line);
+  }
+
+  dt {
+    color: var(--text-muted);
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  dd a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch);
+  }
+
+  .muted {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin: 4px 0;
+  }
+
+  .wide {
+    margin-top: 12px;
+    width: 100%;
+    min-height: var(--touch);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface-alt);
+    cursor: pointer;
+  }
+</style>

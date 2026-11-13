@@ -1,0 +1,25 @@
+// MapApp. Copyright 2026 Play, Inc.
+// Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE.
+
+// Type settings for the web app itself (everything under src/).
+// Build tooling that runs in Node is checked by tsconfig.node.json.
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["svelte", "vite/client"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": false,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "src/**/*.svelte", "src/**/*.json"]
+}

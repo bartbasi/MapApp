@@ -12,10 +12,24 @@ wsl -d Ubuntu -- bash pipeline/build.sh <layer> <county-id>
 
 For example: `bash pipeline/build.sh publicland il-champaign`.
 
-- Downloads go to `data/cache/`. A rerun reuses them.
-- Outputs go to `data/build/<county-id>/`.
+- Downloads go to `data/cache/`. A rerun reuses them. `REFRESH=1` downloads again.
+- Outputs go to `data/build/<county-id>/`. A build report (what each filter removed, manager names) goes to `data/reports/<county-id>/`.
 - Nothing under `data/` is committed.
 - A run is safe to interrupt. Files are written under a temporary name and renamed when complete.
+- The PMTiles tool is go-pmtiles 1.31.2 for Linux in `.tools/pmtiles-linux/`. The scripts copy it to `~/.cache/map-data-build/` in WSL, because starting it from the Windows drive takes 20 to 50 seconds.
+- `basemap` uses the newest Protomaps build. `PROTOMAPS_BUILD=<key>` (for example `20261112.pmtiles`) repeats an older one while Protomaps still keeps it.
+
+Files:
+
+| File | What it does |
+|---|---|
+| `build.sh` | The entry point. Checks the layer and county, runs `layers/<layer>.sh`, then validates the metadata against this contract. |
+| `lib/common.sh` | Bash helpers: paths, downloads to a temporary name, atomic publish. |
+| `lib/mapdata.py` | Python helpers: `counties.json`, the county outline, tile math, metadata writing and validation. `python3 -I pipeline/lib/mapdata.py validate-meta <meta.json> <archive>` checks any archive. |
+| `sources.json` | Name, license, credit and address of each source, copied into the metadata. |
+| `layers/basemap.sh` | The `basemap` layer. |
+| `layers/publicland.sh`, `layers/publicland.py` | The `publicland` layer. |
+| `layers/publicland-mapping.json` | Every PAD-US mapping table: manager names, categories, access, filter thresholds, corrections. |
 
 ## Counties
 
@@ -25,7 +39,7 @@ For example: `bash pipeline/build.sh publicland il-champaign`.
 { "id": "il-champaign", "name": "Champaign County", "state": "IL", "stateName": "Illinois", "fips": "17019" }
 ```
 
-The county outline is fetched from the US Census Bureau by FIPS code and cached.
+The county outline is fetched from the US Census Bureau by FIPS code and cached: one single-county query of the Census TIGERweb `State_County` service, layer 1 "Counties" (January 1, 2026 vintage), about 140 KB. The national cartographic boundary file would be a much larger download.
 
 ## The archive contract
 
@@ -74,6 +88,8 @@ data/build/<county-id>/<layer>.meta.json
 
 - `sources` lists every dataset that went into the archive. The app's attribution screen and legends are built from it. Credit text comes from `docs/DATA_SOURCES.md`.
 - `dataDate` is the date of the data itself, not the day it was downloaded.
+- `bounds` is the bounding box of the county outline, rounded outward to 4 decimals.
+- `provenance` (optional, added in Step 1) is an object with build details for people, not for the app: the county outline source and vintage, the Protomaps build key and OpenStreetMap data time, the PAD-US service, and how many features each filter removed. The app should ignore it.
 
 ### Layers
 
@@ -97,10 +113,16 @@ data/build/<county-id>/<layer>.meta.json
 
 `category` values: `state`, `county_district` (forest preserve and conservation districts), `local` (city, village, township and park district land), `university`, `federal`, `ngo` (land trusts and similar private conservation owners), `other`.
 
+Each feature also carries a numeric feature ID: the PAD-US `OBJECTID`, or 1,000,000,000 plus the planning commission's `objectid`. The same land has the same ID in every county's archive.
+
 What is left out, and why:
 
-- Easements on private land that are closed to access. They are private land, and drawing them as public land would send someone onto it.
-- Planning boundaries that are not land ownership, such as the former air base boundary in Champaign County.
-- Duplicate shapes where PAD-US has both a "fee" and an "easement" record for one site. The fee record is kept.
+- Easements on private land that are closed to access. They are private land, and drawing them as public land would send someone onto it. "Private land" means a PAD-US owner type that is not public (`Own_Type` other than FED, STAT, LOC, DIST, JNT). A closed easement on public land is kept unless it repeats a fee record, because PAD-US marks state nature preserve dedications closed even where the site is open (Spitler Woods in Macon County is one).
+- Planning boundaries that are not land ownership, such as the former air base boundary in Champaign County. These are every PAD-US feature class other than Fee and Easement.
+- Duplicate shapes where PAD-US has both a "fee" and an "easement" record for one site. The fee record is kept. An easement is a duplicate when half or more of it lies under kept fee shapes.
+
+Champaign County Forest Preserve District land comes from the regional planning commission's dataset (`source` = `ccrpc`). Its shapes replace each PAD-US record of that district that lies at least half under them. This is driven by the data: it applies wherever that dataset has land of a manager listed in `publicland-mapping.json`.
+
+Tile completeness: features are fetched for every zoom 12 tile that touches the county, plus a small margin. So every tile from zoom 12 to 14 is whole, as rule 1 requires. Tiles at zoom 6 to 11 are larger than that area and hold only the public land near this county, so two counties' archives can hold different versions of the same low-zoom tile. This does not meet rule 1 at zoom 6 to 11 and needs a decision (see the Step 1 report).
 
 Whether hunting is allowed is not in the tiles. PAD-US has no hunting field. The app keeps its own short notes per managing body, each with a link to the rule (D16).

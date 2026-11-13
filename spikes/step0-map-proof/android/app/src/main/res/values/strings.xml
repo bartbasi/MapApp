@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">Map Proof</string>
-    <string name="title_activity_main">Map Proof</string>
-    <string name="package_name">dev.spike.mapproof</string>
-    <string name="custom_url_scheme">dev.spike.mapproof</string>
-</resources>

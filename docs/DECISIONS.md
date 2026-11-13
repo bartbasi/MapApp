@@ -73,7 +73,8 @@ In a browser, the same archive is read from a web server with ordinary Range req
 
 ## D7. Aerial imagery: NAIP 2025 by default, Illinois 2025 leaf-off imagery as the goal
 
-- **Default aerial view: USDA NAIP 2025**, 0.6 m, public domain. County mosaics are 1.62 GB to download. Built to zoom 16 as WebP, the two counties are an estimated 140 MB (plus or minus 40 percent). NAIP is flown in summer with leaves on.
+- **Default aerial view: USDA NAIP 2025**, public domain, flown in summer with leaves on. The native detail is 0.6 m.
+- **Changed in Step 1:** the county mosaics turned out to be in a proprietary format (MrSID) that the open source tools cannot read, so the layer is built from the cloud-hosted GeoTIFF copies of NAIP. Step 1 builds from their 1.2 m level, to zoom 16 with 512 pixel tiles, with NAIP 2023 filling a gap in eastern Macon County. The size is measured when it is built. See `docs/DATA_SOURCES.md`, "NAIP delivery".
 - **Better for hunters: the State of Illinois 2025 imagery**, 6 inch, flown with leaves off, stated as public domain in its metadata. Leaf-off imagery shows trails, creek bottoms and fence lines under the trees. The catch is delivery. No county download was found, and the state image service that covers most of Champaign County has downloads switched off. Getting it means asking the Illinois State Geological Survey for the two county image sets, which is an open question for the owner.
 - Until that is answered, Step 1 builds the aerial view from NAIP. The leaf-off imagery becomes a second, optional aerial layer when a source is settled. Nothing else in the app depends on which one is used.
 

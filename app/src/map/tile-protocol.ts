@@ -1,0 +1,66 @@
+// MapApp. Copyright 2026 Play, Inc.
+// Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE.
+
+// The custom tile address scheme the style uses: mapapp://<layer>/{z}/{x}/{y}.
+// A style names a layer, never a county. The loader below turns such an
+// address into tile bytes through the TileResolver.
+
+import type { TileResolver } from './tile-resolver';
+
+export const TILE_SCHEME = 'mapapp';
+
+/** The tile URL template for a layer's map source. */
+export function tileUrlTemplate(layer: string): string {
+  return `${TILE_SCHEME}://${layer}/{z}/{x}/{y}`;
+}
+
+export interface TileAddress {
+  layer: string;
+  z: number;
+  x: number;
+  y: number;
+}
+
+export function parseTileUrl(url: string): TileAddress | null {
+  const m = /^mapapp:\/\/([a-z0-9-]+)\/(\d+)\/(\d+)\/(\d+)$/.exec(url);
+  if (!m) return null;
+  return { layer: m[1] ?? '', z: Number(m[2]), x: Number(m[3]), y: Number(m[4]) };
+}
+
+/** Counts kept for the diagnostics screen. */
+export interface TileStats {
+  requested: number;
+  failed: number;
+  lastError: string;
+}
+
+export function newTileStats(): TileStats {
+  return { requested: 0, failed: 0, lastError: '' };
+}
+
+/**
+ * The function given to MapLibre's addProtocol. A tile no archive holds is
+ * answered with zero bytes: MapLibre draws that as an empty vector tile, or as
+ * a transparent raster tile.
+ */
+export function createTileLoader(resolver: TileResolver, stats: TileStats = newTileStats()) {
+  return async (params: { url: string }, abort: AbortController): Promise<{ data: Uint8Array }> => {
+    stats.requested++;
+    const address = parseTileUrl(params.url);
+    if (!address) {
+      stats.failed++;
+      stats.lastError = `bad tile address ${params.url}`;
+      throw new Error(stats.lastError);
+    }
+    try {
+      const data = await resolver.getTile(address.layer, address.z, address.x, address.y, abort.signal);
+      return { data: data === undefined ? new Uint8Array(0) : new Uint8Array(data) };
+    } catch (e) {
+      if (!(e instanceof Error && e.name === 'AbortError')) {
+        stats.failed++;
+        stats.lastError = String(e instanceof Error ? e.message : e);
+      }
+      throw e;
+    }
+  };
+}

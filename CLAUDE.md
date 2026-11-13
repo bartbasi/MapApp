@@ -11,7 +11,7 @@ The full brief is `MapApp-kickoff-prompt.md`. Read it before any step-level work
 - `docs/STEP_PLAN.md`: the steps of Phase 1 and their checks.
 - `docs/reports/`: the report sent to the owner at the end of each step.
 - `.claude/agents/`: the subagent team (data-engineer, app-developer, ux-designer, qa-tester, step-reviewer).
-- `spikes/`: throwaway tests. Not product code.
+- `app/`: the web app (TypeScript, Svelte, MapLibre) and, in `app/android/`, the Capacitor Android project.
 
 ## Rules that are never broken
 
