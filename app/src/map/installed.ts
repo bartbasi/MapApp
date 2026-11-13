@@ -64,13 +64,13 @@ export function firstSentence(credit: string): string {
 }
 
 /**
- * The on-map credit for a layer, built from its archives' metadata: the first
+ * The on-map credit for some archives, built from their metadata: the first
  * sentence of each distinct credit, once. The full credits are on the sources
  * screen. MapLibre shows this as HTML, so the text is escaped.
  */
-export function attributionHtml(layer: InstalledLayer): string {
+export function attributionHtml(archives: readonly ArchiveEntry[]): string {
   const seen = new Set<string>();
-  for (const a of layer.archives) {
+  for (const a of archives) {
     for (const s of a.meta.sources) {
       if (s.credit) seen.add(firstSentence(s.credit));
     }

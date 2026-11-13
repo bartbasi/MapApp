@@ -1,30 +1,33 @@
 // MapApp. Copyright 2026 Play, Inc.
 // Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE.
 
-// The custom tile address scheme the style uses: mapapp://<layer>/{z}/{x}/{y}.
-// A style names a layer, never a county. The loader below turns such an
-// address into tile bytes through the TileResolver.
+// The custom tile address scheme the style uses:
+//   mapapp://<layer>/{z}/{x}/{y}           the layer, from whichever archive has the tile
+//   mapapp://<layer>@<county>/{z}/{x}/{y}  one archive only (raster layers)
+// The loader below turns such an address into tile bytes through the TileResolver.
 
 import type { TileResolver } from './tile-resolver';
 
 export const TILE_SCHEME = 'mapapp';
 
-/** The tile URL template for a layer's map source. */
-export function tileUrlTemplate(layer: string): string {
-  return `${TILE_SCHEME}://${layer}/{z}/{x}/{y}`;
+/** The tile URL template for a layer's map source, or for one archive's source. */
+export function tileUrlTemplate(layer: string, county?: string): string {
+  return `${TILE_SCHEME}://${layer}${county ? `@${county}` : ''}/{z}/{x}/{y}`;
 }
 
 export interface TileAddress {
   layer: string;
+  /** Set when the address names one archive. */
+  county?: string;
   z: number;
   x: number;
   y: number;
 }
 
 export function parseTileUrl(url: string): TileAddress | null {
-  const m = /^mapapp:\/\/([a-z0-9-]+)\/(\d+)\/(\d+)\/(\d+)$/.exec(url);
+  const m = /^mapapp:\/\/([a-z0-9-]+)(?:@([a-z0-9-]+))?\/(\d+)\/(\d+)\/(\d+)$/.exec(url);
   if (!m) return null;
-  return { layer: m[1] ?? '', z: Number(m[2]), x: Number(m[3]), y: Number(m[4]) };
+  return { layer: m[1] ?? '', ...(m[2] ? { county: m[2] } : {}), z: Number(m[3]), x: Number(m[4]), y: Number(m[5]) };
 }
 
 /** Counts kept for the diagnostics screen. */
@@ -53,7 +56,7 @@ export function createTileLoader(resolver: TileResolver, stats: TileStats = newT
       throw new Error(stats.lastError);
     }
     try {
-      const data = await resolver.getTile(address.layer, address.z, address.x, address.y, abort.signal);
+      const data = await resolver.getTile(address.layer, address.z, address.x, address.y, abort.signal, address.county);
       return { data: data === undefined ? new Uint8Array(0) : new Uint8Array(data) };
     } catch (e) {
       if (!(e instanceof Error && e.name === 'AbortError')) {

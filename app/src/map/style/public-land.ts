@@ -3,12 +3,22 @@
 
 // The public land overlay: a fill and an outline colored by managing category,
 // a heavier outline on the tapped site, and site names at closer zooms.
+//
+// Site names are drawn from a separate point source with one point per site
+// (see ../public-land-labels.ts), not from the polygons: a polygon label is
+// placed once per tile the polygon touches, so names repeated at tile edges.
 
 import type { ExpressionSpecification, FilterSpecification, LayerSpecification } from 'maplibre-gl';
 import { PUBLIC_LAND_CATEGORIES, PUBLIC_LAND_LAYER } from '../public-land';
 import { fonts } from './fonts';
 import { publicLandPalette, publicLandStyle as s } from './palette';
 import type { LabelColors } from './base-map';
+
+/** The point source holding one label point per site. */
+export const PUBLIC_LAND_LABELS_SOURCE = 'publicland-labels';
+
+/** The zoom from which site names are drawn. */
+export const PUBLIC_LAND_LABEL_MINZOOM = 12;
 
 /** The layer a tap is tested against. */
 export const PUBLIC_LAND_FILL = 'publicland-fill';
@@ -78,15 +88,12 @@ export function publicLandLabelLayers(source: string, colors: LabelColors): Laye
       id: 'publicland-label',
       type: 'symbol',
       source,
-      'source-layer': PUBLIC_LAND_LAYER,
-      minzoom: 12,
-      filter: ['has', 'name'],
+      minzoom: PUBLIC_LAND_LABEL_MINZOOM,
       layout: {
         'text-field': ['get', 'name'],
         'text-font': fonts.medium,
         'text-size': 12,
         'text-max-width': 9,
-        'symbol-placement': 'point',
       },
       paint: { 'text-color': categoryColor, 'text-halo-color': colors.halo, 'text-halo-width': 1.6 },
     },

@@ -22,6 +22,7 @@ export function openArchives(access: ArchiveAccess, entries: readonly ArchiveEnt
       id: `${entry.county}/${entry.layer}`,
       entry,
       layer: entry.layer,
+      county: entry.county,
       minzoom: entry.meta.minzoom,
       maxzoom: entry.meta.maxzoom,
       bounds: entry.meta.bounds,

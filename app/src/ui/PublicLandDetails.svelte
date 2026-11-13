@@ -7,13 +7,16 @@
   import { findHuntingNote, huntingNotes, huntingStatusText } from '../content/hunting-notes';
   import { accessOnFootText, categoryLabels, type PublicLandSite } from '../map/public-land';
   import { publicLandPalette } from '../map/style/palette';
+  import type { ArchiveSource } from '../platform/archive-meta';
   import { formatAcres, formatDate } from './format';
 
   interface Props {
     site: PublicLandSite;
+    /** The public land layer's sources, from the archives' metadata. */
+    sources: ArchiveSource[];
   }
 
-  let { site }: Props = $props();
+  let { site, sources }: Props = $props();
 
   const note = $derived(findHuntingNote(huntingNotes, site));
 </script>
@@ -44,6 +47,14 @@
 </section>
 
 <p class="survey">Boundaries come from public records and are not a legal survey.</p>
+
+{#if sources.length}
+  <ul class="credits" aria-label="Public land data sources">
+    {#each sources as src (src.name + src.credit)}
+      <li>{src.credit} ({src.license}, data of {formatDate(src.dataDate)})</li>
+    {/each}
+  </ul>
+{/if}
 
 <style>
   .category {
@@ -117,5 +128,19 @@
     margin: 12px 0 0;
     font-size: 0.9rem;
     color: var(--text-muted);
+  }
+
+  .credits {
+    margin: 12px 0 0;
+    padding: 8px 0 0;
+    list-style: none;
+    border-top: 1px solid var(--line);
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: var(--text-muted);
+  }
+
+  .credits li + li {
+    margin-top: 4px;
   }
 </style>

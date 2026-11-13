@@ -11,6 +11,8 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import { detectPlatform } from '../platform';
+  import type { LngLat } from 'maplibre-gl';
+  import type { ArchiveSource } from '../platform/archive-meta';
   import type { Platform } from '../platform/platform';
   import { loadDataSession, presentPublicLandCategories, type CategoryList, type DataSession } from '../map/data-session';
   import { buildTour, runFrameTest, tourArea, type FrameTestResult } from '../map/frame-test';
@@ -68,11 +70,12 @@
         session = s;
         registerTileProtocol(s.resolver);
         mapView = new MapView(mapContainer, styleOptions(), {
-          onPublicLandTap: (tapped) => {
+          onPublicLandTap: (tapped, at) => {
             if (frameRunning) return;
             if (tapped) {
               site = tapped;
               panel = 'details';
+              void revealUnderSheet(at);
             } else if (panel === 'details') {
               panel = null;
               site = null;
@@ -98,6 +101,26 @@
   $effect(() => {
     const opts = styleOptions();
     mapView?.update(opts);
+  });
+
+  /**
+   * On a narrow screen the details sheet covers the lower part of the map.
+   * Once it is open, move the map so the tapped spot shows above it.
+   */
+  async function revealUnderSheet(at: LngLat) {
+    await tick();
+    if (!mapView || !window.matchMedia('(max-width: 599px)').matches) return;
+    const sheet = document.querySelector<HTMLElement>('aside.panel');
+    if (sheet) mapView.reveal(at, sheet.offsetHeight);
+  }
+
+  /** Every source of the installed public land archives, once each, for the details panel. */
+  const publicLandSources = $derived.by(() => {
+    const seen = new Map<string, ArchiveSource>();
+    for (const a of installed.get(PUBLIC_LAND_LAYER)?.archives ?? []) {
+      for (const src of a.meta.sources) seen.set(`${src.name}|${src.credit}`, src);
+    }
+    return [...seen.values()];
   });
 
   function open(name: PanelName) {
@@ -197,7 +220,7 @@
           onOpenSources={() => open('sources')}
         />
       {:else if panel === 'details' && site}
-        <PublicLandDetails {site} />
+        <PublicLandDetails {site} sources={publicLandSources} />
       {:else if panel === 'sources'}
         <SourcesScreen entries={session?.entries ?? []} onOpenDiagnostics={() => open('diagnostics')} />
       {:else if panel === 'diagnostics'}

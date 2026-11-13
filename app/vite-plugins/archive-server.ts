@@ -7,8 +7,9 @@
 // /_tiles/<county-id>/<layer>.pmtiles, plus an index of what is installed at
 // /_tiles/index.json. The Android shell answers the same paths natively.
 //
-// The folder is read on every index request, so an archive that the pipeline
-// finishes while the server runs shows up on the next page load.
+// The folders are read on every index request, so an archive that the pipeline
+// finishes while the server runs shows up on the next page load. With several
+// folders, the first one that has a county and layer wins.
 
 import { createReadStream, readdirSync, readFileSync, statSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -18,9 +19,24 @@ import { ARCHIVE_ID_PATTERN, parseArchiveMeta, parseArchivePath, type ArchiveEnt
 
 type Next = (err?: unknown) => void;
 
+interface FoundArchive extends ArchiveEntry {
+  file: string;
+}
+
+/** Every archive in the folders, first folder first, one per county and layer. */
+function scanAll(roots: readonly string[], warn: (msg: string) => void): FoundArchive[] {
+  const out: FoundArchive[] = [];
+  for (const root of roots) {
+    for (const a of scanArchives(root, warn)) {
+      if (!out.some((b) => b.county === a.county && b.layer === a.layer)) out.push(a);
+    }
+  }
+  return out;
+}
+
 /** Lists every <county>/<layer>.pmtiles that has a valid <layer>.meta.json beside it. */
-export function scanArchives(root: string, warn: (msg: string) => void = () => {}): ArchiveEntry[] {
-  const out: ArchiveEntry[] = [];
+export function scanArchives(root: string, warn: (msg: string) => void = () => {}): FoundArchive[] {
+  const out: FoundArchive[] = [];
   let counties: string[];
   try {
     counties = readdirSync(root).sort();
@@ -48,7 +64,7 @@ export function scanArchives(root: string, warn: (msg: string) => void = () => {
           warn(`${county}/${layer}: metadata names ${meta.county}/${meta.layer}, skipped`);
           continue;
         }
-        out.push({ county, layer, meta });
+        out.push({ county, layer, meta, file: join(dir, file) });
       } catch (e) {
         warn(`${county}/${layer}: ${(e as Error).message}, skipped`);
       }
@@ -63,29 +79,28 @@ function send(res: ServerResponse, status: number, body = ''): void {
   res.end(body);
 }
 
-function handler(root: string, warn: (msg: string) => void) {
+function handler(roots: readonly string[], warn: (msg: string) => void) {
   return (req: IncomingMessage, res: ServerResponse, next: Next): void => {
     const url = new URL(req.url ?? '/', 'http://localhost');
     if (!url.pathname.startsWith('/_tiles/')) return next();
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405);
 
-    const archives = scanArchives(root, warn);
+    const archives = scanAll(roots, warn);
 
     if (url.pathname === '/_tiles/index.json') {
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Cache-Control', 'no-store');
-      res.end(JSON.stringify({ archives }));
+      res.end(JSON.stringify({ archives: archives.map(({ county, layer, meta }) => ({ county, layer, meta })) }));
       return;
     }
 
     // Only paths of known archives are served. The pattern check in
     // parseArchivePath already refuses "..", slashes and odd characters.
     const ref = parseArchivePath(url.pathname);
-    if (!ref || !archives.some((a) => a.county === ref.county && a.layer === ref.layer)) {
-      return send(res, 404, 'No such archive');
-    }
-    const file = join(root, ref.county, `${ref.layer}.pmtiles`);
+    const found = ref && archives.find((a) => a.county === ref.county && a.layer === ref.layer);
+    if (!found) return send(res, 404, 'No such archive');
+    const file = found.file;
     const size = statSync(file).size;
 
     const range = req.headers.range;
@@ -113,17 +128,17 @@ function handler(root: string, warn: (msg: string) => void) {
   };
 }
 
-/** The Vite plugin. `root` is the folder holding <county-id>/<layer>.pmtiles. */
-export function archiveServer(root: string): Plugin {
+/** The Vite plugin. Each root is a folder holding <county-id>/<layer>.pmtiles. */
+export function archiveServer(roots: readonly string[]): Plugin {
   return {
     name: 'mapapp-archive-server',
     configureServer(server) {
       const warn = (msg: string) => server.config.logger.warn(`[archives] ${msg}`);
-      server.middlewares.use(handler(root, warn));
+      server.middlewares.use(handler(roots, warn));
     },
     configurePreviewServer(server) {
       const warn = (msg: string) => server.config.logger.warn(`[archives] ${msg}`);
-      server.middlewares.use(handler(root, warn));
+      server.middlewares.use(handler(roots, warn));
     },
   };
 }

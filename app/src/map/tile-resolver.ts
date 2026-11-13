@@ -16,6 +16,7 @@ export interface TileArchive {
   /** For messages only, such as "il-champaign/basemap". */
   readonly id: string;
   readonly layer: string;
+  readonly county: string;
   readonly minzoom: number;
   readonly maxzoom: number;
   readonly bounds: Bounds;
@@ -41,12 +42,15 @@ export class TileResolver {
     this.byLayer = next;
   }
 
-  /** The archives that could hold this tile, in the order they are tried. */
-  candidates(layer: string, z: number, x: number, y: number): TileArchive[] {
+  /**
+   * The archives that could hold this tile, in the order they are tried.
+   * With a county, only that county's archive of the layer is considered.
+   */
+  candidates(layer: string, z: number, x: number, y: number, county?: string): TileArchive[] {
     const list = this.byLayer.get(layer);
     if (!list) return [];
     const tb = tileBounds(z, x, y);
-    return list.filter((a) => z >= a.minzoom && z <= a.maxzoom && boundsOverlap(a.bounds, tb));
+    return list.filter((a) => (county === undefined || a.county === county) && z >= a.minzoom && z <= a.maxzoom && boundsOverlap(a.bounds, tb));
   }
 
   /**
@@ -55,9 +59,9 @@ export class TileResolver {
    * only when no archive could answer, so one bad file does not blank the map
    * where another covers it.
    */
-  async getTile(layer: string, z: number, x: number, y: number, signal?: AbortSignal): Promise<ArrayBuffer | undefined> {
+  async getTile(layer: string, z: number, x: number, y: number, signal?: AbortSignal, county?: string): Promise<ArrayBuffer | undefined> {
     let firstError: unknown;
-    for (const archive of this.candidates(layer, z, x, y)) {
+    for (const archive of this.candidates(layer, z, x, y, county)) {
       signal?.throwIfAborted();
       try {
         const data = await archive.getTile(z, x, y, signal);

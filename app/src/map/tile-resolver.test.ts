@@ -28,10 +28,10 @@ function fakeArchive(
   id: string,
   bounds: Bounds,
   has: (z: number, x: number, y: number) => boolean,
-  opts: Partial<Pick<TileArchive, 'layer' | 'minzoom' | 'maxzoom'>> = {},
+  opts: Partial<Pick<TileArchive, 'layer' | 'county' | 'minzoom' | 'maxzoom'>> = {},
 ) {
   const getTile = vi.fn(async (z: number, x: number, y: number) => (has(z, x, y) ? bytes(id) : undefined));
-  const archive: TileArchive = { id, layer: opts.layer ?? 'basemap', minzoom: opts.minzoom ?? 0, maxzoom: opts.maxzoom ?? 15, bounds, getTile };
+  const archive: TileArchive = { id, layer: opts.layer ?? 'basemap', county: opts.county ?? id, minzoom: opts.minzoom ?? 0, maxzoom: opts.maxzoom ?? 15, bounds, getTile };
   return { archive, getTile };
 }
 
@@ -112,6 +112,19 @@ describe('TileResolver', () => {
     expect(a.getTile).not.toHaveBeenCalled();
   });
 
+  it('answers from one named archive only when the address names a county', async () => {
+    // Two aerial archives whose areas share a low zoom tile.
+    const a = fakeArchive('a', EAST, () => true, { layer: 'aerial', county: 'il-champaign' });
+    const b = fakeArchive('b', WEST, () => true, { layer: 'aerial', county: 'il-macon' });
+    const r = new TileResolver();
+    r.setArchives([a.archive, b.archive]);
+    const [x7, y7] = tileAt(-88.6, 40.0, 7);
+    expect(r.candidates('aerial', 7, x7, y7).map((c) => c.id)).toEqual(['a', 'b']);
+    expect(text(await r.getTile('aerial', 7, x7, y7, undefined, 'il-macon'))).toBe('b');
+    expect(text(await r.getTile('aerial', 7, x7, y7, undefined, 'il-champaign'))).toBe('a');
+    expect(await r.getTile('aerial', 7, x7, y7, undefined, 'il-piatt')).toBeUndefined();
+  });
+
   it('treats tiles that only touch an archive edge as outside it', () => {
     const tb = tileBounds(12, ex, ey);
     const touching = fakeArchive('touch', [tb[2], tb[1], tb[2] + 1, tb[3]], () => true);
@@ -126,6 +139,10 @@ describe('tile protocol', () => {
     const url = tileUrlTemplate('publicland').replace('{z}', '12').replace('{x}', '1043').replace('{y}', '1550');
     expect(parseTileUrl(url)).toEqual({ layer: 'publicland', z: 12, x: 1043, y: 1550 });
     expect(parseTileUrl('mapapp://../12/1/1')).toBeNull();
+    const one = tileUrlTemplate('aerial', 'il-macon').replace('{z}', '9').replace('{x}', '130').replace('{y}', '195');
+    expect(one).toBe('mapapp://aerial@il-macon/9/130/195');
+    expect(parseTileUrl(one)).toEqual({ layer: 'aerial', county: 'il-macon', z: 9, x: 130, y: 195 });
+    expect(parseTileUrl('mapapp://aerial@../9/1/1')).toBeNull();
     expect(parseTileUrl('pmtiles://basemap/1/1/1')).toBeNull();
   });
 

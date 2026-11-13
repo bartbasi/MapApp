@@ -241,6 +241,58 @@ export function baseMapGroundLayers(source: string): LayerSpecification[] {
   return layers;
 }
 
+/**
+ * A plain base map drawn under the imagery in the aerial and hybrid views:
+ * woods, water and roads only, no labels. It shows where and when there is no
+ * imagery (beyond the imagery's area, or below its first zoom), so the screen
+ * is never blank. Kept small because it is drawn under opaque imagery too.
+ */
+export function plainBaseMapLayers(source: string): LayerSpecification[] {
+  return [
+    {
+      id: 'plain-wood',
+      type: 'fill',
+      source,
+      'source-layer': 'landuse',
+      filter: kindIn('wood', 'forest'),
+      paint: { 'fill-color': c.wood },
+    },
+    {
+      id: 'plain-water-area',
+      type: 'fill',
+      source,
+      'source-layer': 'water',
+      filter: ['==', ['geometry-type'], 'Polygon'],
+      paint: { 'fill-color': c.water },
+    },
+    {
+      id: 'plain-water-line',
+      type: 'line',
+      source,
+      'source-layer': 'water',
+      filter: ['==', ['geometry-type'], 'LineString'],
+      paint: { 'line-color': c.waterLine, 'line-width': width(0.5, 1.6) },
+    },
+    {
+      id: 'plain-road-minor',
+      type: 'line',
+      source,
+      'source-layer': 'roads',
+      minzoom: 12,
+      filter: kindIn('minor_road'),
+      paint: { 'line-color': c.minorRoadCasing, 'line-width': width(0.5, 2, 12) },
+    },
+    {
+      id: 'plain-road-major',
+      type: 'line',
+      source,
+      'source-layer': 'roads',
+      filter: kindIn('highway', 'major_road'),
+      paint: { 'line-color': c.majorRoadCasing, 'line-width': width(0.8, 3) },
+    },
+  ];
+}
+
 export interface LabelColors {
   text: string;
   halo: string;

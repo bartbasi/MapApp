@@ -236,3 +236,23 @@ The owner answered the eight questions in one short message. His words are quote
 | 8. Protomaps as the route for base map tiles | "8 is good" | Confirmed (D6). |
 
 **What answers 1 and 2 do not settle.** They read as the counties having replied to his permission requests, but the message does not say what each county granted. Until the owner says what was granted, and ideally shows it in writing, the rule is unchanged: live lookup and saved tapped results only. No bulk download, no bundled county data, no county data in the repository or on any host. Finding the Champaign County map service's address is now allowed, because the owner has decided the county may be used. That is done in Step 3.
+
+## D23. How the app reads several counties' archives (2026-11-12, Step 1)
+
+Each county has its own archive of each layer (D4). The app has to show them as one map.
+
+- **Vector layers: one map source per layer.** A tile request is answered from the first installed archive that has that tile. This works because every tile in a vector archive is whole: it holds everything the source data has for that tile, even past the county line. The map style never names a county.
+- **Raster layers: one map source per archive.** A county's imagery archive covers that county and is transparent beyond it, so the app draws each one as its own layer and they overlap cleanly.
+- **A layer starts at the lowest zoom where whole tiles are practical.** Public land runs from zoom 10 to 14. Below zoom 10 a tile is wider than several counties, and the sites here are too small to see. Imagery runs from zoom 10 to 16. In the aerial and hybrid views the plain base map sits under the imagery, so the screen is never blank when zoomed out.
+- **For later:** a state with large public lands needs a statewide low-zoom overview archive. That is a new layer on the same pattern, not a change to this design.
+
+## D24. What counts as public land (2026-11-12, Step 1)
+
+The public land layer shows land a member of the public could reasonably think of as public. The source, PAD-US, also lists other protected land. The rules:
+
+- **Kept:** land owned or managed by a public body, whatever its access. Land owned by a land trust or similar conservation group, if its access is open or restricted.
+- **Dropped:** privately owned land, including private easements, private reserves and country clubs, even where PAD-US marks it "open". Planning boundaries that are not ownership. A record that repeats another record of the same site.
+- **Corrected:** Champaign County Forest Preserve District land is taken from the regional planning commission's open dataset, because PAD-US has it badly out of date. Any PAD-US record lying mostly inside one of those shapes is dropped as a duplicate.
+- Access is shown as access on foot. It is never shown as permission to hunt (D16).
+
+Known faults left in the data, to be listed in the Step 1 report: one PAD-US record named "City Park" bundles many small parks far apart, and seven Champaign County parks have no recorded manager.

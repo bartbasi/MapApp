@@ -33,7 +33,15 @@ export interface ArchiveMeta {
   buildDate: string;
   sources: ArchiveSource[];
   notes: string;
+  /**
+   * Raster tiles' size in pixels. Not in the contract yet: the contract says
+   * raster tiles are 512 pixels, so that is the value when the field is absent.
+   */
+  tileSize?: number;
 }
+
+/** The raster tile size the contract fixes, used when metadata does not say. */
+export const DEFAULT_RASTER_TILE_SIZE = 512;
 
 /** An installed archive: where it is and what its metadata says. */
 export interface ArchiveEntry {
@@ -121,5 +129,6 @@ export function parseArchiveMeta(raw: unknown): ArchiveMeta {
     buildDate: str(o, 'buildDate', ''),
     sources,
     notes: str(o, 'notes', ''),
+    ...(typeof o['tileSize'] === 'number' && [256, 512].includes(o['tileSize']) ? { tileSize: o['tileSize'] } : {}),
   };
 }

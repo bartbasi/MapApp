@@ -27,6 +27,7 @@ The county parcel findings were made by the lead directly and are written in ful
 | Macon County parcel service | Parcel outlines and owners | Live only | No terms posted | Not copied | Edited 2026-10-28 |
 | Champaign County GIS Consortium | Parcel outlines and owners | **Blocked** | Terms forbid copying, public display and reuse | None | Not checked |
 | OpenStreetMap, via the Protomaps daily build | Roads, water, woodland, place names | Approved | ODbL 1.0 | 16.7 MB cut by bounding box, 16.2 MB cut by county outline (both measured, zoom 0 to 15) | 2026-11-12 |
+| Natural Earth | Coastlines and borders in the zoomed-out base map tiles. It comes inside the Protomaps build. | Approved | Public domain | Inside the base map archive | Not dated |
 | US Census TIGER/Line 2026 | County boundaries, which are the hunting units | Approved | Public domain | County outlines come from an 83 MB national file. Roads and water for both counties are 7.3 MB and are not needed while OpenStreetMap supplies them. | 2026-10-06 |
 | USDA NAIP 2025 | Aerial imagery (default) | Approved | Public domain | 1.62 GB download. About 140 MB as tiles to zoom 16 (estimated) | Summer 2025, 0.6 m, leaf-on |
 | State of Illinois 2025 imagery | Aerial imagery (leaf-off) | Approved, but no complete way to get it yet | Public domain per its metadata | About 700 GB source. As tiles to zoom 17: 0.3 to 0.45 GB in WebP, 0.6 to 0.85 GB in JPEG (estimated) | 2023 to 2025, 6 inch, leaf-off |
@@ -90,6 +91,7 @@ These go on the attribution screen. The OpenStreetMap credit also sits on the ma
 |---|---|
 | OpenStreetMap | © OpenStreetMap contributors (linked to openstreetmap.org/copyright). The tile files are offered under ODbL 1.0. |
 | Protomaps tile layout | Protomaps © OpenStreetMap |
+| Natural Earth | Made with Natural Earth |
 | TIGER/Line | U.S. Census Bureau, TIGER/Line Shapefiles 2026 |
 | NAIP | Imagery: USDA Farm Production and Conservation Business Center, NAIP 2025 |
 | Illinois 2025 imagery | Leaf-off imagery: State of Illinois and the University of Illinois (Illinois State Geological Survey), 2025 |
