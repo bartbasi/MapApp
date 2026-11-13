@@ -38,8 +38,8 @@ USER_AGENT = "map-data-build"
 # The layers of the archive contract (pipeline/README.md).
 LAYERS = {
     "basemap": {"kind": "vector", "title": "Base map", "minzoom": 0, "maxzoom": 15},
-    "aerial": {"kind": "raster", "title": "Aerial imagery", "minzoom": 8, "maxzoom": 16},
-    "publicland": {"kind": "vector", "title": "Public land", "minzoom": 6, "maxzoom": 14},
+    "aerial": {"kind": "raster", "title": "Aerial imagery", "minzoom": 10, "maxzoom": 16},
+    "publicland": {"kind": "vector", "title": "Public land", "minzoom": 10, "maxzoom": 14},
 }
 
 # Census TIGERweb, current vintage, "Counties" layer. A single-county query is
@@ -103,12 +103,16 @@ def read_json(path):
 
 # ---------------------------------------------------------------- downloads
 
-def http(url, data=None, tries=5, timeout=180):
-    """GET (or POST form data) and return the body. Retries on network errors,
-    HTTP 429 and 5xx."""
+def http(url, data=None, tries=5, timeout=180, json_body=None):
+    """GET (or POST form data, or POST a JSON body) and return the body.
+    Retries on network errors, HTTP 429 and 5xx."""
+    headers = {"User-Agent": USER_AGENT}
     body = urllib.parse.urlencode(data).encode() if data is not None else None
+    if json_body is not None:
+        body = json.dumps(json_body).encode()
+        headers["Content-Type"] = "application/json"
     for attempt in range(1, tries + 1):
-        req = urllib.request.Request(url, data=body, headers={"User-Agent": USER_AGENT})
+        req = urllib.request.Request(url, data=body, headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 return r.read()
@@ -144,6 +148,32 @@ def arcgis_json(url):
     if isinstance(res, dict) and res.get("error"):
         raise PipelineError(f"ArcGIS error from {url}: {res['error']}")
     return res
+
+
+def wait_for_quiet_machine(what):
+    """This machine has 12 GB of RAM. Before a heavy step, wait while a Gradle
+    build (a java.exe using CPU) or the Android emulator (qemu) runs on
+    Windows; see busy.ps1. Checks once a minute. Skipped where Windows is not
+    reachable (not WSL). tasklist.exe is not used: called from WSL it can
+    take minutes."""
+    script = os.path.join(PIPELINE, "lib", "busy.ps1")
+    first = True
+    while True:
+        try:
+            win = subprocess.run(["wslpath", "-w", script], capture_output=True, text=True, timeout=30).stdout.strip()
+            out = subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", win],
+                                 capture_output=True, text=True, timeout=180).stdout
+        except (OSError, subprocess.SubprocessError):
+            return
+        busy = sorted({line.strip() for line in out.splitlines() if line.strip()})
+        if not busy:
+            if not first:
+                log(f"  machine is quiet again, starting: {what}")
+            return
+        if first:
+            log(f"  waiting before {what}: {', '.join(busy)} running on Windows (checking each minute)")
+            first = False
+        time.sleep(60)
 
 
 def cached(path):
@@ -222,6 +252,30 @@ def wgs84():
     return s
 
 
+def buffer_meters(geom, meters):
+    """Buffer a lon/lat geometry by a distance in metres, using an
+    azimuthal equidistant projection centred on the geometry."""
+    _, ogr, osr = gdal_modules()
+    c = geom.Centroid()
+    local = osr.SpatialReference()
+    local.ImportFromProj4(f"+proj=aeqd +lat_0={c.GetY()} +lon_0={c.GetX()} +datum=WGS84 +units=m +no_defs")
+    to_local = osr.CoordinateTransformation(wgs84(), local)
+    to_wgs = osr.CoordinateTransformation(local, wgs84())
+    g = geom.Clone()
+    g.Transform(to_local)
+    g = g.Buffer(meters, 8)
+    g.Transform(to_wgs)
+    g.AssignSpatialReference(wgs84())
+    return g
+
+
+def polygonal_simplify(geom, tolerance_deg=0.001):
+    """A simpler polygon that still contains geom, for search queries."""
+    g = geom.Buffer(2 * tolerance_deg, 2).SimplifyPreserveTopology(tolerance_deg)
+    g.AssignSpatialReference(wgs84())
+    return g
+
+
 def outline_bounds(county, digits=4):
     """Bounding box of the county outline, rounded outward."""
     env = outline_geometry(county).GetEnvelope()  # minx, maxx, miny, maxy
@@ -280,22 +334,49 @@ def pmtiles_header(path):
     return json.loads(out)
 
 
+def raster_tile_size(path):
+    """Width in pixels of a decoded tile of a raster archive (the tile at the
+    archive's centre, at its highest zoom). Raises if the tile is not square."""
+    gdal, _, _ = gdal_modules()
+    h = pmtiles_header(path)
+    lon, lat = h["center"][0], h["center"][1]
+    x, y = lonlat_to_tile(lon, lat, h["maxzoom"])
+    data = subprocess.run([PMTILES, "tile", path, str(h["maxzoom"]), str(x), str(y)],
+                          check=True, capture_output=True).stdout
+    if not data:
+        raise PipelineError(f"no tile at the centre of {path} to measure")
+    name = f"/vsimem/tilesize-{os.getpid()}"
+    gdal.FileFromMemBuffer(name, data)
+    try:
+        ds = gdal.Open(name)
+        w, hgt = ds.RasterXSize, ds.RasterYSize
+        ds = None
+    finally:
+        gdal.Unlink(name)
+    if w != hgt:
+        raise PipelineError(f"tiles of {path} are {w} by {hgt} pixels, not square")
+    return w
+
+
 # ---------------------------------------------------------------- metadata
 
 DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
-def source_entry(key, data_date=None, name_suffix=""):
-    """One entry of the metadata 'sources' list, from pipeline/sources.json."""
+def source_entry(key, data_date=None, name_suffix="", **fields):
+    """One entry of the metadata 'sources' list, from pipeline/sources.json.
+    Placeholders such as {year} in the name and credit are filled from fields."""
     s = read_json(os.path.join(PIPELINE, "sources.json"))[key]
     date = data_date or s.get("dataDate")
     if not date:
         raise PipelineError(f"no data date for source {key}")
-    return {"name": s["name"] + name_suffix, "license": s["license"], "credit": s["credit"],
-            "url": s["url"], "dataDate": date}
+    return {"name": s["name"].format(**fields) + name_suffix, "license": s["license"],
+            "credit": s["credit"].format(**fields), "url": s["url"], "dataDate": date}
 
 
 def make_meta(layer, county, archive, sources, notes, bounds=None, provenance=None):
+    """Metadata for an archive. For raster archives, tileSize is read back
+    from a decoded tile."""
     spec = LAYERS[layer]
     meta = {
         "schema": 1,
@@ -312,6 +393,8 @@ def make_meta(layer, county, archive, sources, notes, bounds=None, provenance=No
         "sources": sources,
         "notes": notes,
     }
+    if spec["kind"] == "raster":
+        meta["tileSize"] = raster_tile_size(archive)
     if provenance:
         meta["provenance"] = provenance
     return meta
@@ -322,8 +405,8 @@ def validate_meta(meta, archive=None):
     Returns a list of problems; empty means valid."""
     p = []
     allowed = {"schema", "layer", "county", "countyName", "kind", "title", "minzoom", "maxzoom",
-               "bounds", "bytes", "buildDate", "sources", "notes", "provenance"}
-    required = allowed - {"provenance"}
+               "bounds", "bytes", "buildDate", "sources", "notes", "provenance", "tileSize"}
+    required = allowed - {"provenance", "tileSize"}
     for k in sorted(required - meta.keys()):
         p.append(f"missing '{k}'")
     for k in sorted(meta.keys() - allowed):
@@ -339,6 +422,14 @@ def validate_meta(meta, archive=None):
         for k in ("kind", "minzoom", "maxzoom"):
             if meta[k] != spec[k]:
                 p.append(f"{k} is {meta[k]!r}, the contract says {spec[k]!r}")
+        if spec["kind"] == "raster":
+            ts = meta.get("tileSize")
+            if not isinstance(ts, int) or ts <= 0:
+                p.append("tileSize is required for raster archives and must be a positive integer")
+            elif archive and raster_tile_size(archive) != ts:
+                p.append(f"tileSize is {ts} but a decoded tile is {raster_tile_size(archive)} pixels")
+        elif "tileSize" in meta:
+            p.append("tileSize must be absent for vector archives")
     try:
         c = get_county(meta["county"])
         if meta["countyName"] != county_label(c):

@@ -30,6 +30,12 @@
     "credit": "Champaign County Regional Planning Commission, Champaign County Greenways, ODbL",
     "url": "https://data.ccrpc.org/dataset/champaign-county-greenways"
   },
+  "naip": {
+    "name": "USDA NAIP {year}",
+    "license": "Public domain",
+    "credit": "Imagery: USDA Farm Production and Conservation Business Center, NAIP {year}",
+    "url": "https://catalog.data.gov/dataset/national-agriculture-imagery-program-naip-imagery"
+  },
   "census-tiger": {
     "name": "US Census Bureau TIGER/Line county boundaries",
     "license": "Public domain",

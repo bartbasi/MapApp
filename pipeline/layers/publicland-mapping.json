@@ -87,6 +87,13 @@
     "TERR": "other"
   },
 
+  "privateLand": {
+    "ownerTypes": ["PVT", "NGO"],
+    "keepCategories": ["ngo"],
+    "keepAccess": ["open", "restricted"]
+  },
+  "_privateLand": "Records whose PAD-US owner type is private are left out: private land is not public land. Kept: land of a land trust or similar conservation organization (manager category ngo) that is open or restricted to the public.",
+
   "duplicateEasementOverlap": 0.5,
   "_duplicateEasementOverlap": "An easement record is the duplicate of a fee record when at least this share of its area lies under kept fee shapes. The fee record is kept.",
 
@@ -111,6 +118,8 @@
       },
       "replaceOverlap": 0.5,
       "_replaceOverlap": "A PAD-US record of a listed manager is replaced when at least this share of it lies under this dataset's shapes. Otherwise it is kept and reported.",
+      "dropPadusInside": 0.5,
+      "_dropPadusInside": "Any other PAD-US record that lies more than this share inside this dataset's shapes repeats land already drawn and is left out, whoever PAD-US says manages it.",
       "containedOverlap": 0.9,
       "_containedOverlap": "A shape of this dataset that lies at least this much inside a larger shape of the same manager in the same dataset is a duplicate and is left out."
     }

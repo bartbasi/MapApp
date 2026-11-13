@@ -29,15 +29,14 @@ import mapdata as md  # noqa: E402
 LAYER = "publicland"
 PADUS_LAYER = "https://services.arcgis.com/v01gqwM5QqNysAAi/ArcGIS/rest/services/Manager_Name_PADUS/FeatureServer/0"
 
-# Features are fetched for every zoom-12 tile that touches the county, plus a
-# margin for tippecanoe's tile buffer. That makes every tile from zoom 12 to
-# 14 complete (contract rule 1). Tiles at zoom 6 to 11 reach further than
-# that and hold only the land near this county.
-COMPLETE_FROM_ZOOM = 12
+# Features are fetched for every tile at the layer's lowest zoom that touches
+# the county, plus a margin for tippecanoe's tile buffer. That makes every
+# tile in the archive complete (contract rule 1).
 MARGIN_DEG = 0.003
 # A feature first appears at the zoom where it is at least this many 256 px
-# tile pixels across, and from zoom 12 on whatever its size.
+# tile pixels across, and from FULL_ZOOM on whatever its size.
 MIN_PIXELS = 2
+FULL_ZOOM = 12
 ACRE_M2 = 4046.8564224
 
 gdal, ogr, osr = md.gdal_modules()
@@ -143,7 +142,7 @@ def esri_polygon(g):
 
 def query_area(county):
     outline = md.outline_geometry(county)
-    cover, ntiles = md.tile_cover(outline, COMPLETE_FROM_ZOOM)
+    cover, ntiles = md.tile_cover(outline, md.LAYERS[LAYER]["minzoom"])
     area = cover.Buffer(MARGIN_DEG, 1)
     area.AssignSpatialReference(md.wgs84())
     return outline, area, ntiles
@@ -287,7 +286,7 @@ def build(county_id):
 
     outline_path, outline_prov = md.county_outline(county)
     outline, area, ntiles = query_area(county)
-    log(f"Query area: the {ntiles} zoom-{COMPLETE_FROM_ZOOM} tiles touching the county, plus {MARGIN_DEG} degrees")
+    log(f"Query area: the {ntiles} zoom-{spec['minzoom']} tiles touching the county, plus {MARGIN_DEG} degrees")
     padus, padus_meta = fetch_padus(county, area)
 
     removed = collections.defaultdict(list)   # rule -> [description]
@@ -396,22 +395,25 @@ def build(county_id):
                 "category": mapper.category(manager, "DIST"), "access": access,
                 "source": corr["featureSource"],
                 "src_date": "", "gis_acres": s["props"].get("area_acres"), "geom": s["geom"]})
-        # PAD-US records of other managers that lie mostly under a correction
-        # shape: reported, not changed (only listed managers are corrected).
-        overlaps = []
+        # Any other PAD-US record that lies more than half inside a correction
+        # shape repeats land the correction already draws, whoever PAD-US says
+        # manages it.
+        keep = []
         for r in records:
-            if r["source"] == "padus" and r["featclass"] == "Fee" and covered_share(r["geom"], cover) >= 0.5:
-                overlaps.append(describe(r) + f" | {round(100 * covered_share(r['geom'], cover))}% under {corr['source']} shapes")
+            share = covered_share(r["geom"], cover) if r["source"] == "padus" else 0.0
+            if share > corr["dropPadusInside"]:
+                removed[f"PAD-US record inside a {corr['source']} shape"].append(
+                    describe(r) + f" | {round(100 * share)}% inside")
+            else:
+                keep.append(r)
+        records = keep
         used_sources.append((corr["source"], (cmeta.get("metadataModified") or "")[:10]))
         corrections_report.append({
             "source": corr["source"], "managers": sorted(managers), "shapesUsed": len(kept_shapes),
-            "padusReplaced": len(replaced), "padusKeptNotCovered": not_covered,
-            "otherManagersMostlyUnderCorrection": overlaps, "dataset": cmeta})
+            "padusReplaced": len(replaced), "padusKeptNotCovered": not_covered, "dataset": cmeta})
         log(f"Correction '{corr['source']}': {len(kept_shapes)} shapes replace {len(replaced)} PAD-US records")
         for x in not_covered:
             log(f"  kept from PAD-US, not in {corr['source']}: {x}")
-        for x in overlaps:
-            log(f"  REPORT, not changed: {x}")
 
     # Rule: easements on private land that are closed to access.
     fee_cover = union([r["geom"] for r in records if r["featclass"] == "Fee"])
@@ -436,13 +438,25 @@ def build(county_id):
             keep.append(r)
     records = keep
 
+    # Rule: privately owned land is not public land, except land of a
+    # conservation organization (category ngo) that the public may enter.
+    rule = mapping["privateLand"]
+    keep = []
+    for r in records:
+        if (r["own_type"] in rule["ownerTypes"]
+                and not (r["category"] in rule["keepCategories"] and r["access"] in rule["keepAccess"])):
+            removed["privately owned land"].append(describe(r))
+        else:
+            keep.append(r)
+    records = keep
+
     # Features for tippecanoe.
     records.sort(key=lambda r: (r["source"], r["id"]))
     features = []
     for r in records:
         features.append({
             "type": "Feature", "id": r["id"],
-            "tippecanoe": {"minzoom": feature_minzoom(r["geom"], spec["minzoom"], COMPLETE_FROM_ZOOM)},
+            "tippecanoe": {"minzoom": feature_minzoom(r["geom"], spec["minzoom"], FULL_ZOOM)},
             "properties": {
                 "name": r["name"], "manager": r["manager"], "category": r["category"], "access": r["access"],
                 "acres": int(round(acres(r["geom"]))), "source": r["source"], "src_date": r["src_date"]},
@@ -506,12 +520,10 @@ def build(county_id):
     for corr in mapping["corrections"]:
         if corr["source"] in names:
             notes += " " + corr["note"]
-    notes += (f" Tiles from zoom {COMPLETE_FROM_ZOOM} to {spec['maxzoom']} hold all public land in them; tiles at "
-              f"lower zooms hold only the land near this county.")
     sources = [md.source_entry(k, d) for k, d in used_sources]
     prov = {
         "padus": {k: padus_meta.get(k) for k in ("service", "layerName", "dataLastEditDate", "fetched", "count")},
-        "queryArea": f"zoom-{COMPLETE_FROM_ZOOM} tiles touching the county outline ({ntiles} tiles) plus {MARGIN_DEG} degrees",
+        "queryArea": f"zoom-{spec['minzoom']} tiles touching the county outline ({ntiles} tiles) plus {MARGIN_DEG} degrees",
         "removed": {rule: len(items) for rule, items in removed.items()},
         "corrections": [{k: c[k] for k in ("source", "managers", "shapesUsed", "padusReplaced")} for c in corrections_report],
         "features": len(features),
