@@ -16,6 +16,7 @@ import type { InstalledLayers } from './installed';
 import { PUBLIC_LAND_LAYER, readPublicLandSite, type PublicLandSite } from './public-land';
 import { publicLandLabelPoints, type LabelSource } from './public-land-labels';
 import { revealOffset } from './reveal';
+import { DOUBLE_TAP_MS, TAP_REACH_PX, isSecondTap, type Tap } from './taps';
 import { buildStyle, type StyleOptions } from './style/build-style';
 import { styleImage } from './style/images';
 import { PUBLIC_LAND_FILL, PUBLIC_LAND_LABEL_MINZOOM } from './style/public-land';
@@ -57,6 +58,8 @@ export class MapView {
   private labels: FeatureCollection<Point> | null = null;
   private labelsKey = '';
   private readonly resizeObserver: ResizeObserver;
+  private tapTimer: number | undefined;
+  private lastTap: Tap | null = null;
   private readonly onWindowResize = () => this.map.resize();
 
   constructor(container: HTMLElement, options: StyleOptions, events: MapViewEvents = {}) {
@@ -85,11 +88,19 @@ export class MapView {
     this.map.on('rotate', () => events.onBearingChange?.(this.map.getBearing()));
     this.map.on('click', (e) => {
       if (!events.onPublicLandTap) return;
-      if (!this.map.getLayer(PUBLIC_LAND_FILL)) return events.onPublicLandTap(null, e.lngLat);
-      const hits = this.map.queryRenderedFeatures(e.point, { layers: [PUBLIC_LAND_FILL] });
-      const hit = hits.find((f) => f.sourceLayer === PUBLIC_LAND_LAYER);
-      events.onPublicLandTap(hit ? readPublicLandSite(hit.properties as Record<string, unknown>) : null, e.lngLat);
+      const tap: Tap = { time: performance.now(), x: e.point.x, y: e.point.y };
+      const second = isSecondTap(this.lastTap, tap);
+      this.lastTap = tap;
+      window.clearTimeout(this.tapTimer);
+      // A double tap zooms the map and is not a tap on a site.
+      if (second) return;
+      // Wait a moment to see that this tap is not the first of a double tap.
+      this.tapTimer = window.setTimeout(() => {
+        const hit = this.publicLandAt(tap.x, tap.y);
+        events.onPublicLandTap?.(hit ? readPublicLandSite(hit) : null, e.lngLat);
+      }, DOUBLE_TAP_MS);
     });
+    this.map.on('dblclick', () => window.clearTimeout(this.tapTimer));
 
     // The style's hatch and shield images are drawn in code (style/images.ts)
     // and added the first time a layer asks for one.
@@ -101,6 +112,22 @@ export class MapView {
 
     // Once tiles have loaded and the map is still, place one name per site.
     this.map.on('idle', () => this.refreshPublicLandLabels());
+  }
+
+  /**
+   * The public land site at a screen point: the one under the point, or else
+   * one within a fingertip of it, so a thin strip of land can still be tapped.
+   */
+  private publicLandAt(x: number, y: number): Record<string, unknown> | null {
+    if (!this.map.getLayer(PUBLIC_LAND_FILL)) return null;
+    const own = (f: { sourceLayer?: string }) => f.sourceLayer === PUBLIC_LAND_LAYER;
+    const exact = this.map.queryRenderedFeatures([x, y], { layers: [PUBLIC_LAND_FILL] }).find(own);
+    if (exact) return exact.properties as Record<string, unknown>;
+    const r = TAP_REACH_PX;
+    const near = this.map
+      .queryRenderedFeatures([[x - r, y - r], [x + r, y + r]], { layers: [PUBLIC_LAND_FILL] })
+      .find(own);
+    return near ? (near.properties as Record<string, unknown>) : null;
   }
 
   private withLabels(options: StyleOptions): StyleOptions {
@@ -128,11 +155,18 @@ export class MapView {
     this.update(this.options);
   }
 
-  /** Moves the map, if needed, so a point hidden under a bottom sheet of this height shows above it. */
+  /**
+   * Moves the map, if needed, so a point shows: clear of a bottom sheet of this
+   * height, and not off the side or at the very edge of the map.
+   */
   reveal(at: LngLat, coveredBottom: number): void {
+    // A panel beside the map has just changed the map's width. Take the new size now.
+    this.map.resize();
     const p = this.map.project(at);
-    const dy = revealOffset(p.y, this.map.getContainer().clientHeight, coveredBottom);
-    if (dy !== 0) this.map.panBy([0, dy], { duration: 300 });
+    const box = this.map.getContainer();
+    const dx = revealOffset(p.x, box.clientWidth, 0);
+    const dy = revealOffset(p.y, box.clientHeight, coveredBottom);
+    if (dx !== 0 || dy !== 0) this.map.panBy([dx, dy], { duration: 300 });
   }
 
   /** Applies a new base view, overlay set or selection. The camera is kept. */
@@ -154,6 +188,7 @@ export class MapView {
   }
 
   destroy(): void {
+    window.clearTimeout(this.tapTimer);
     this.resizeObserver.disconnect();
     window.removeEventListener('resize', this.onWindowResize);
     window.visualViewport?.removeEventListener('resize', this.onWindowResize);

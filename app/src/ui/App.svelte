@@ -17,7 +17,7 @@
   import { loadDataSession, presentPublicLandCategories, type CategoryList, type DataSession } from '../map/data-session';
   import { buildTour, runFrameTest, tourArea, type FrameTestResult } from '../map/frame-test';
   import { MapView, registerTileProtocol, tileStats } from '../map/map-view';
-  import { PUBLIC_LAND_LAYER, type PublicLandSite } from '../map/public-land';
+  import { PUBLIC_LAND_LAYER, sourcesForSite, type PublicLandSite } from '../map/public-land';
   import { availableBaseViews, effectiveBaseView, type BaseView, type StyleOptions } from '../map/style/build-style';
   import { glyphsUrl } from '../map/style/fonts';
   import BaseViewSwitch from './BaseViewSwitch.svelte';
@@ -105,14 +105,17 @@
   });
 
   /**
-   * On a narrow screen the details sheet covers the lower part of the map.
-   * Once it is open, move the map so the tapped spot shows above it.
+   * The details panel takes room from the map. On a narrow screen it is a
+   * sheet over the lower part of the map; on a wide screen it sits beside the
+   * map, which gets narrower. Once it is open, move the map if the tapped spot
+   * is now hidden or at the very edge.
    */
   async function revealUnderSheet(at: LngLat) {
     await tick();
-    if (!mapView || !window.matchMedia('(max-width: 599px)').matches) return;
+    if (!mapView) return;
     const sheet = document.querySelector<HTMLElement>('aside.panel');
-    if (sheet) mapView.reveal(at, sheet.offsetHeight);
+    const narrow = window.matchMedia('(max-width: 599px)').matches;
+    mapView.reveal(at, narrow && sheet ? sheet.offsetHeight : 0);
   }
 
   /** Every source of the installed public land archives, once each, for the details panel. */
@@ -220,7 +223,7 @@
           onOpenSources={() => open('sources')}
         />
       {:else if panel === 'details' && site}
-        <PublicLandDetails {site} sources={publicLandSources} />
+        <PublicLandDetails {site} sources={sourcesForSite(site, publicLandSources)} />
       {:else if panel === 'sources'}
         <SourcesScreen entries={session?.entries ?? []} onOpenDiagnostics={() => open('diagnostics')} />
       {:else if panel === 'diagnostics'}

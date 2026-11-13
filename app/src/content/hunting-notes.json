@@ -1,7 +1,14 @@
 {
-  "comment": "Hand-written notes on whether hunting is allowed on public land, by managing body or by site. See docs/DECISIONS.md D16. Each note cites a public rule or page. The first matching note wins, so site notes come before manager notes. Matching is case-insensitive and tests whether the field contains the text.",
+  "comment": "Hand-written notes on whether hunting is allowed on public land, by managing body or by site. The first note is different: it applies to any site the source data lists as closed to the public, whoever manages it. See docs/DECISIONS.md D16. Each note cites a public rule or page. The first matching note wins, so site notes come before manager notes. Matching is case-insensitive and tests whether the field contains the text.",
   "asOf": "2026-11-12",
   "notes": [
+    {
+      "match": { "access": "closed" },
+      "hunting": "no",
+      "text": "The source data lists this site as closed to the public, so do not enter or hunt here. If you think that is wrong, ask the managing body.",
+      "sourceName": "",
+      "sourceUrl": ""
+    },
     {
       "match": { "nameIncludes": "Gifford" , "category": "state" },
       "hunting": "limited",

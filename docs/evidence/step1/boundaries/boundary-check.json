@@ -1,0 +1,149 @@
+[
+ {
+  "name": "Gifford State Habitat Area",
+  "source": "PAD-US OBJECTID 76642",
+  "expect": "state",
+  "zoom": 15.27,
+  "tested": 2897,
+  "skippedWithin10m": 103,
+  "insideDrawn": 751,
+  "insideNotDrawn": 0,
+  "outsideNotDrawn": 2146,
+  "outsideDrawn": 0,
+  "categoriesDrawn": {
+   "state": 751
+  },
+  "worstMetres": [],
+  "lineColors": {
+   "publicland-outline": "#4b2a8a",
+   "publicland-band": "#4b2a8a"
+  },
+  "screenshot": "gifford-state-habitat-area.png"
+ },
+ {
+  "name": "Trelease Woods",
+  "source": "PAD-US OBJECTID 76684",
+  "expect": "university",
+  "zoom": 15.53,
+  "tested": 2873,
+  "skippedWithin10m": 127,
+  "insideDrawn": 747,
+  "insideNotDrawn": 0,
+  "outsideNotDrawn": 2126,
+  "outsideDrawn": 0,
+  "categoriesDrawn": {
+   "university": 747
+  },
+  "worstMetres": [],
+  "lineColors": {
+   "publicland-outline": "#7a4a1e",
+   "publicland-band": "#7a4a1e"
+  },
+  "screenshot": "trelease-woods.png"
+ },
+ {
+  "name": "Meadowbrook Park",
+  "source": "PAD-US OBJECTID 135681",
+  "expect": "local",
+  "zoom": 15.29,
+  "tested": 2861,
+  "skippedWithin10m": 139,
+  "insideDrawn": 935,
+  "insideNotDrawn": 0,
+  "outsideNotDrawn": 1926,
+  "outsideDrawn": 0,
+  "categoriesDrawn": {
+   "local": 935
+  },
+  "worstMetres": [],
+  "lineColors": {
+   "publicland-outline": "#c2185b",
+   "publicland-band": "#c2185b"
+  },
+  "screenshot": "meadowbrook-park.png"
+ },
+ {
+  "name": "Rock Springs Conservation Area",
+  "source": "PAD-US OBJECTID 70469",
+  "expect": "county_district",
+  "zoom": 13.37,
+  "tested": 2904,
+  "skippedWithin10m": 96,
+  "insideDrawn": 684,
+  "insideNotDrawn": 0,
+  "outsideNotDrawn": 2220,
+  "outsideDrawn": 0,
+  "categoriesDrawn": {
+   "county_district": 684
+  },
+  "worstMetres": [],
+  "lineColors": {
+   "publicland-outline": "#cc5a0a",
+   "publicland-band": "#cc5a0a"
+  },
+  "screenshot": "rock-springs-conservation-area.png"
+ },
+ {
+  "name": "Fairview Park",
+  "source": "PAD-US OBJECTID 105981",
+  "expect": "local",
+  "zoom": 14.07,
+  "tested": 2960,
+  "skippedWithin10m": 40,
+  "insideDrawn": 233,
+  "insideNotDrawn": 0,
+  "outsideNotDrawn": 2727,
+  "outsideDrawn": 0,
+  "categoriesDrawn": {
+   "local": 233
+  },
+  "worstMetres": [],
+  "lineColors": {
+   "publicland-outline": "#c2185b",
+   "publicland-band": "#c2185b"
+  },
+  "screenshot": "fairview-park.png"
+ },
+ {
+  "name": "Spitler Woods",
+  "source": "PAD-US OBJECTID 164852",
+  "expect": "state",
+  "zoom": 15.3,
+  "tested": 2921,
+  "skippedWithin10m": 79,
+  "insideDrawn": 288,
+  "insideNotDrawn": 0,
+  "outsideNotDrawn": 2633,
+  "outsideDrawn": 0,
+  "categoriesDrawn": {
+   "state": 288
+  },
+  "worstMetres": [],
+  "lineColors": {
+   "publicland-outline": "#4b2a8a",
+   "publicland-band": "#4b2a8a"
+  },
+  "screenshot": "spitler-woods.png"
+ },
+ {
+  "name": "Middle Fork River Forest Preserve",
+  "source": "CCRPC objectid 164",
+  "expect": "county_district",
+  "zoom": 12.92,
+  "tested": 2966,
+  "skippedWithin10m": 34,
+  "insideDrawn": 496,
+  "insideNotDrawn": 0,
+  "outsideNotDrawn": 2470,
+  "outsideDrawn": 0,
+  "categoriesDrawn": {
+   "county_district": 496
+  },
+  "worstMetres": [],
+  "lineColors": {
+   "publicland-outline": "#cc5a0a",
+   "publicland-band": "#cc5a0a"
+  },
+  "screenshot": "middle-fork-river-forest-preserve.png"
+ }
+]

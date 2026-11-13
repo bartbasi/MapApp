@@ -22,6 +22,8 @@ export interface NoteMatch {
   nameIncludes?: string;
   managerIncludes?: string;
   category?: string;
+  /** The site's access on foot, exactly: open, restricted, closed or unknown. */
+  access?: string;
 }
 
 export interface HuntingNotes {
@@ -34,6 +36,7 @@ export interface SiteForNote {
   name: string;
   manager: string;
   category: string;
+  access?: string;
 }
 
 function contains(field: string, text: string): boolean {
@@ -44,6 +47,7 @@ function matches(m: NoteMatch, site: SiteForNote): boolean {
   if (m.nameIncludes !== undefined && !contains(site.name, m.nameIncludes)) return false;
   if (m.managerIncludes !== undefined && !contains(site.manager, m.managerIncludes)) return false;
   if (m.category !== undefined && site.category.toLowerCase() !== m.category.toLowerCase()) return false;
+  if (m.access !== undefined && (site.access ?? '').toLowerCase() !== m.access.toLowerCase()) return false;
   return true;
 }
 

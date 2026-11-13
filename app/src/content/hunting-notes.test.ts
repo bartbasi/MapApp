@@ -56,6 +56,15 @@ describe('the bundled hunting-notes.json', () => {
     expect(n).toEqual(huntingNotes.default);
   });
 
+  it('tells the user to stay out of a site listed as closed, whoever manages it', () => {
+    const closed = { name: 'Spitler Woods Nature Preserve', manager: 'Illinois Nature Preserves Commission', category: 'state', access: 'closed' };
+    const n = findHuntingNote(huntingNotes, closed);
+    expect(n.hunting).toBe('no');
+    expect(n.text).toContain('closed to the public');
+    // The same site listed as open gets its manager's note instead.
+    expect(findHuntingNote(huntingNotes, { ...closed, access: 'open' }).hunting).toBe('unknown');
+  });
+
   it('has a date', () => {
     expect(huntingNotes.asOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });

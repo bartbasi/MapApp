@@ -79,6 +79,8 @@ a {
 .maplibregl-ctrl-bottom-right {
   padding-right: var(--inset-right);
   padding-bottom: var(--inset-bottom);
+  /* The credit line wraps before it reaches the scale bar in the other corner. */
+  max-width: calc(100% - 140px - var(--inset-left));
 }
 .maplibregl-ctrl-attrib {
   font-size: 11px;

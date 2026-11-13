@@ -32,6 +32,27 @@ export interface PublicLandSite {
   category: PublicLandCategory;
   access: Access;
   acres: number | null;
+  /** Which dataset the shape came from: 'padus', 'ccrpc', or '' if the tile does not say. */
+  source: string;
+}
+
+/**
+ * Text found in the name of each dataset's entry in the archive metadata, by
+ * the tile's `source` value. Used to credit a site to the dataset it came from.
+ */
+const SOURCE_NAME_HINTS: Record<string, string> = {
+  padus: 'PAD-US',
+  ccrpc: 'Regional Planning Commission',
+};
+
+/**
+ * The metadata sources that a site's shape came from. If the site's dataset
+ * is not recognized, every source is returned, so a credit is never dropped.
+ */
+export function sourcesForSite<T extends { name: string }>(site: Pick<PublicLandSite, 'source'>, sources: readonly T[]): T[] {
+  const hint = SOURCE_NAME_HINTS[site.source];
+  const own = hint ? sources.filter((s) => s.name.includes(hint)) : [];
+  return own.length ? own : [...sources];
 }
 
 /** Reads a tapped feature's properties. Missing or odd values become "unknown" ones. */
@@ -47,6 +68,7 @@ export function readPublicLandSite(props: Record<string, unknown>): PublicLandSi
     category: isPublicLandCategory(category) ? category : 'other',
     access: access === 'open' || access === 'restricted' || access === 'closed' ? access : 'unknown',
     acres: Number.isFinite(acres) ? acres : null,
+    source: text('source'),
   };
 }
 

@@ -1,0 +1,45 @@
+11-13 03:33:27.123  4649  4649 W bartbasi.mapapp: Unexpected CPU variant for x86: x86_64.
+11-13 03:33:27.123  4649  4649 W bartbasi.mapapp: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, goldmont-without-sha-xsaves, tremont, kabylake, alderlake, default
+11-13 03:33:28.807  4649  4664 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+11-13 03:33:28.836  4649  4664 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-13 03:33:28.959  4649  4649 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+11-13 03:33:29.593  4649  4649 W bartbasi.mapapp: Failed to find entry 'classes.dex': Entry not found
+11-13 03:33:30.186  4649  4669 E chromium: [1113/033330.183888:ERROR:variations_seed_loader.cc(39)] Seed missing signature.
+11-13 03:33:30.606  4649  4676 W chromium: [WARNING:dns_config_service_android.cc(81)] Failed to read DnsConfig.
+11-13 03:33:31.792  4649  4649 W Capacitor: Unable to read file at path public/plugins
+11-13 03:33:31.914  4649  4692 W cr_media: BLUETOOTH_CONNECT permission is missing.
+11-13 03:33:31.916  4649  4692 W cr_media: getBluetoothAdapter() requires BLUETOOTH permission
+11-13 03:33:31.917  4649  4692 W cr_media: registerBluetoothIntentsIfNeeded: Requires BLUETOOTH permission
+11-13 03:33:31.970  4649  4712 W libc    : Access denied finding property "vendor.mesa.log"
+11-13 03:33:31.971  4649  4712 W libc    : Access denied finding property "vendor.mesa.log.file"
+11-13 03:33:31.971  4649  4712 E MESA    : Failed to open rendernode: No such file or directory
+11-13 03:33:32.165  4649  4712 W libc    : Access denied finding property "vendor.mesa.vk.trace.per.submit"
+11-13 03:33:32.165  4649  4712 W libc    : Access denied finding property "vendor.mesa.gallium.print.optio"
+11-13 03:33:32.165  4649  4712 W libc    : Access denied finding property "vendor.mesa.vk.trace.frame"
+11-13 03:33:32.198  4649  4712 W libc    : Access denied finding property "vendor.mesa.vk.wsi.headless.swa"
+11-13 03:33:32.389  4649  4649 W HWUI    : Unknown dataspace 0
+11-13 03:33:32.489  4649  4712 W chromium: [WARNING:viz_main_impl.cc(85)] VizNullHypothesis is disabled (not a warning)
+11-13 03:34:59.241  4823  4823 W bartbasi.mapapp: Unexpected CPU variant for x86: x86_64.
+11-13 03:34:59.241  4823  4823 W bartbasi.mapapp: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, goldmont-without-sha-xsaves, tremont, kabylake, alderlake, default
+11-13 03:35:00.888  4823  4823 W bartbasi.mapapp: Verification of void androidx.fragment.app.FragmentManager.<init>() took 104.867ms (1678.30 bytecodes/s) (0B arena alloc)
+11-13 03:35:00.918  4823  4838 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+11-13 03:35:00.918  4823  4838 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-13 03:35:01.081  4823  4823 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+11-13 03:35:01.525  4823  4823 W bartbasi.mapapp: Failed to find entry 'classes.dex': Entry not found
+11-13 03:35:01.783  4823  4843 E chromium: [1113/033501.782447:ERROR:variations_seed_loader.cc(39)] Seed missing signature.
+11-13 03:35:02.108  4823  4849 W chromium: [WARNING:dns_config_service_android.cc(81)] Failed to read DnsConfig.
+11-13 03:35:02.816  4823  4823 W Capacitor: Unable to read file at path public/plugins
+11-13 03:35:03.011  4823  4881 W libc    : Access denied finding property "vendor.mesa.log"
+11-13 03:35:03.011  4823  4881 W libc    : Access denied finding property "vendor.mesa.log.file"
+11-13 03:35:03.011  4823  4881 E MESA    : Failed to open rendernode: No such file or directory
+11-13 03:35:03.035  4823  4864 W cr_media: BLUETOOTH_CONNECT permission is missing.
+11-13 03:35:03.058  4823  4864 W cr_media: getBluetoothAdapter() requires BLUETOOTH permission
+11-13 03:35:03.059  4823  4864 W cr_media: registerBluetoothIntentsIfNeeded: Requires BLUETOOTH permission
+11-13 03:35:03.124  4823  4881 W libc    : Access denied finding property "vendor.mesa.vk.trace.per.submit"
+11-13 03:35:03.124  4823  4881 W libc    : Access denied finding property "vendor.mesa.gallium.print.optio"
+11-13 03:35:03.125  4823  4881 W libc    : Access denied finding property "vendor.mesa.vk.trace.frame"
+11-13 03:35:03.163  4823  4881 W libc    : Access denied finding property "vendor.mesa.vk.wsi.headless.swa"
+11-13 03:35:03.299  4823  4823 W HWUI    : Unknown dataspace 0
+11-13 03:35:04.194  4823  4881 W chromium: [WARNING:viz_main_impl.cc(85)] VizNullHypothesis is disabled (not a warning)
+11-13 03:35:04.618  4823  4849 W bartbasi.mapapp: Long monitor contention with owner ThreadPoolForeg (4854) at java.lang.Object libcore.content.type.MimeMap$MemoizingSupplier.get()(MimeMap.java:475) waiters=0 in java.lang.Object libcore.content.type.MimeMap$MemoizingSupplier.get() for 401ms
+11-13 03:35:05.400  4823  4897 W bartbasi.mapapp: Long monitor contention with owner ThreadPoolSingl (4871) at java.util.Map android.media.MediaCodecList.getGlobalSettings()(MediaCodecList.java:69) waiters=0 in void android.media.MediaCodecList.initCodecList() for 607ms
