@@ -1,0 +1,7 @@
+# Keep line endings as LF everywhere. Pipeline scripts run in WSL and break with CRLF.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.png binary
+*.webp binary
+*.pbf binary
+*.jar binary

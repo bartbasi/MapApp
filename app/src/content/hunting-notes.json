@@ -1,0 +1,54 @@
+{
+  "comment": "Hand-written notes on whether hunting is allowed on public land, by managing body or by site. See docs/DECISIONS.md D16. Each note cites a public rule or page. The first matching note wins, so site notes come before manager notes. Matching is case-insensitive and tests whether the field contains the text.",
+  "asOf": "2026-11-12",
+  "notes": [
+    {
+      "match": { "nameIncludes": "Gifford" , "category": "state" },
+      "hunting": "limited",
+      "text": "Pheasant and rabbit only, by a free lottery permit from the state. No deer or turkey hunting.",
+      "sourceName": "Illinois Department of Natural Resources, Gifford site page",
+      "sourceUrl": "https://huntillinois.org/sites/gifford-pha"
+    },
+    {
+      "match": { "nameIncludes": "Perdueville", "category": "state" },
+      "hunting": "limited",
+      "text": "Pheasant and rabbit only, by a free lottery permit from the state. No deer or turkey hunting. This site crosses into Ford County, which has its own season rules.",
+      "sourceName": "Illinois Department of Natural Resources, Perdueville site page",
+      "sourceUrl": "https://huntillinois.org/sites/perdueville-pha"
+    },
+    {
+      "match": { "managerIncludes": "Champaign County Forest Preserve" },
+      "hunting": "no",
+      "text": "Hunting is not allowed. The district's rules also ban carrying a firearm or a bow on its land.",
+      "sourceName": "Champaign County Forest Preserve District, General Use Ordinance, section V",
+      "sourceUrl": "https://ccfpd.org/Portals/0/adam/Content/rgc15fVO406rRglhx1mriA/Link/RulesRegulationOrdinance.pdf"
+    },
+    {
+      "match": { "managerIncludes": "Macon County Conservation District" },
+      "hunting": "limited",
+      "text": "No hunting without a district permit. The district runs an archery deer program by lottery at Rock Springs, Sand Creek, Friends Creek and Fort Daniel. Apply to the district.",
+      "sourceName": "Macon County Conservation District, Deer Herd Management Program",
+      "sourceUrl": "https://www.maconccd.org/conservation/deer-herd-management/"
+    },
+    {
+      "match": { "category": "state" },
+      "hunting": "unknown",
+      "text": "State sites each have their own rules, and many small state sites are closed to hunting. Check this site on the state's list before you hunt.",
+      "sourceName": "Illinois Department of Natural Resources, public hunting areas, east central region",
+      "sourceUrl": "https://dnr.illinois.gov/hunting/factsheets/eastcentral.html"
+    },
+    {
+      "match": { "category": "ngo" },
+      "hunting": "unknown",
+      "text": "This is private conservation land. Access and hunting need the owner's permission.",
+      "sourceName": "",
+      "sourceUrl": ""
+    }
+  ],
+  "default": {
+    "hunting": "unknown",
+    "text": "Open to the public does not mean open to hunting. Ask the managing body before you hunt here.",
+    "sourceName": "",
+    "sourceUrl": ""
+  }
+}
