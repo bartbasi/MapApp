@@ -1,12 +1,12 @@
 # Status
 
-Last updated: 2026-11-12, end of Step 0.
+Last updated: 2026-11-12, start of Step 1.
 
 ## Where the project stands
 
-**Step 0 (survey and decisions) is finished, reviewed and reported.** The report is `docs/reports/step-0.md`. Work is stopped for the owner's review.
+**Step 0 is finished and the owner has answered it.** His answers are in DECISIONS D22.
 
-**Next: Step 1 (map core and base data).** Do not start it until the owner has answered the Step 0 report. The plan is in `docs/STEP_PLAN.md`.
+**Step 1 (map core and base data) is in progress.** The plan is in `docs/STEP_PLAN.md`.
 
 ## Done
 
@@ -21,16 +21,10 @@ Last updated: 2026-11-12, end of Step 0.
 
 ## Waiting on the owner
 
-The eight questions at the end of `docs/reports/step-0.md`:
-
-1. Agreement to ship Champaign County without parcels until the consortium replies. News of either county's reply to his permission request.
-2. Agreement to run the Macon County live lookup while no terms are posted, and to save tapped parcels on the phone for Macon County.
-3. The frame rate from the test APK on his Galaxy Z Fold 5 (`build/step0-map-proof-debug.apk`), unfolded and folded. An average under about 45 frames per second means DECISIONS D2 is revisited before anything is built on it. The 45 is the lead's rule of thumb, not a measured threshold.
-4. Approval for the first push to a public GitHub repository, the repository name, and whether the brief, `CLAUDE.md` and the reports go public. Needed before Step 2.
-5. Whether he will ask the Illinois State Geological Survey for the 2025 leaf-off county imagery, or wants an email drafted.
-6. Whether he will ask the Illinois Department of Natural Resources for permission to use its site boundaries and hunting table, or wants an email drafted.
-7. Confirmation of the feedback address in `NOTICE` and the package ID `io.github.bartbasi.mapapp`.
-8. Whether taking base map tiles from the Protomaps public build is acceptable (DECISIONS D6).
+1. What each county actually granted for its parcel data: live lookup only, or a copy that may be bundled in the app. Until he says, both counties are live lookup only (D22).
+2. A plain yes or no on the first push to a public GitHub repository, and which files go public. Needed before Step 2.
+3. The frame rate on his Galaxy Z Fold 5. He said he would test on 2026-11-13.
+4. Whether to ask the Illinois State Geological Survey for the leaf-off imagery, and the Illinois Department of Natural Resources for its hunting table.
 
 ## First actions in Step 1
 

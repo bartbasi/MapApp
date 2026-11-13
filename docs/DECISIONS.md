@@ -183,15 +183,16 @@ Public domain, 30 m, 5.5 MB for both counties from the per-county download. A 10
 
 ```
 app/          the web app (TypeScript, Svelte, map styles, tests)
-android/      the Capacitor Android project and native plugins
+app/android/  the Capacitor Android project and native plugins
 pipeline/     data build scripts
 docs/         decisions, data sources, step plan, status, reports, evidence
-spikes/       throwaway tests
 data/         downloads and built archives (ignored by git)
 .tools/       project-local tools such as JDK 21 (ignored by git)
 ```
 
-The app's package ID follows WoodLogic's pattern: `io.github.bartbasi.mapapp`. The ID cannot change after a store release, and the name is a working title, so this is confirmed with the owner before the first release build in Step 5.
+The Android project sits inside `app/` because that is where Capacitor expects it.
+
+The app's package ID follows WoodLogic's pattern: `io.github.bartbasi.mapapp`. The ID cannot change after a store release, and the name is a working title, so it was put to the owner. He confirmed the package ID on 2026-11-12 (D22).
 
 ## D20. Fold and unfold: no engine problem found
 
@@ -217,3 +218,20 @@ Rules that follow:
 - The parcel lookup never runs in the background. It runs only when the parcel layer is switched on and the map is zoomed in.
 - The parcel layer has a plain note that it contacts the county's server.
 - No request carries a name, an account or a device identifier.
+
+## D22. The owner's answers to the Step 0 report (2026-11-12)
+
+The owner answered the eight questions in one short message. His words are quoted, then how they are applied.
+
+| Question | His answer | Applied as |
+|---|---|---|
+| 1. Champaign County parcels | "We can use it" | Champaign County gets a parcel source. It is built as live lookup in Step 3. This replaces the "nothing for Champaign County yet" part of D8. |
+| 2. Macon County parcels, and saving tapped parcels | "Said we call use those as well" | The Macon County live lookup and saved tapped results go ahead. |
+| 3. Frame rate on the Z Fold 5 | "I'll test it tomorrow" | Step 1 starts on the current engine. D2 is revisited if his numbers are poor. |
+| 4. First push to GitHub | The message breaks off after "4" | **Not approved.** Nothing is pushed until he says so plainly. |
+| 5. Leaf-off imagery request | No answer | The aerial view is built from NAIP. |
+| 6. State hunting table request | No answer | The state table stays blocked. Hand-written notes are used (D16). |
+| 7. Feedback address and package ID | "7 is good" | `io.github.bartbasi.mapapp` and the address in `NOTICE` are confirmed. |
+| 8. Protomaps as the route for base map tiles | "8 is good" | Confirmed (D6). |
+
+**What answers 1 and 2 do not settle.** They read as the counties having replied to his permission requests, but the message does not say what each county granted. Until the owner says what was granted, and ideally shows it in writing, the rule is unchanged: live lookup and saved tapped results only. No bulk download, no bundled county data, no county data in the repository or on any host. Finding the Champaign County map service's address is now allowed, because the owner has decided the county may be used. That is done in Step 3.
