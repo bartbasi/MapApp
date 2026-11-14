@@ -102,6 +102,11 @@ export class MapView {
       }, DOUBLE_TAP_MS);
     });
     this.map.on('dblclick', () => window.clearTimeout(this.tapTimer));
+    // On a touch screen the engine swallows the second tap of a double tap, so
+    // no second click and no dblclick arrives here. The zoom it starts does.
+    // Any zoom that starts while a tap is waiting means the tap was not a
+    // plain tap on a site.
+    this.map.on('zoomstart', () => window.clearTimeout(this.tapTimer));
 
     // The style's hatch and shield images are drawn in code (style/images.ts)
     // and added the first time a layer asks for one.

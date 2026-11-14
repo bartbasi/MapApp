@@ -8,7 +8,7 @@ Step 1 is built and tested on the emulator. One check is still open, and only yo
 
 - **Works:** the app shows three base views (Map, Aerial, Hybrid) and the public land layer for Champaign County and Macon County. It runs with no network. It works folded and unfolded, and it keeps its place when you fold or unfold. Tapping a public land site shows its name, its manager, its size and a hunting note, with a link to the rule where one exists.
 - **Went wrong:** the imagery is public domain USDA imagery, but I fetched it from Microsoft's Planetary Computer. Its terms say that using the service counts as accepting them. Your brief says to ask you before accepting a license. I read the terms only afterwards. The details are under "The imagery service's terms" below. Nothing has been published.
-- **Does not work well:** the aerial imagery of Champaign County is made of two different years, and the join shows as a straight line across the county.
+- **Does not work well:** the aerial imagery is a patchwork of two years and several flight dates. Blocks of it differ in color, and the joins show as straight lines. The worst is in Champaign County.
 - **Not yet known:** the frame rate on your phone. The emulator on this laptop gave 15 to 24 frames per second, which says little about the phone.
 - **Needed from you:** install the test build and run the frame test (five minutes, steps below), and answer the six questions at the end.
 
@@ -18,7 +18,7 @@ The build I am giving you is newer than the build the tester ran all checks on. 
 
 ## The test build
 
-The file is `C:\bart\MapApp\build\step1-debug.apk`. It is APK_MB MB, because both counties' map data is inside it. In Step 2 the app becomes small and downloads its data instead.
+The file is `C:\bart\MapApp\build\step1-debug.apk`. It is 370 MB, because both counties' map data is inside it. In Step 2 the app becomes small and downloads its data instead.
 
 To run the frame test on your phone:
 
@@ -75,7 +75,9 @@ The frame test moves the map along a set path for 15 seconds and counts frames. 
 
 The worst 1 percent of frames ran at 5 to 7 frames per second. No map tile failed to load in any run.
 
-These numbers are lower than in Step 0. The Step 0 test app gave 26.6 to 40.8 frames per second on the same emulator. The two tests are not the same: Step 1 has the full map style, the public land layer and a different path. I cannot tell from the emulator how much of the drop is the app and how much is the laptop. That is why your phone's numbers matter.
+One more run, on the final build right after a fresh start of the emulator, gave a very different number: 55.8 frames per second on average in the Map view, unfolded, with the worst 1 percent at 20. So the emulator's numbers move by a factor of two with the state of the laptop.
+
+These numbers are lower than in Step 0. The Step 0 test app gave 26.6 to 40.8 frames per second on the same emulator. The two tests are not the same: Step 1 has the full map style, the public land layer and a different path. The 55.8 above suggests the drop was mostly the laptop, but I cannot be sure from the emulator. That is why your phone's numbers matter.
 
 ### Other things the tester checked
 
@@ -101,8 +103,8 @@ These numbers are lower than in Step 0. The Step 0 test app gave 26.6 to 40.8 fr
 
 | Layer | Champaign County | Macon County | Zoom levels |
 |---|---|---|---|
-| Base map | 12.0 MB | 4.3 MB | 0 to 15 |
-| Aerial imagery | AERIAL_CH MB | AERIAL_MA MB | 7 to 16 |
+| Base map | 11.5 MB | 4.1 MB | 0 to 15 |
+| Aerial imagery | 215 MB | 134 MB | 7 to 16 |
 | Public land | 0.13 MB | 0.10 MB | 10 to 14 |
 
 **The app.** The map screen with the Map, Aerial and Hybrid switch. The Layers panel with the public land switch and a legend. The public land panel. The sources screen. The diagnostics screen with the frame test. On the folded screen a panel is a sheet at the bottom. On the unfolded screen it sits beside the map. The map style, the colors and the icons inside the app were drawn for this app. Two things were not: the font is Noto Sans, a free font under the SIL Open Font License, and the app's launcher icon and start screen are still the stock ones of the app framework. The app needs its own icon before release.
@@ -123,12 +125,12 @@ These numbers are lower than in Step 0. The Step 0 test app gave 26.6 to 40.8 fr
 
 1. **Where the aerial imagery comes from.** See the section above and DECISIONS D7.
 2. **Half detail.** The imagery was read at 1.2 m per pixel, not the full 0.6 m. Full detail means reading about 50 GB. The download for this step was about 8.7 GB, measured by the build's own network counter. Trees, field edges, lanes and buildings are clear. Full detail can come later.
-3. **Two years of imagery.** The Microsoft copy does not have the 2025 imagery for all of either county. About a quarter of Champaign County (FILL_CH square km, the south) and about half of Macon County (FILL_MA square km, the east, with Decatur) are filled from 2023.
+3. **Two years of imagery.** The Microsoft copy does not have the 2025 imagery for all of either county. About a quarter of Champaign County (597 square km, the south) and about half of Macon County (773 square km, the east, with Decatur) are filled from 2023.
 4. **What counts as public land.** Private land is left out even where the source lists it, such as country clubs. Land of a land trust is kept if the public may enter. Easements on private land that are closed to the public are left out, so the map never sends someone onto private ground. See DECISIONS D24.
 
 ## Known faults
 
-1. **The join between imagery years in Champaign County.** North of latitude 40.0 the fields are yellow (September 2025). South of it they are green (August 2023). The line is straight and obvious. See `docs/evidence/step1/device/aerial-year-join-unfolded.png`. The join in Macon County is hard to see.
+1. **The aerial imagery is a patchwork.** In Champaign County, north of latitude 40.0 most fields are yellow (September 2025). South of it they are green (August 2023). The line is straight and obvious. See `docs/evidence/step1/device/aerial-year-join-unfolded.png`. In Macon County a block in the west is tan (2025) and the rest is green (2023). Zoomed out, both counties show the blocks plainly: see `docs/evidence/step1/final/opening-aerial-folded.png`. Up close, away from a join, the imagery is fine.
 2. **Sites the source lists as closed show "do not enter or hunt", and some of them are probably open.** The source marks state nature preserves as closed even where people may walk in. Seven such records lie in or at the two counties: Spitler Woods Nature Preserve and its buffer, Bois du Sangamon Nature Preserve and Upper Sangamon Natural Area (both Macon County Conservation District), Tomlinson Cemetery, Barnhart Prairie, and Upper Embarras Woods Nature Preserve. The same note shows on six closed records just over the line in Piatt County. The closed note replaces the manager's own note, so the two conservation district sites do not show the district's permit note. This is wrong in the safe direction. A better rule needs a public source that I have not found.
 3. **A few source records are poor.** Four records are named "Unnamed Property". The largest is 979 acres of the Decatur Park District. One record named "City Park" covers several parks. Seven Champaign County parks have no manager listed.
 4. **A site's panel opens half a second after the tap.** The app waits to see whether the tap is the first of a double tap, which zooms. The wait matches the map engine's own double tap time.
@@ -144,13 +146,25 @@ These numbers are lower than in Step 0. The Step 0 test app gave 26.6 to 40.8 fr
 
 The tester's full report is `docs/evidence/step1/device/qa-report.md`. The reviewer then read the work with fresh eyes. These were fixed:
 
-FIX_TABLE
+| What was wrong | Where the fix was checked |
+|---|---|
+| The credit line covered the scale bar on a narrow screen. | Emulator, folded and unfolded, all three views. |
+| In the Aerial and Hybrid views, the opening view of both counties showed no imagery. The imagery now starts at a wider zoom. | Emulator, folded and unfolded. |
+| A double tap to zoom also opened a site's panel. | Emulator, unfolded. My first fix worked in a desktop browser and failed on the touch screen. The final pass caught it. The second fix was checked on the emulator in the build you are getting. |
+| A thin strip of land was hard to tap. A tap within about a fingertip of a site now counts. | Emulator: a tap 30 screen pixels from a trail opened it, a tap 120 pixels away did not. |
+| On the unfolded screen the side panel could hide the tapped site. | Emulator. |
+| On the folded screen the bottom sheet could hide the tapped site. | Emulator. |
+| A closed site showed a calm "ask first" note. It now says not to enter or hunt. | Emulator, at Spitler Woods Nature Preserve. |
+| A Macon County site's panel credited the Champaign County planning commission. | Emulator, on two Macon County sites and one Champaign County forest preserve. |
+| From the reviewer: the tapped site is now found at the moment of the tap, and the double tap time matches the map engine's. | Automated tests and the emulator checks above. |
+
+The final emulator pass is `docs/evidence/step1/final/qa-final.md`. The build you are getting differs from the build of that pass by one change, the second double tap fix. After it I rechecked the double tap and the single tap on the emulator (`docs/evidence/step1/final2/`), and nothing else.
 
 ## Questions for you
 
 1. **Frame rate.** Please run the frame test above and send the numbers.
 2. **The imagery service's terms.** Three options. (a) You read the two pages of terms and accept them. The imagery stays as built. (b) You do not accept them. I delete the imagery and build it another way. The other ways are: USDA's county files, which need the MrSID decoder and its license, also yours to accept; or the Amazon copy, which costs a small download fee. (c) You want legal advice first. Then the app waits with a base map only. I recommend (a) if the terms read acceptably to you, because the imagery itself is public domain.
-3. **The imagery join in Champaign County.** Three options. (a) Leave it: newest imagery where it exists. This is what the build does. (b) Use 2023 for the whole county: one even picture, two years older in the north. (c) Accept the MrSID decoder's license so I can read USDA's complete 2025 county file: one even 2025 picture at full detail. I recommend (a) for now.
+3. **The imagery patchwork.** Three options. (a) Leave it: newest imagery where it exists. This is what the build does. (b) Use 2023 for the whole of both counties: one even picture, two years older where 2025 exists. (c) Accept the MrSID decoder's license so I can read USDA's complete 2025 county files: all 2025 at full detail, though flight dates within 2025 may still differ in color. I recommend (a) for now.
 4. **Hunting notes.** Are the eight notes right, as far as you know the ground?
 5. **Still open from Step 0.** What did each county grant for its parcel data: a live lookup only, or a copy that may be stored in the app? Step 3 (parcels) depends on it.
 6. **Still open from Step 0.** May I make the first push to the public GitHub repository, and do the brief, `CLAUDE.md` and these reports go public with it? Step 2 needs the push, because the app will download its data from GitHub. Your last message ended at "4" before the answer.
@@ -160,4 +174,4 @@ Also still open, with no hurry: whether to ask the state geological survey for i
 ## Housekeeping
 
 - Two empty folders appeared in the project root during a tool run: `BASI\PADX` and one named `C:SERSBART`. A safety check stopped me from deleting them. They are safe to delete by hand.
-- The work is in COMMITS local commits. Nothing is on GitHub.
+- The work is in 13 local commits. Nothing is on GitHub.

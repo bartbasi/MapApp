@@ -1,0 +1,1 @@
+11-14 08:34:10.310  3977  3977 I Capacitor/Console: File: https://localhost/assets/index-DDgHoyb1.js - Line 848 - Msg: FRAME_TEST {"seconds":15.1,"frames":843,"avgFps":55.8,"worst1pctFps":20,"framesOver33ms":13,"settleMs":398,"base":"map","overlays":{"publicland":true},"platform":"android","viewport":"842x641","pixelRatio":2.625,"tileReads":302,"tileFailures":0}
