@@ -38,7 +38,7 @@ USER_AGENT = "map-data-build"
 # The layers of the archive contract (pipeline/README.md).
 LAYERS = {
     "basemap": {"kind": "vector", "title": "Base map", "minzoom": 0, "maxzoom": 15},
-    "aerial": {"kind": "raster", "title": "Aerial imagery", "minzoom": 10, "maxzoom": 16},
+    "aerial": {"kind": "raster", "title": "Aerial imagery", "minzoom": 7, "maxzoom": 16},
     "publicland": {"kind": "vector", "title": "Public land", "minzoom": 10, "maxzoom": 14},
 }
 

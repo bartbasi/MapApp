@@ -202,7 +202,7 @@ Requested, not legally required. Suggested: `Roads, water and boundaries: U.S. C
   - Use constraints: "The USDA-FPAC-BC Geospatial Enterprise Operations branch asks to be credited in derived products."
 - USGS NAIP service description (https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer?f=json): "free downloads of public domain, NAIP compressed orthoimagery".
 - AWS Registry entry (https://raw.githubusercontent.com/awslabs/open-data-registry/main/datasets/naip.yaml): "License: Public Domain with Attribution".
-- Planetary Computer STAC collection `naip` reports `"license": "proprietary"`. That is a STAC placeholder and is contradicted by the USDA public-domain label. Microsoft's own service terms were not read (NOT CONFIRMED).
+- Planetary Computer STAC collection `naip` reports `"license": "proprietary"`. That is a STAC placeholder and is contradicted by the USDA public-domain label. Microsoft's own service terms were not read at the time (NOT CONFIRMED). They were read on 2026-11-14, after the imagery had been fetched: using the service counts as accepting them. See `docs/DATA_SOURCES.md`, "The terms of the service the imagery was fetched from".
 - **Usable and redistributable:** Yes. Public domain, credit requested.
 
 ### Required attribution text

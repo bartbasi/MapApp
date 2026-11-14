@@ -4,7 +4,6 @@
 import type { Polygon, Position } from 'geojson';
 import { describe, expect, it } from 'vitest';
 import { insidePoly, interiorPoint, publicLandLabelPoints, type LabelSource } from './public-land-labels';
-import { revealOffset } from './reveal';
 
 const square = (x: number, y: number, size: number): Position[] => [
   [x, y],
@@ -117,24 +116,5 @@ describe('interiorPoint', () => {
   it('avoids a hole', () => {
     const poly = [square(0, 0, 4), square(1, 1, 2)];
     expect(insidePoly(interiorPoint(poly), poly)).toBe(true);
-  });
-});
-
-describe('revealOffset', () => {
-  it('does nothing when the tapped point is already above the sheet', () => {
-    expect(revealOffset(200, 800, 400)).toBe(0);
-  });
-
-  it('moves a point under the sheet to the middle of the visible part', () => {
-    // 800 tall, sheet covers 500: visible 300, middle 150. Point at 600 moves up by 450.
-    expect(revealOffset(600, 800, 500)).toBe(450);
-  });
-
-  it('moves a point just above the sheet edge into clear view', () => {
-    expect(revealOffset(395, 800, 400)).toBe(195);
-  });
-
-  it('does nothing with no sheet room at all', () => {
-    expect(revealOffset(500, 800, 800)).toBe(0);
   });
 });

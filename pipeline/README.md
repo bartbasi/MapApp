@@ -100,7 +100,7 @@ data/build/<county-id>/<layer>.meta.json
 | Layer | Kind | Zooms | Source | What is inside |
 |---|---|---|---|---|
 | `basemap` | vector | 0 to 15 | OpenStreetMap, cut from the Protomaps planet build | The Protomaps basemap tile layout, version 4. Layers such as `earth`, `water`, `landuse`, `landcover`, `roads`, `boundaries`, `places`, `pois`. |
-| `aerial` | raster | 10 to 16 | USDA NAIP 2025, with the newest earlier NAIP year where 2025 has gaps | Natural color, leaf-on summer imagery, built from the 1.2 m level. |
+| `aerial` | raster | 7 to 16 | USDA NAIP 2025, with the newest earlier NAIP year where 2025 has gaps | Natural color, leaf-on summer imagery, built from the 1.2 m level. |
 | `publicland` | vector | 10 to 14 | USGS PAD-US 4.1, corrected with the regional planning commission's open spaces | One vector layer named `publicland`. Fields below. |
 
 ### Fields of the `publicland` layer

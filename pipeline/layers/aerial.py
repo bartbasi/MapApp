@@ -1,6 +1,6 @@
 # MapApp. Copyright 2026 Play, Inc.
 # Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE.
-"""Layer 'aerial': natural color NAIP imagery, WebP 512 px tiles, zoom 10 to 16.
+"""Layer 'aerial': natural color NAIP imagery, WebP 512 px tiles, zoom 7 to 16.
 
 Images come from the cloud-optimized GeoTIFF copies of NAIP on the Microsoft
 Planetary Computer (anonymous access with a free SAS token). The newest year

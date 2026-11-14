@@ -16,7 +16,7 @@ import type { InstalledLayers } from './installed';
 import { PUBLIC_LAND_LAYER, readPublicLandSite, type PublicLandSite } from './public-land';
 import { publicLandLabelPoints, type LabelSource } from './public-land-labels';
 import { revealOffset } from './reveal';
-import { DOUBLE_TAP_MS, TAP_REACH_PX, isSecondTap, type Tap } from './taps';
+import { DOUBLE_TAP_MS, TAP_REACH_STEPS_PX, isSecondTap, type Tap } from './taps';
 import { buildStyle, type StyleOptions } from './style/build-style';
 import { styleImage } from './style/images';
 import { PUBLIC_LAND_FILL, PUBLIC_LAND_LABEL_MINZOOM } from './style/public-land';
@@ -94,9 +94,10 @@ export class MapView {
       window.clearTimeout(this.tapTimer);
       // A double tap zooms the map and is not a tap on a site.
       if (second) return;
-      // Wait a moment to see that this tap is not the first of a double tap.
+      // Find the site now, while the map is where the finger met it. Then wait
+      // a moment to see that this tap is not the first of a double tap.
+      const hit = this.publicLandAt(tap.x, tap.y);
       this.tapTimer = window.setTimeout(() => {
-        const hit = this.publicLandAt(tap.x, tap.y);
         events.onPublicLandTap?.(hit ? readPublicLandSite(hit) : null, e.lngLat);
       }, DOUBLE_TAP_MS);
     });
@@ -123,11 +124,14 @@ export class MapView {
     const own = (f: { sourceLayer?: string }) => f.sourceLayer === PUBLIC_LAND_LAYER;
     const exact = this.map.queryRenderedFeatures([x, y], { layers: [PUBLIC_LAND_FILL] }).find(own);
     if (exact) return exact.properties as Record<string, unknown>;
-    const r = TAP_REACH_PX;
-    const near = this.map
-      .queryRenderedFeatures([[x - r, y - r], [x + r, y + r]], { layers: [PUBLIC_LAND_FILL] })
-      .find(own);
-    return near ? (near.properties as Record<string, unknown>) : null;
+    // Widen the search in steps, so the nearest site wins over one further off.
+    for (const r of TAP_REACH_STEPS_PX) {
+      const near = this.map
+        .queryRenderedFeatures([[x - r, y - r], [x + r, y + r]], { layers: [PUBLIC_LAND_FILL] })
+        .find(own);
+      if (near) return near.properties as Record<string, unknown>;
+    }
+    return null;
   }
 
   private withLabels(options: StyleOptions): StyleOptions {

@@ -2,7 +2,7 @@
 # MapApp. Copyright 2026 Play, Inc.
 # Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE.
 #
-# Layer 'aerial': NAIP natural color imagery, WebP 512 px tiles, zoom 10 to
+# Layer 'aerial': NAIP natural color imagery, WebP 512 px tiles, zoom 7 to
 # 16, clipped to the county outline plus about 300 m. The work is in
 # aerial.py. The first run downloads several GB; images are cached per image
 # under data/cache/naip/ and a rerun skips the ones already saved.
