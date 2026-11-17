@@ -15,11 +15,14 @@
     installed: InstalledLayers;
     publicLandOn: boolean;
     categories: CategoryList | null;
+    /** The phone's position is on (the same switch as the position button on the map). */
+    positionOn: boolean;
+    onTogglePosition: (on: boolean) => void;
     onTogglePublicLand: (on: boolean) => void;
     onOpenSources: () => void;
   }
 
-  let { installed, publicLandOn, categories, onTogglePublicLand, onOpenSources }: Props = $props();
+  let { installed, publicLandOn, categories, positionOn, onTogglePosition, onTogglePublicLand, onOpenSources }: Props = $props();
 
   const publicLand = $derived(installed.get(PUBLIC_LAND_LAYER));
 
@@ -33,6 +36,15 @@
     return { names, dates, counties };
   }
 </script>
+
+<section>
+  <label class="toggle">
+    <span class="toggle-text">My position</span>
+    <input type="checkbox" role="switch" checked={positionOn} onchange={(e) => onTogglePosition(e.currentTarget.checked)} />
+    <span class="track" aria-hidden="true"><span class="thumb"></span></span>
+  </label>
+  <p class="muted">Shows where this phone is. Your position stays on this phone and is never sent anywhere.</p>
+</section>
 
 <section>
   {#if publicLand}

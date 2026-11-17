@@ -19,7 +19,9 @@
     | 'permit'
     | 'ask'
     | 'info'
-    | 'external';
+    | 'external'
+    | 'locate'
+    | 'locate-fix';
 </script>
 
 <script lang="ts">
@@ -87,6 +89,14 @@
     <circle cx="12" cy="7.6" r="1.2" fill="currentColor" stroke="none" />
   {:else if name === 'external'}
     <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" stroke-width="2" />
+  {:else if name === 'locate' || name === 'locate-fix'}
+    <!-- A sighting ring with four short marks, like a scope's reticle. With a
+         solid center when the phone's position is known. -->
+    <circle cx="12" cy="12" r="6.6" stroke-width="2.3" />
+    <path d="M12 1.8v3.4M12 18.8v3.4M1.8 12h3.4M18.8 12h3.4" stroke-width="2.3" />
+    {#if name === 'locate-fix'}
+      <circle class="center" cx="12" cy="12" r="3.3" fill="currentColor" stroke="none" />
+    {/if}
   {/if}
 </svg>
 

@@ -20,17 +20,31 @@
   import { PUBLIC_LAND_LAYER, sourcesForSite, type PublicLandSite } from '../map/public-land';
   import { availableBaseViews, effectiveBaseView, type BaseView, type StyleOptions } from '../map/style/build-style';
   import { glyphsUrl } from '../map/style/fonts';
+  import { createPositionSource } from '../position';
+  import { markerData } from '../position/marker';
+  import { PositionStore, type PositionSnapshot } from '../position/store';
   import BaseViewSwitch from './BaseViewSwitch.svelte';
   import Icon from './Icon.svelte';
   import DiagnosticsScreen from './DiagnosticsScreen.svelte';
   import LayersPanel from './LayersPanel.svelte';
+  import LocateButton from './LocateButton.svelte';
   import Panel from './Panel.svelte';
+  import PositionMessage from './PositionMessage.svelte';
+  import PositionReadout from './PositionReadout.svelte';
   import PublicLandDetails from './PublicLandDetails.svelte';
   import SourcesScreen from './SourcesScreen.svelte';
 
   type PanelName = 'layers' | 'details' | 'sources' | 'diagnostics';
 
+  // The platform is known at once; the position store needs it before the map exists.
+  const platformImpl = detectPlatform();
+  const position = new PositionStore(createPositionSource(platformImpl.kind));
+  let pos = $state.raw<PositionSnapshot>(position.snapshot);
+  const messageContext = { android: platformImpl.kind === 'android', canOpenSettings: platformImpl.settings.canOpen };
+
   let platform = $state.raw<Platform | null>(null);
+  /** Height of the map's own bottom controls (scale bar, credit line), so the position controls sit above them. */
+  let chromeBottom = $state(28);
   let mapView: MapView | null = null;
   let mapContainer: HTMLDivElement;
 
@@ -63,9 +77,10 @@
 
   onMount(() => {
     let cancelled = false;
+    const cleanups: (() => void)[] = [];
     (async () => {
       try {
-        platform = detectPlatform();
+        platform = platformImpl;
         const s = await loadDataSession(platform);
         if (cancelled) return;
         session = s;
@@ -83,9 +98,24 @@
             }
           },
           onBearingChange: (b) => (bearing = b),
+          onUserMove: () => position.userMovedMap(),
         });
+        const view = mapView;
+        cleanups.push(
+          position.subscribe((snap) => {
+            pos = snap;
+            view.setPosition(markerData(snap));
+          }),
+          position.onCamera((c) => view.centerOn(c.lng, c.lat, c.minZoom, sheetHeight())),
+          watchBottomChrome(mapContainer),
+        );
         // A handle for checks in a desktop browser during development only.
-        if (import.meta.env.DEV) Object.assign(window, { __mapapp: { map: mapView.map, tileStats, session: s } });
+        if (import.meta.env.DEV) {
+          const { devPositionHandle } = await import('../position/dev');
+          Object.assign(window, {
+            __mapapp: { map: mapView.map, tileStats, session: s, position: devPositionHandle(position, platformImpl.kind) },
+          });
+        }
         if (s.installed.has(PUBLIC_LAND_LAYER)) categories = await presentPublicLandCategories(s);
       } catch (e) {
         console.error(e);
@@ -94,9 +124,34 @@
     })();
     return () => {
       cancelled = true;
+      for (const c of cleanups) c();
+      position.destroy();
       mapView?.destroy();
     };
   });
+
+  /**
+   * Keeps the position controls just above the map's scale bar and credit
+   * line. The credit line wraps to two lines on a narrow screen with imagery,
+   * so its height is measured, not assumed.
+   */
+  function watchBottomChrome(container: HTMLElement): () => void {
+    const corners = ['.maplibregl-ctrl-bottom-left', '.maplibregl-ctrl-bottom-right']
+      .map((sel) => container.querySelector<HTMLElement>(sel))
+      .filter((el): el is HTMLElement => el !== null);
+    const measure = () => {
+      const h = Math.max(0, ...corners.map((el) => el.offsetHeight));
+      chromeBottom = Math.ceil(h);
+    };
+    const observer = new ResizeObserver(measure);
+    for (const el of corners) observer.observe(el);
+    measure();
+    return () => observer.disconnect();
+  }
+
+  function openSettings(page: 'app' | 'location') {
+    void platformImpl.settings.open(page);
+  }
 
   // Redraw the style when a choice changes. The camera is untouched.
   $effect(() => {
@@ -113,9 +168,14 @@
   async function revealUnderSheet(at: LngLat) {
     await tick();
     if (!mapView) return;
+    mapView.reveal(at, sheetHeight());
+  }
+
+  /** How much of the map's bottom a panel covers: the sheet's height on a narrow screen, none on a wide one. */
+  function sheetHeight(): number {
     const sheet = document.querySelector<HTMLElement>('aside.panel');
     const narrow = window.matchMedia('(max-width: 599px)').matches;
-    mapView.reveal(at, narrow && sheet ? sheet.offsetHeight : 0);
+    return narrow && sheet ? sheet.offsetHeight : 0;
   }
 
   /** Every source of the installed public land archives, once each, for the details panel. */
@@ -174,8 +234,16 @@
 </script>
 
 <div class="app">
-  <div class="map-area">
+  <div class="map-area" style:--chrome-bottom={`${chromeBottom}px`}>
     <div class="map" bind:this={mapContainer}></div>
+
+    <div class="bottom">
+      <PositionMessage store={position} context={messageContext} onOpenSettings={openSettings} />
+      <div class="bottom-row">
+        <div class="readout-slot"><PositionReadout store={position} /></div>
+        <LocateButton mode={pos.follow} waiting={pos.on && !pos.fix} onTap={() => position.tapLocate()} />
+      </div>
+    </div>
 
     <div class="top-left">
       <BaseViewSwitch value={shownView} available={views} onChange={(v) => (baseView = v)} />
@@ -219,6 +287,8 @@
           {installed}
           {publicLandOn}
           {categories}
+          positionOn={pos.on}
+          onTogglePosition={(on) => (on ? position.tapLocate() : position.turnOff())}
           onTogglePublicLand={(on) => (publicLandOn = on)}
           onOpenSources={() => open('sources')}
         />
@@ -318,6 +388,58 @@
     top: auto;
     bottom: calc(var(--inset-bottom) + 48px);
     font-size: 0.9rem;
+  }
+
+  /* The position controls: the message card, then the accuracy line and the
+     locate button, just above the scale bar and credit line. The map's own
+     bottom controls already include the bottom inset. */
+  .bottom {
+    position: absolute;
+    left: calc(var(--inset-left) + var(--gap));
+    right: calc(var(--inset-right) + var(--gap));
+    bottom: calc(var(--chrome-bottom) + 6px);
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+  }
+
+  .bottom > :global(*) {
+    pointer-events: auto;
+  }
+
+  .bottom-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 8px;
+    pointer-events: none;
+  }
+
+  .bottom-row > :global(*) {
+    pointer-events: auto;
+  }
+
+  .readout-slot {
+    flex: 1;
+    min-width: 0;
+    pointer-events: none;
+  }
+
+  .readout-slot > :global(*) {
+    pointer-events: auto;
+  }
+
+  @media (min-width: 600px) {
+    .bottom {
+      left: auto;
+      width: min(420px, calc(100% - 2 * var(--gap)));
+    }
+
+    .app:has(:global(.panel)) .bottom {
+      right: var(--gap);
+    }
   }
 
   /* Wide screen: the panel sits beside the map, so the right-hand buttons
