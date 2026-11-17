@@ -304,6 +304,7 @@ Applied as:
 ## D28. How the readout decides which side of a line the phone is on (2026-11-17, Step 2)
 
 - **The app never names a side the evidence cannot support.** The doubt around a position is the GPS accuracy the phone reports, plus 3 m for error in the county's lines. If the nearest property line is closer than that, the readout says the phone is on or near the line and names the parcels on both sides.
+- **What the phone's accuracy figure means.** Android's accuracy is a radius the true position lies inside about 68 times in 100. About one fix in three lies outside it, and under trees the figure is often too hopeful. So "never" above is a rule for the app's words, not a promise about the ground: at the edge of the band the app can still name the wrong side. The 3 m is the only margin against that. (Added after the step review, 2026-11-17.)
 - **The 3 m is a judgement, not a measurement.** County lines are drawn for tax assessment. Their error is not published and varies from place to place. The figure is one named constant in `app/src/parcels/readout.ts` and can be raised.
 - **A weak fix is said to be weak.** When the accuracy is worse than 50 m the readout says the GPS is too weak to place the phone, and marks any parcel it names as a guess.
 - **Each answer belongs to one fix.** The parcel lookup is made again for each new fix. An older answer is widened by how far the phone has moved since, and is dropped after 30 m.
