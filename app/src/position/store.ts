@@ -22,10 +22,23 @@ export function fixAgeMs(receivedAt: number | null, now: number): number | null 
   return receivedAt === null ? null : Math.max(0, now - receivedAt);
 }
 
+/**
+ * A fix older than this says nothing useful about where the phone is now:
+ * the readout stops naming a parcel or a distance, and says only that there
+ * is no current position. Five minutes on foot is a few hundred meters.
+ */
+export const NO_POSITION_AFTER_MS = 5 * 60_000;
+
 /** True when there was a fix and none has come for more than STALE_AFTER_MS. */
 export function isStale(receivedAt: number | null, now: number): boolean {
   const age = fixAgeMs(receivedAt, now);
   return age !== null && age > STALE_AFTER_MS;
+}
+
+/** True when there was a fix and none has come for more than NO_POSITION_AFTER_MS. */
+export function isTooOld(receivedAt: number | null, now: number): boolean {
+  const age = fixAgeMs(receivedAt, now);
+  return age !== null && age > NO_POSITION_AFTER_MS;
 }
 
 export interface PositionSnapshot {
@@ -40,7 +53,10 @@ export interface PositionSnapshot {
   fix: PositionFix | null;
   /** Milliseconds since that fix arrived, or null. */
   ageMs: number | null;
+  /** Older than STALE_AFTER_MS: the marker is gray. */
   stale: boolean;
+  /** Older than NO_POSITION_AFTER_MS: too old to place the phone at all. */
+  tooOld: boolean;
   /** The heading to show, or null for none. */
   heading: Heading | null;
   /** The last error that stopped position or still matters, until dismissed or a fix arrives. */
@@ -59,6 +75,22 @@ export interface PositionStoreDeps {
   setInterval?: (fn: () => void, ms: number) => unknown;
   clearInterval?: (handle: unknown) => void;
   compass?: CompassSensor | null;
+  /**
+   * Calls back when the app comes back to the screen, and returns the
+   * unsubscribe function. Default: the page's visibilitychange event, where
+   * there is a page. Null for none.
+   */
+  onVisible?: ((fn: () => void) => () => void) | null;
+}
+
+/** The page's visibilitychange event, when running in a page. */
+function pageVisibility(fn: () => void): () => void {
+  if (typeof document === 'undefined') return () => {};
+  const handler = () => {
+    if (document.visibilityState === 'visible') fn();
+  };
+  document.addEventListener('visibilitychange', handler);
+  return () => document.removeEventListener('visibilitychange', handler);
 }
 
 /** How often the age and stale state are brought up to date while position is on. */
@@ -90,6 +122,7 @@ export class PositionStore {
   private centerOnNextFix = false;
   private ticker: unknown = null;
   private current: PositionSnapshot;
+  private readonly unsubscribeVisible: () => void;
 
   constructor(source: PositionSource, deps: PositionStoreDeps = {}) {
     this.source = source;
@@ -99,6 +132,16 @@ export class PositionStore {
     this.clearIntervalFn = deps.clearInterval ?? ((h) => globalThis.clearInterval(h as ReturnType<typeof globalThis.setInterval>));
     this.compass = deps.compass === undefined ? new DeviceCompass() : deps.compass;
     this.current = this.makeSnapshot();
+    // Back from the background, the age is brought up to date at once: the
+    // ticker may not have run while the app was hidden, and an old fix must
+    // not show as current until the next tick.
+    const onVisible = deps.onVisible === undefined ? pageVisibility : deps.onVisible;
+    this.unsubscribeVisible = onVisible ? onVisible(() => this.refresh()) : () => {};
+  }
+
+  /** Brings the fix's age and stale state up to date now. */
+  refresh(): void {
+    if (this.on) this.notify();
   }
 
   /** Svelte store contract: called at once with the current state, then on every change. */
@@ -177,6 +220,7 @@ export class PositionStore {
 
   destroy(): void {
     this.turnOff();
+    this.unsubscribeVisible();
     this.unsubscribeSource();
     this.subscribers.clear();
     this.cameraListeners.clear();
@@ -277,6 +321,7 @@ export class PositionStore {
   private makeSnapshot(): PositionSnapshot {
     const now = this.now();
     const stale = isStale(this.receivedAt, now);
+    const tooOld = isTooOld(this.receivedAt, now);
     return {
       on: this.on,
       follow: this.follow,
@@ -285,6 +330,7 @@ export class PositionStore {
       fix: this.fix,
       ageMs: fixAgeMs(this.receivedAt, now),
       stale,
+      tooOld,
       // A stale fix shows no heading: the phone may have turned since.
       heading: stale ? null : this.heading,
       error: this.error,

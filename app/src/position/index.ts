@@ -9,7 +9,7 @@ import { NativePositionSource } from './native-source';
 import type { PositionSource } from './types';
 
 export type { PermissionState, PositionError, PositionErrorKind, PositionEvent, PositionFix, PositionListener, PositionSource } from './types';
-export { PositionStore, STALE_AFTER_MS, isStale, fixAgeMs, type CameraCommand, type PositionSnapshot } from './store';
+export { PositionStore, STALE_AFTER_MS, NO_POSITION_AFTER_MS, isStale, isTooOld, fixAgeMs, type CameraCommand, type PositionSnapshot } from './store';
 export type { FollowMode } from './follow';
 export type { Heading, HeadingSource } from './heading';
 

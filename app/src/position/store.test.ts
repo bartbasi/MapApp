@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CompassSensor } from './compass';
 import { LOCATE_ZOOM, locateZoom, nextFollowMode } from './follow';
-import { STALE_AFTER_MS, PositionStore, fixAgeMs, isStale, type CameraCommand, type PositionSnapshot } from './store';
+import { NO_POSITION_AFTER_MS, STALE_AFTER_MS, PositionStore, fixAgeMs, isStale, isTooOld, type CameraCommand, type PositionSnapshot } from './store';
 import { TestClock } from './test-clock';
 import { BasePositionSource, type PositionErrorKind, type PositionFix } from './types';
 
@@ -45,7 +45,12 @@ function setup() {
   const clock = new TestClock();
   const source = new HandSource();
   const compass = new HandCompass();
-  const store = new PositionStore(source, { now: clock.now, setInterval: clock.setInterval, clearInterval: clock.clearInterval, compass });
+  let visible: (() => void) | null = null;
+  const onVisible = (fn: () => void) => {
+    visible = fn;
+    return () => (visible = null);
+  };
+  const store = new PositionStore(source, { now: clock.now, setInterval: clock.setInterval, clearInterval: clock.clearInterval, compass, onVisible });
   const camera: CameraCommand[] = [];
   store.onCamera((c) => camera.push(c));
   let last: PositionSnapshot = store.snapshot;
@@ -54,7 +59,7 @@ function setup() {
     last = s;
     updates++;
   });
-  return { clock, source, compass, store, camera, snap: () => last, updates: () => updates };
+  return { clock, source, compass, store, camera, snap: () => last, updates: () => updates, becomeVisible: () => visible?.() };
 }
 
 describe('stale detection', () => {
@@ -90,6 +95,47 @@ describe('stale detection', () => {
     expect(t.snap().heading?.source).toBe('compass');
     t.clock.advance(11_000);
     expect(t.snap().heading).toBeNull();
+  });
+});
+
+describe('a fix too old to use', () => {
+  it('is too old after more than five minutes, and the limit is one named constant', () => {
+    expect(NO_POSITION_AFTER_MS).toBe(300_000);
+    expect(isTooOld(null, 10_000_000)).toBe(false);
+    expect(isTooOld(1000, 1000 + NO_POSITION_AFTER_MS)).toBe(false);
+    expect(isTooOld(1000, 1001 + NO_POSITION_AFTER_MS)).toBe(true);
+  });
+
+  it('the store says so after five minutes without a fix, and not before', () => {
+    const t = setup();
+    t.store.tapLocate();
+    t.source.send();
+    t.clock.advance(NO_POSITION_AFTER_MS);
+    expect(t.snap()).toMatchObject({ stale: true, tooOld: false });
+    t.clock.advance(1000);
+    expect(t.snap()).toMatchObject({ stale: true, tooOld: true });
+    t.source.send();
+    expect(t.snap()).toMatchObject({ stale: false, tooOld: false });
+  });
+
+  it('back from the background, an old fix is marked stale at once, before the next tick', () => {
+    const t = setup();
+    t.store.tapLocate();
+    t.source.send();
+    // Hidden: time passes, the ticker does not run.
+    t.clock.jump(60_000);
+    expect(t.snap().stale).toBe(false);
+    t.becomeVisible();
+    expect(t.snap()).toMatchObject({ stale: true, ageMs: 60_000 });
+    t.clock.jump(NO_POSITION_AFTER_MS);
+    t.becomeVisible();
+    expect(t.snap().tooOld).toBe(true);
+  });
+
+  it('stops listening for the app coming back when destroyed', () => {
+    const t = setup();
+    t.store.destroy();
+    expect(() => t.becomeVisible()).not.toThrow();
   });
 });
 

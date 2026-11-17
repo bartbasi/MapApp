@@ -12,7 +12,7 @@ const BROWSER: MessageContext = { android: false, canOpenSettings: false };
 const FIX = { lng: -88.2, lat: 40.1, accuracyM: 4, headingDeg: null, speedMps: null, timeMs: 0 };
 
 function snap(o: Partial<PositionSnapshot>): PositionSnapshot {
-  return { on: true, follow: 'following', following: true, permission: 'granted', fix: FIX, ageMs: 0, stale: false, heading: null, error: null, ...o };
+  return { on: true, follow: 'following', following: true, permission: 'granted', fix: FIX, ageMs: 0, stale: false, tooOld: false, heading: null, error: null, ...o };
 }
 
 describe('words', () => {
@@ -24,6 +24,13 @@ describe('words', () => {
     expect(plain(formatDistance(0.2))).toBe('1 ft (1 m)');
     expect(plain(formatDistance(65))).toBe('210 ft (65 m)');
     expect(plain(formatDistance(2000))).toBe('1.2 mi (2.0 km)');
+  });
+
+  it('says the accuracy is not known when the fix gives none, never about 0 ft', () => {
+    expect(accuracyText(0)).toBe('GPS accuracy not known');
+    expect(accuracyText(-1)).toBe('GPS accuracy not known');
+    expect(accuracyText(NaN)).toBe('GPS accuracy not known');
+    expect(accuracyText(Infinity)).toBe('GPS accuracy not known');
   });
 
   it('keeps each number with its unit', () => {
@@ -41,6 +48,8 @@ describe('words', () => {
       positionMessage(snap({ on: false, error: { kind: 'denied', detail: '' } }), ANDROID),
       positionMessage(snap({ on: false, error: { kind: 'denied', detail: '' } }), BROWSER),
       positionMessage(snap({ on: false, error: { kind: 'location-off', detail: '' } }), ANDROID),
+      positionMessage(snap({ on: false, error: { kind: 'approximate', detail: '' } }), ANDROID),
+      positionMessage(snap({ on: false, error: { kind: 'approximate', detail: '' } }), BROWSER),
       positionMessage(snap({ on: false, error: { kind: 'unavailable', detail: '' } }), ANDROID),
       positionMessage(snap({ fix: null }), ANDROID),
       positionMessage(snap({ stale: true, ageMs: 45_000 }), ANDROID),
@@ -76,6 +85,16 @@ describe('positionMessage', () => {
     expect(m.settings).toBe('location');
   });
 
+  it('approximate location only: says precise location is needed, and where to turn it on', () => {
+    const m = positionMessage(snap({ on: false, fix: null, error: { kind: 'approximate', detail: '' } }), ANDROID)!;
+    expect(m.kind).toBe('approximate');
+    expect(m.title).toBe('MapApp needs your precise location.');
+    expect(m.body).toContain('Permissions, then Location, and turn on Use precise location');
+    expect(m.body).not.toMatch(/weak|open sky|into the open/);
+    expect(m.settings).toBe('app');
+    expect(m.dismissible).toBe(true);
+  });
+
   it('waiting for the first fix', () => {
     expect(positionMessage(snap({ fix: null }), ANDROID)!.kind).toBe('waiting');
   });
@@ -97,6 +116,12 @@ describe('markerData', () => {
     expect(parts(snap({ heading: { deg: 33, source: 'compass' } }))).toEqual(['accuracy', 'heading', 'dot']);
     const wedge = markerData(snap({ heading: { deg: 33.333, source: 'compass' } })).features[1]!;
     expect(wedge.properties.heading).toBe(33.3);
+  });
+
+  it('draws no accuracy circle when the accuracy is not known', () => {
+    const parts = (s: PositionSnapshot) => markerData(s).features.map((f) => f.properties.part);
+    expect(parts(snap({ fix: { ...FIX, accuracyM: 0 } }))).toEqual(['dot']);
+    expect(parts(snap({ fix: { ...FIX, accuracyM: NaN } }))).toEqual(['dot']);
   });
 
   it('marks a stale fix and drops its wedge', () => {

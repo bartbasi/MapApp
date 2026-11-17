@@ -42,6 +42,14 @@ export class TestClock {
     this.t = end;
   }
 
+  /**
+   * Moves time forward without firing any timer, as when the app is in the
+   * background and its timers do not run.
+   */
+  jump(ms: number): void {
+    this.t += ms;
+  }
+
   get pending(): number {
     return this.timers.length;
   }

@@ -6,6 +6,7 @@
 // a fix that has gone stale. Plain words, one idea per sentence.
 
 import type { PositionSnapshot } from './store';
+import { accuracyKnown } from './types';
 
 const FEET_PER_METER = 3.28084;
 /** Keeps a number on the same line as its unit. */
@@ -23,9 +24,9 @@ export function formatDistance(m: number): string {
   return `${mi.toFixed(1)}${NBSP}mi (${km.toFixed(1)}${NBSP}km)`;
 }
 
-/** "GPS accurate to about 13 ft (4 m)". */
+/** "GPS accurate to about 13 ft (4 m)", or "GPS accuracy not known" when the fix gave none (zero, negative or not a number). */
 export function accuracyText(accuracyM: number): string {
-  return `GPS accurate to about ${formatDistance(accuracyM)}`;
+  return accuracyKnown(accuracyM) ? `GPS accurate to about ${formatDistance(accuracyM)}` : 'GPS accuracy not known';
 }
 
 /** "45 s", "3 min", "2 h". */
@@ -37,7 +38,7 @@ export function formatAge(ms: number): string {
   return `${Math.floor(min / 60)} h`;
 }
 
-export type PositionMessageKind = 'denied' | 'location-off' | 'unavailable' | 'waiting' | 'stale';
+export type PositionMessageKind = 'denied' | 'approximate' | 'location-off' | 'unavailable' | 'waiting' | 'stale';
 
 export interface PositionMessage {
   kind: PositionMessageKind;
@@ -70,6 +71,16 @@ export function positionMessage(s: PositionSnapshot, ctx: MessageContext): Posit
           body: ctx.android
             ? 'To allow it, open the app settings, choose Permissions, then Location, then Allow only while using the app. Then tap the position button again.'
             : 'To allow it, open this site’s settings in your browser and allow location. Then tap the position button again.',
+          settings: ctx.canOpenSettings && ctx.android ? 'app' : null,
+          dismissible: true,
+        };
+      case 'approximate':
+        return {
+          kind: 'approximate',
+          title: 'MapApp needs your precise location.',
+          body: ctx.android
+            ? 'This phone gives MapApp only an approximate location, which can be off by a mile or more. That is too rough to show you against the property lines. Open the app settings, choose Permissions, then Location, and turn on Use precise location. Then tap the position button again.'
+            : 'This device gives MapApp only an approximate location, which is too rough to show you against the property lines. Allow the precise location in its settings. Then tap the position button again.',
           settings: ctx.canOpenSettings && ctx.android ? 'app' : null,
           dismissible: true,
         };

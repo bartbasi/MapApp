@@ -8,6 +8,7 @@
 import type { Feature, FeatureCollection, Point, Polygon } from 'geojson';
 import { groundCircle } from './geo';
 import type { PositionSnapshot } from './store';
+import { accuracyKnown } from './types';
 
 export type MarkerPart = 'accuracy' | 'dot' | 'heading';
 
@@ -30,7 +31,8 @@ export function markerData(s: Pick<PositionSnapshot, 'on' | 'fix' | 'stale' | 'h
   const { lng, lat, accuracyM } = s.fix;
   const at: Point = { type: 'Point', coordinates: [lng, lat] };
   const features: Feature<Point | Polygon, MarkerProps>[] = [];
-  if (accuracyM > 0 && Number.isFinite(accuracyM)) {
+  // No circle when the fix gives no accuracy (Android reports 0 then).
+  if (accuracyKnown(accuracyM)) {
     features.push({ type: 'Feature', geometry: groundCircle(lng, lat, accuracyM, CIRCLE_STEPS), properties: { part: 'accuracy', stale: s.stale } });
   }
   if (s.heading && !s.stale) {

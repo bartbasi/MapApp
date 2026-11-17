@@ -25,7 +25,7 @@
   $effect(() => store.subscribe((s) => (snap = s)));
 
   const message = $derived(snap ? positionMessage(snap, context) : null);
-  const urgent = $derived(message?.kind === 'denied' || message?.kind === 'location-off' || message?.kind === 'unavailable');
+  const urgent = $derived(message?.kind === 'denied' || message?.kind === 'approximate' || message?.kind === 'location-off' || message?.kind === 'unavailable');
 </script>
 
 {#if message}

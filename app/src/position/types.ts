@@ -10,7 +10,11 @@
 export interface PositionFix {
   lng: number;
   lat: number;
-  /** Radius in meters within which the true position probably lies. */
+  /**
+   * Radius in meters within which the true position probably lies. Zero, a
+   * negative or a non-finite value means not known (Android reports 0 for a
+   * fix with no accuracy): see accuracyKnown.
+   */
   accuracyM: number;
   /** Direction of travel, degrees clockwise from true north, or null when the source has none. */
   headingDeg: number | null;
@@ -23,20 +27,23 @@ export interface PositionFix {
 /**
  * Whether the app may use the position.
  * - unknown: not asked yet, or not known.
- * - granted: allowed (precise or approximate).
+ * - granted: allowed, with the precise position.
+ * - approximate: allowed only an approximate position (Android's
+ *   "Approximate" choice), which is too rough to use against property lines.
  * - denied: the user said no. On Android this may need the app's settings page.
  * - unavailable: this device or browser has no location service at all.
  */
-export type PermissionState = 'unknown' | 'granted' | 'denied' | 'unavailable';
+export type PermissionState = 'unknown' | 'granted' | 'approximate' | 'denied' | 'unavailable';
 
 /**
  * What went wrong, in the app's own words.
  * - denied: permission refused.
+ * - approximate: only an approximate position is allowed. Position stays off.
  * - location-off: the phone's Location switch is off.
  * - timeout: no reading came in time. Not fatal: the source keeps waiting.
  * - unavailable: the location service failed or does not exist.
  */
-export type PositionErrorKind = 'denied' | 'location-off' | 'timeout' | 'unavailable';
+export type PositionErrorKind = 'denied' | 'approximate' | 'location-off' | 'timeout' | 'unavailable';
 
 export interface PositionError {
   kind: PositionErrorKind;
@@ -102,6 +109,14 @@ export abstract class BasePositionSource implements PositionSource {
   protected emitError(kind: PositionErrorKind, detail: string): void {
     this.emit({ type: 'error', error: { kind, detail } });
   }
+}
+
+/**
+ * True when an accuracy radius is a real measurement: finite and above zero.
+ * No real fix is exact, so 0 means the platform had no accuracy to give.
+ */
+export function accuracyKnown(accuracyM: number): boolean {
+  return Number.isFinite(accuracyM) && accuracyM > 0;
 }
 
 /** A finite number, else null. Sources report missing values in several ways. */
