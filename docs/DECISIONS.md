@@ -309,3 +309,11 @@ Applied as:
 - **Each answer belongs to one fix.** The parcel lookup is made again for each new fix. An older answer is widened by how far the phone has moved since, and is dropped after 30 m.
 - **Every place is answered by the tile that owns it.** A tile's copy of a parcel beyond its own edge can sit a few centimeters off, which was found on the Macon County data to hide a real line and overstate the distance by more than a meter. The parcel code reads the neighbouring tile instead of trusting that copy.
 - **D8 is amended:** the two operations of `ParcelSource` are now the parcel at a point (for a tap) and the position query (for the readout). The map draws the outlines straight from the archive (D27).
+
+## D29. The parcel lines and the GPS frame (2026-11-17, Step 2)
+
+- The county stores its parcels in the NAD83 map frame. A phone's GPS reports in the current world frame, which sits about 1.3 m from NAD83 in central Illinois. A parcel archive that ignored this would be off by that much, always in the same direction.
+- **The Macon County archive does not ignore it.** The county's service converts to the world frame as of 1997 when it hands out coordinates. That was checked on one parcel, to the millimeter, with an independent calculation (`docs/evidence/step2/parcels/datum.md`).
+- **What is left is about 0.5 m east**, from the drift of the continent since 1997. It is not corrected. It is small beside a phone's GPS error and the 3 m allowance in D28, and correcting it would need a fresh download of the county's data.
+- A rough test against road centerlines agrees that the county's lines are placed in true NAD83, but it cannot prove it. Survey control would.
+- **Rule for any new county:** find out what frame its coordinates arrive in before building, and never apply a datum shift without checking whether the service has already applied one. A first reading of this very case had the sign reversed and the size doubled.
