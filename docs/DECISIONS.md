@@ -317,3 +317,17 @@ Applied as:
 - **What is left is about 0.5 m east**, from the drift of the continent since 1997. It is not corrected. It is small beside a phone's GPS error and the 3 m allowance in D28, and correcting it would need a fresh download of the county's data.
 - A rough test against road centerlines agrees that the county's lines are placed in true NAD83, but it cannot prove it. Survey control would.
 - **Rule for any new county:** find out what frame its coordinates arrive in before building, and never apply a datum shift without checking whether the service has already applied one. A first reading of this very case had the sign reversed and the size doubled.
+
+## D30. How the property lines and the readout are shown (2026-11-17, Step 2)
+
+- **The line.** A property line is a bright yellow-green line on a near-black edge, with no fill, the same in all three base views. It is thin at zoom 13 and heavy at zoom 19. It draws above public land and below place names and the position marker. The colour was chosen to stand out on both the pale map and the dark imagery, and to differ from the yellow of a tapped feature and the blue of the marker.
+- **One map source per county archive.** The outlines draw straight from each county's archive (D27). A county without an archive simply has no lines, and the app says so in words.
+- **The readout card.** It sits at the bottom left, beside the locate button. It has five states: inside a parcel, on or near a line, not in a parcel, GPS too weak, and no property lines for this place. Closed, it gives the owner, the distance and direction to the nearest line, the parcel ID and the GPS accuracy. Opened, it adds the parcel across the line, the acreage, the county, the data date and the "not a legal survey" sentence.
+- **On the map.** From zoom 15 a dashed line runs from the marker to the nearest property line. When the phone is on or near a line, that stretch of line is drawn in amber and black stripes instead. The lines of the parcel the phone is in get a soft blue glow, drawn under the lines so it does not change their colour.
+- **A parcel record with no parcel ID is never named.** The county has 379 of them, mostly road strips. A position inside one reads as not in a parcel. Their edges still count as property lines.
+- **Several parcels on one outline** (condominiums) are listed, with the count. The first is shown and the rest are in the opened card and the tap panel.
+- **A missing or zero acreage** reads "Acreage not listed in the county record". The county records zero for many town lots.
+- **D28 is amended in one detail.** A new lookup is skipped when the phone has moved less than 0.5 m since the last one. The older answer is still widened by that movement, so the readout can only be more cautious.
+- **Owner names in evidence.** A development build, or a test build made with `VITE_MAPAPP_MASK_OWNERS=1`, can show "OWNER NAME" in place of every owner, so screenshots can be kept. No other build can mask. The build given to the owner shows the real names.
+- **The distance check.** `pipeline/checks/parcels_line_distance.py` fetches named parcels from the county's service and measures test points against those outlines, without reading the archive. This is the independent side of the Step 2 distance check.
+
