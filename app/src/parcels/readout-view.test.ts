@@ -32,7 +32,7 @@ describe('readout words: inside a parcel', () => {
   it('names the owner, the distance and direction to the line, the parcel and the accuracy', () => {
     const v = view(4, query([A], line(26, [A], [B])));
     expect(v).toMatchObject({ kind: 'inside', tone: 'clear', icon: 'parcel', title: 'PERSON 11-22-333-001' });
-    expect(v.lines).toEqual([`Property line 85${NB}ft${NB}(26${NB}m) to the NE`]);
+    expect(v.lines).toEqual([`Property line 85${NB}ft${NB}(26${NB}m)${NB}to${NB}the${NB}NE`]);
     expect(v.small[0]).toBe(`Parcel 11-22-333-001 · GPS accurate to about 13${NB}ft (4${NB}m)`);
     expect(v.more).toContain('Across that line: PERSON 11-22-333-002, parcel 11-22-333-002.');
     expect(v.more).toContain('Parcel 11-22-333-001: 12.3 acres.');
@@ -76,7 +76,7 @@ describe('readout words: in no parcel', () => {
   it('says not in a parcel, what that usually is, and the nearest line', () => {
     const v = view(2, query(null, line(12, [], [B], 90)));
     expect(v).toMatchObject({ kind: 'no-parcel', tone: 'clear', icon: 'gap', title: 'Not in a parcel.', lines: ['This is often a road or a railway.'] });
-    expect(v.small[0]).toBe(`Nearest property line 39${NB}ft${NB}(12${NB}m) to the E`);
+    expect(v.small[0]).toBe(`Nearest property line 39${NB}ft${NB}(12${NB}m)${NB}to${NB}the${NB}E`);
     expect(v.more[0]).toBe('Across that line: PERSON 11-22-333-002, parcel 11-22-333-002.');
   });
 });

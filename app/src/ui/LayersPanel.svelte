@@ -10,6 +10,8 @@
   import { formatDate } from './format';
   import Icon from './Icon.svelte';
   import PublicLandSwatch from './PublicLandSwatch.svelte';
+  import ParcelLineSwatch from './ParcelLineSwatch.svelte';
+  import { PARCELS_LAYER } from '../map/style/build-style';
 
   interface Props {
     installed: InstalledLayers;
@@ -19,12 +21,26 @@
     positionOn: boolean;
     onTogglePosition: (on: boolean) => void;
     onTogglePublicLand: (on: boolean) => void;
+    parcelsOn: boolean;
+    onToggleParcels: (on: boolean) => void;
     onOpenSources: () => void;
   }
 
-  let { installed, publicLandOn, categories, positionOn, onTogglePosition, onTogglePublicLand, onOpenSources }: Props = $props();
+  let { installed, publicLandOn, categories, positionOn, onTogglePosition, onTogglePublicLand, parcelsOn, onToggleParcels, onOpenSources }: Props = $props();
 
   const publicLand = $derived(installed.get(PUBLIC_LAND_LAYER));
+  const parcels = $derived(installed.get(PARCELS_LAYER));
+  const shortCounty = (name: string) => name.replace(/, Illinois$/, '');
+  /** Counties with property lines, and counties with other map data but no property lines yet. */
+  const parcelCounties = $derived.by(() => {
+    const withLines = new Map((parcels?.archives ?? []).map((a) => [a.county, shortCounty(a.meta.countyName)]));
+    const without = new Map<string, string>();
+    for (const l of installed.values()) {
+      for (const a of l.archives) if (!withLines.has(a.county)) without.set(a.county, shortCounty(a.meta.countyName));
+    }
+    return { withLines: [...withLines.values()], without: [...without.values()] };
+  });
+  const listCounties = (names: string[]) => (names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`);
 
   /** Unique source names and the newest data date across a layer's archives. */
   function layerSummary(layer: string) {
@@ -44,6 +60,29 @@
     <span class="track" aria-hidden="true"><span class="thumb"></span></span>
   </label>
   <p class="muted">Shows where this phone is. Your position stays on this phone and is never sent anywhere.</p>
+</section>
+
+<section>
+  {#if parcels}
+    {@const s = layerSummary(PARCELS_LAYER)}
+    <label class="toggle">
+      <span class="toggle-text">Property lines</span>
+      <input type="checkbox" role="switch" checked={parcelsOn} onchange={(e) => onToggleParcels(e.currentTarget.checked)} />
+      <span class="track" aria-hidden="true"><span class="thumb"></span></span>
+    </label>
+    <ul class="legend" aria-label="Property lines">
+      <li><ParcelLineSwatch /><span>Property line</span></li>
+    </ul>
+    <p class="muted">Installed for {listCounties(parcelCounties.withLines)}. County data of {s.dates.length ? s.dates.map(formatDate).join(', ') : 'unknown date'}.</p>
+    {#if parcelCounties.without.length}
+      <p class="muted">None yet for {listCounties(parcelCounties.without)}.</p>
+    {/if}
+    <p class="muted">The lines come from county tax records. They are not a legal survey.</p>
+    <p class="muted">The lines show when you zoom in close. Tap inside a parcel to see its owner.</p>
+  {:else}
+    <h3>Property lines</h3>
+    <p class="muted">No property lines are installed.</p>
+  {/if}
 </section>
 
 <section>

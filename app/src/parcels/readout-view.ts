@@ -63,8 +63,13 @@ const NBSP = ' ';
 /** "85 ft (26 m)", never broken across lines. */
 const dist = (m: number) => formatDistance(m).text.replace(/ /g, NBSP);
 
+/** "85 ft (26 m) to the NE", kept on one line. */
+function distanceAndWay(l: LineReadout): string {
+  return `${dist(l.distanceM)}${NBSP}to${NBSP}the${NBSP}${l.compass}`;
+}
+
 function lineText(l: LineReadout): string {
-  return `Property line ${dist(l.distanceM)} to the ${l.compass}`;
+  return `Property line ${distanceAndWay(l)}`;
 }
 
 /** "OWNER, parcel 12-34-567". */
@@ -152,7 +157,7 @@ export function readoutView(r: Readout | null, options: ReadoutViewOptions): Rea
       v.sides = [sideText(r.thisSide, masked), sideText(r.otherSide, masked)];
       v.small = [accuracyText(r.accuracyM), ...stale];
       const first = r.thisSide[0] ?? r.otherSide[0];
-      v.more.push(`The line is ${dist(r.line.distanceM)} to the ${r.line.compass}.`);
+      v.more.push(`The line is ${distanceAndWay(r.line)}.`);
       if (first) v.more.push(countyLine(first));
       v.more.push(SURVEY_TEXT);
       const extra = [...r.thisSide.slice(1), ...r.otherSide.slice(1)];
@@ -165,7 +170,7 @@ export function readoutView(r: Readout | null, options: ReadoutViewOptions): Rea
     case 'no-parcel': {
       const v = empty('no-parcel', 'clear', 'gap', 'Not in a parcel.');
       v.lines = [GAP_TEXT];
-      const nearest = r.line ? [`Nearest property line ${dist(r.line.distanceM)} to the ${r.line.compass}`] : [];
+      const nearest = r.line ? [`Nearest property line ${distanceAndWay(r.line)}`] : [];
       v.small = [...nearest, accuracyText(r.accuracyM), ...stale];
       if (r.nearest) v.more.push(`Across that line: ${parcelLabel(r.nearest, masked)}.`);
       v.more.push(SURVEY_TEXT);

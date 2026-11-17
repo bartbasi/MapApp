@@ -7,6 +7,7 @@
   metadata files. Nothing here is written per source.
 -->
 <script lang="ts">
+  import { layerTitle } from '../map/installed';
   import type { ArchiveEntry } from '../platform/archive-meta';
   import { formatBytes, formatDate } from './format';
   import Icon from './Icon.svelte';
@@ -25,7 +26,7 @@
 
 {#each entries as entry (`${entry.county}/${entry.layer}`)}
   <article>
-    <h3>{entry.meta.title}</h3>
+    <h3>{layerTitle(entry)}</h3>
     <p class="muted">{entry.meta.countyName}. Built {formatDate(entry.meta.buildDate)}, {formatBytes(entry.meta.bytes)}.</p>
     {#each entry.meta.sources as source, i (i)}
       <dl>

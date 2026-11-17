@@ -21,7 +21,12 @@
     | 'info'
     | 'external'
     | 'locate'
-    | 'locate-fix';
+    | 'locate-fix'
+    | 'parcel'
+    | 'caution'
+    | 'gap'
+    | 'weak-gps'
+    | 'no-lines';
 </script>
 
 <script lang="ts">
@@ -97,6 +102,27 @@
     {#if name === 'locate-fix'}
       <circle class="center" cx="12" cy="12" r="3.3" fill="currentColor" stroke="none" />
     {/if}
+  {:else if name === 'parcel'}
+    <!-- A plot of land with an uneven boundary and a dot inside it: you are in this parcel. -->
+    <path d="M3.5 6.5 10 3.5l10.5 3-1.5 13-12.5 1z" stroke-width="2.2" />
+    <circle cx="11.5" cy="12" r="2.6" fill="currentColor" stroke="none" />
+  {:else if name === 'caution'}
+    <!-- A warning triangle with an exclamation mark. -->
+    <path d="M12 3 22 20.5H2z" stroke-width="2.3" />
+    <path d="M12 9.5v5.2" stroke-width="2.6" />
+    <circle cx="12" cy="17.6" r="1.3" fill="currentColor" stroke="none" />
+  {:else if name === 'gap'}
+    <!-- Two boundaries with a strip between them, like a road between fields. -->
+    <path d="M7 2.5v19M17 2.5v19" stroke-width="2.4" />
+    <path d="M12 4v3M12 10.5v3M12 17v3" stroke-width="1.8" />
+  {:else if name === 'weak-gps'}
+    <!-- A broken ring around a hollow center: the position is not known well enough. -->
+    <circle cx="12" cy="12" r="8.5" stroke-dasharray="3.2 3" stroke-width="2.3" />
+    <circle cx="12" cy="12" r="2.6" stroke-width="2" />
+  {:else if name === 'no-lines'}
+    <!-- A plot drawn in dashes: no property lines here. -->
+    <path d="M4 5h16v14H4z" stroke-dasharray="3 2.6" stroke-width="2" />
+    <path d="M9 12h6" stroke-width="2.2" />
   {/if}
 </svg>
 

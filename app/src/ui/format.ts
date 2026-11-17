@@ -16,6 +16,25 @@ export function formatAcres(acres: number | null): string {
   return `${Math.round(acres).toLocaleString('en-US')} acres`;
 }
 
+/**
+ * Splits text into plain pieces and parcel IDs (a run of digits and hyphens
+ * or dots, at least five long), so a screen can keep each ID on one line: a
+ * browser otherwise breaks an ID such as 08-06-23-100-005 at a hyphen.
+ */
+export function splitIds(text: string): { text: string; id: boolean }[] {
+  const out: { text: string; id: boolean }[] = [];
+  const re = /\d[\d.-]{3,}\d/g;
+  let last = 0;
+  for (const m of text.matchAll(re)) {
+    const at = m.index ?? 0;
+    if (at > last) out.push({ text: text.slice(last, at), id: false });
+    out.push({ text: m[0], id: true });
+    last = at + m[0].length;
+  }
+  if (last < text.length) out.push({ text: text.slice(last), id: false });
+  return out;
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;

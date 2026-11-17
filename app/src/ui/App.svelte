@@ -16,13 +16,24 @@
   import type { Platform } from '../platform/platform';
   import { loadDataSession, presentPublicLandCategories, type CategoryList, type DataSession } from '../map/data-session';
   import { buildTour, runFrameTest, tourArea, type FrameTestResult } from '../map/frame-test';
-  import { MapView, registerTileProtocol, tileStats } from '../map/map-view';
+  import { MapView, registerTileProtocol, tileStats, type MapTap } from '../map/map-view';
   import { PUBLIC_LAND_LAYER, sourcesForSite, type PublicLandSite } from '../map/public-land';
-  import { availableBaseViews, effectiveBaseView, type BaseView, type StyleOptions } from '../map/style/build-style';
+  import { PARCELS_LAYER, availableBaseViews, effectiveBaseView, type BaseView, type StyleOptions } from '../map/style/build-style';
   import { glyphsUrl } from '../map/style/fonts';
+  import { PARCEL_RELATION_SOURCE, PARCEL_SELECTED_SOURCE } from '../map/style/parcels';
+  import { OwnerMask, maskRequested } from '../parcels/owner-text';
+  import { parcelPanel } from '../parcels/parcel-panel';
+  import { isNamedParcel } from '../parcels/parcel-record';
+  import type { LngLat as ParcelPoint, ParcelLookup } from '../parcels/parcel-source';
+  import { ParcelTracker, type TrackerState } from '../parcels/parcel-tracker';
+  import { readoutView } from '../parcels/readout-view';
+  import { EMPTY_RELATION } from '../parcels/relation-features';
+  import { StoredParcelSource, parcelArchivesFrom } from '../parcels/stored-parcel-source';
   import { createPositionSource } from '../position';
   import { markerData } from '../position/marker';
+  import type { PositionFix } from '../position/types';
   import { PositionStore, type PositionSnapshot } from '../position/store';
+  import ParcelDetails from './ParcelDetails.svelte';
   import BaseViewSwitch from './BaseViewSwitch.svelte';
   import Icon from './Icon.svelte';
   import DiagnosticsScreen from './DiagnosticsScreen.svelte';
@@ -61,14 +72,37 @@
   let frameContext = $state('');
   let tilesSnapshot = $state({ ...tileStats });
 
+  // Property lines. The source reads the installed parcel archives; the
+  // tracker keeps the position readout up to date (D26).
+  let parcelsOn = $state(true);
+  let parcelSource: StoredParcelSource | null = null;
+  let tracker: ParcelTracker | null = null;
+  let trackerState = $state.raw<TrackerState | null>(null);
+  /** The parcel lookup for the tapped point, shown in the details panel. */
+  let tapped = $state.raw<{ lookup: ParcelLookup; at: ParcelPoint } | null>(null);
+  let tapSeq = 0;
+
+  // Development only: owner names can be masked for evidence screenshots.
+  // A production build creates the mask as not allowed, so it never masks.
+  const ownerMask = new OwnerMask(import.meta.env.DEV, import.meta.env.DEV && maskRequested(location.search));
+  let masked = $state(ownerMask.on);
+  ownerMask.subscribe((on) => (masked = on));
+
   const installed = $derived(session?.installed ?? new Map());
   const views = $derived(availableBaseViews(installed));
   const shownView = $derived(effectiveBaseView(baseView, installed));
+  const parcelLayer = $derived(installed.get(PARCELS_LAYER));
+  const countiesWithLines = $derived(((parcelLayer?.archives ?? []) as { meta: { countyName: string } }[]).map((a) => a.meta.countyName.replace(/, Illinois$/, '')));
+  /** The readout's words, or null with no parcel data installed (then only the GPS accuracy shows). */
+  const readout = $derived(parcelLayer && trackerState ? readoutView(trackerState.readout, { masked, staleFix: pos.stale, countiesWithLines }) : null);
+  const parcelInfo = $derived(tapped ? parcelPanel(tapped.lookup, masked, countiesWithLines) : null);
+  /** The parcel part of the details panel: shown alone, or under a public land site when it names a parcel. */
+  const showParcelInfo = $derived(!!parcelInfo && (!site || parcelInfo.kind === 'parcels'));
 
   function styleOptions(): StyleOptions {
     return {
       base: baseView,
-      overlays: { publicland: publicLandOn },
+      overlays: { publicland: publicLandOn, parcels: parcelsOn },
       installed,
       glyphs: glyphsUrl(location.origin),
       selection: panel === 'details' && site ? { name: site.name, manager: site.manager } : null,
@@ -86,34 +120,55 @@
         session = s;
         registerTileProtocol(s.resolver);
         mapView = new MapView(mapContainer, styleOptions(), {
-          onPublicLandTap: (tapped, at) => {
-            if (frameRunning) return;
-            if (tapped) {
-              site = tapped;
-              panel = 'details';
-              void revealUnderSheet(at);
-            } else if (panel === 'details') {
-              panel = null;
-              site = null;
-            }
-          },
+          onMapTap: (t) => void onMapTap(t),
           onBearingChange: (b) => (bearing = b),
           onUserMove: () => position.userMovedMap(),
         });
         const view = mapView;
+        const parcelArchives = parcelArchivesFrom(s.archives);
+        if (parcelArchives.length > 0) {
+          parcelSource = new StoredParcelSource(parcelArchives);
+          const t = new ParcelTracker(parcelSource);
+          tracker = t;
+          cleanups.push(
+            t.subscribe((st) => {
+              trackerState = st;
+              view.setLiveData(PARCEL_RELATION_SOURCE, st.relation);
+            }),
+            () => t.destroy(),
+          );
+        }
+        // The tracker hears of a new fix, a fix going stale, or position off.
+        // Not of compass turns or the age ticking, which change nothing for it.
+        let lastFix: PositionFix | null = null;
+        let lastStale = false;
         cleanups.push(
           position.subscribe((snap) => {
             pos = snap;
             view.setPosition(markerData(snap));
+            const fix = snap.on ? snap.fix : null;
+            if (fix !== lastFix || snap.stale !== lastStale) {
+              lastFix = fix;
+              lastStale = snap.stale;
+              tracker?.update(fix, snap.stale);
+            }
           }),
-          position.onCamera((c) => view.centerOn(c.lng, c.lat, c.minZoom, sheetHeight())),
+          position.onCamera((c) => view.centerOn(c.lng, c.lat, c.minZoom, coveredBottom())),
           watchBottomChrome(mapContainer),
         );
         // A handle for checks in a desktop browser during development only.
         if (import.meta.env.DEV) {
           const { devPositionHandle } = await import('../position/dev');
           Object.assign(window, {
-            __mapapp: { map: mapView.map, tileStats, session: s, position: devPositionHandle(position, platformImpl.kind) },
+            __mapapp: {
+              map: mapView.map,
+              tileStats,
+              session: s,
+              position: devPositionHandle(position, platformImpl.kind),
+              /** Replaces every owner name on screen with OWNER NAME, for evidence screenshots. */
+              maskOwners: (on = true) => ownerMask.set(on),
+              parcels: { source: parcelSource, tracker, timings: () => tracker?.timings() ?? null },
+            },
           });
         }
         if (s.installed.has(PUBLIC_LAND_LAYER)) categories = await presentPublicLandCategories(s);
@@ -178,6 +233,80 @@
     return narrow && sheet ? sheet.offsetHeight : 0;
   }
 
+  /**
+   * How much of the map's bottom is covered where the marker would sit: a
+   * bottom sheet, or the position readout and its buttons when they reach
+   * across the middle of the map. Following keeps the marker clear of both.
+   */
+  function coveredBottom(): number {
+    let overlay = 0;
+    const controls = document.querySelector<HTMLElement>('.map-area .bottom');
+    if (controls && mapContainer) {
+      const map = mapContainer.getBoundingClientRect();
+      const box = controls.getBoundingClientRect();
+      const middle = map.left + map.width / 2;
+      if (box.height > 0 && box.left <= middle && box.right >= middle) overlay = Math.max(0, map.bottom - box.top);
+    }
+    return Math.max(sheetHeight(), overlay);
+  }
+
+  /**
+   * A single tap on the map. Public land comes from the map; parcels come
+   * from the parcel source (never from what the map has drawn), only while
+   * the property lines are on and the map is close enough to show them.
+   */
+  async function onMapTap(t: MapTap) {
+    if (frameRunning) return;
+    const seq = ++tapSeq;
+    const at: ParcelPoint = { lng: t.at.lng, lat: t.at.lat };
+    let lookup: ParcelLookup | null = null;
+    const minZoom = parcelLayer?.minzoom ?? Infinity;
+    if (parcelSource && parcelsOn && t.zoom >= minZoom) {
+      try {
+        lookup = await parcelSource.parcelsAt(at);
+      } catch (e) {
+        console.warn('the parcel lookup failed:', e);
+        lookup = { at, coverage: 'read-error', parcels: [] };
+      }
+      // A later tap has taken over.
+      if (seq !== tapSeq) return;
+    }
+    const namesParcel = !!lookup && lookup.coverage === 'ok' && lookup.parcels.some(isNamedParcel);
+    if (t.site || namesParcel) {
+      site = t.site;
+      tapped = lookup ? { lookup, at } : null;
+      panel = 'details';
+      void revealUnderSheet(t.at);
+    } else if (lookup && panel === null) {
+      // Not in a parcel, or no property lines here: a short plain message.
+      site = null;
+      tapped = { lookup, at };
+      panel = 'details';
+    } else if (panel === 'details') {
+      close();
+    }
+  }
+
+  // The tapped parcel's outline, while its panel is open.
+  let selectedKey = '';
+  $effect(() => {
+    const info = panel === 'details' && showParcelInfo ? parcelInfo : null;
+    const point = tapped?.at;
+    const key = info?.kind === 'parcels' && point ? `${info.first.county}|${info.first.pid}|${point.lng}|${point.lat}` : '';
+    if (key === selectedKey) return;
+    selectedKey = key;
+    mapView?.setLiveData(PARCEL_SELECTED_SOURCE, EMPTY_RELATION);
+    if (!key || info?.kind !== 'parcels' || !point || !parcelSource) return;
+    const { pid, county } = info.first;
+    parcelSource
+      .outline(pid, county, point)
+      .then((outline) => {
+        if (selectedKey !== key || !outline) return;
+        mapView?.setLiveData(PARCEL_SELECTED_SOURCE, { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: outline.lines, properties: {} }] });
+      })
+      .catch((e) => console.warn('the tapped parcel outline could not be read:', e));
+  });
+
   /** Every source of the installed public land archives, once each, for the details panel. */
   const publicLandSources = $derived.by(() => {
     const seen = new Map<string, ArchiveSource>();
@@ -195,6 +324,7 @@
   function close() {
     panel = null;
     site = null;
+    tapped = null;
   }
 
   async function frameTest() {
@@ -209,7 +339,7 @@
       const result = await runFrameTest(mapView.map, buildTour(area.bounds, area.minzoom, area.maxzoom));
       const context = {
         base: shownView,
-        overlays: { publicland: publicLandOn && s.installed.has(PUBLIC_LAND_LAYER) },
+        overlays: { publicland: publicLandOn && s.installed.has(PUBLIC_LAND_LAYER), parcels: parcelsOn && s.installed.has(PARCELS_LAYER) },
         platform: platform?.kind ?? 'unknown',
         viewport: `${window.innerWidth}x${window.innerHeight}`,
         pixelRatio: window.devicePixelRatio,
@@ -218,7 +348,7 @@
       };
       console.log('FRAME_TEST ' + JSON.stringify({ ...result, ...context }));
       frameResult = result;
-      frameContext = `Base view ${context.base}, public land ${context.overlays.publicland ? 'on' : 'off'}, ${context.viewport} at pixel ratio ${context.pixelRatio}.`;
+      frameContext = `Base view ${context.base}, public land ${context.overlays.publicland ? 'on' : 'off'}, property lines ${context.overlays.parcels ? 'on' : 'off'}, ${context.viewport} at pixel ratio ${context.pixelRatio}.`;
     } finally {
       frameRunning = false;
       open('diagnostics');
@@ -240,7 +370,7 @@
     <div class="bottom">
       <PositionMessage store={position} context={messageContext} onOpenSettings={openSettings} />
       <div class="bottom-row">
-        <div class="readout-slot"><PositionReadout store={position} /></div>
+        <div class="readout-slot"><PositionReadout store={position} view={readout} /></div>
         <LocateButton mode={pos.follow} waiting={pos.on && !pos.fix} onTap={() => position.tapLocate()} />
       </div>
     </div>
@@ -278,7 +408,7 @@
     <!-- A new panel starts scrolled to the top. A fold does not change the key, so it keeps its place. -->
     {#key panel}
     <Panel
-      title={panel === 'details' && site?.name ? site.name : panelTitles[panel]}
+      title={panel === 'details' ? (site ? site.name || panelTitles.details : parcelInfo?.kind === 'parcels' ? 'Parcel' : 'Property lines') : panelTitles[panel]}
       onClose={close}
       onBack={panel === 'sources' ? () => open('layers') : panel === 'diagnostics' ? () => open('sources') : undefined}
     >
@@ -290,10 +420,18 @@
           positionOn={pos.on}
           onTogglePosition={(on) => (on ? position.tapLocate() : position.turnOff())}
           onTogglePublicLand={(on) => (publicLandOn = on)}
+          {parcelsOn}
+          onToggleParcels={(on) => (parcelsOn = on)}
           onOpenSources={() => open('sources')}
         />
-      {:else if panel === 'details' && site}
-        <PublicLandDetails {site} sources={sourcesForSite(site, publicLandSources)} />
+      {:else if panel === 'details' && (site || showParcelInfo)}
+        {#if site}
+          <PublicLandDetails {site} sources={sourcesForSite(site, publicLandSources)} />
+        {/if}
+        {#if parcelInfo && showParcelInfo}
+          {#if site}<hr class="split" />{/if}
+          <ParcelDetails panel={parcelInfo} />
+        {/if}
       {:else if panel === 'sources'}
         <SourcesScreen entries={session?.entries ?? []} onOpenDiagnostics={() => open('diagnostics')} />
       {:else if panel === 'diagnostics'}
@@ -429,6 +567,13 @@
 
   .readout-slot > :global(*) {
     pointer-events: auto;
+  }
+
+  /* Between a public land site and the parcel under it, in one panel. */
+  .split {
+    margin: 20px -16px 16px;
+    border: 0;
+    border-top: 6px solid var(--surface-alt);
   }
 
   @media (min-width: 600px) {
