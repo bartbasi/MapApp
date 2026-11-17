@@ -27,7 +27,10 @@ Files:
 | `lib/common.sh` | Bash helpers: paths, downloads to a temporary name, atomic publish. |
 | `lib/mapdata.py` | Python helpers: `counties.json`, the county outline, tile math, metadata writing and validation. `python3 -I pipeline/lib/mapdata.py validate-meta <meta.json> <archive>` checks any archive. |
 | `sources.json` | Name, license, credit and address of each source, copied into the metadata. |
+| `lib/protomaps.sh` | Chooses the Protomaps planet build and reads its OpenStreetMap data time. Used by `basemap` and the overview map. |
 | `layers/basemap.sh` | The `basemap` layer. |
+| `layers/overview.sh` | The overview map that comes with the app (see "The overview map" below). Not a county layer: run it on its own, with no county. |
+| `checks/overview_tiles.py` | Tiles and bytes per zoom of a base map archive, and the decoded tile under given points: layers, road kinds, water and place names. |
 | `layers/publicland.sh`, `layers/publicland.py` | The `publicland` layer. |
 | `layers/publicland-mapping.json` | Every PAD-US mapping table: manager names, categories, access, filter thresholds, corrections. |
 | `layers/aerial.sh`, `layers/aerial.py` | The `aerial` layer: NAIP images found by a catalog search of the county, read at the 1.2 m level, cached per image in `data/cache/naip/`, tiled to WebP. `AERIAL_MAX_GB` (default 15) stops a county whose projected download is larger. |
@@ -112,6 +115,20 @@ data/build/<county-id>/<layer>.meta.json
 | `aerial` | raster | 7 to 16 | USDA NAIP 2025, with the newest earlier NAIP year where 2025 has gaps | Natural color, leaf-on summer imagery, built from the 1.2 m level. |
 | `publicland` | vector | 10 to 14 | USGS PAD-US 4.1, corrected with the regional planning commission's open spaces | One vector layer named `publicland`. Fields below. |
 | `parcels` | vector | 13 to 16 | The county's own parcel service, used with the county's permission (D25) | One vector layer named `parcels`. Four fields, below. Not built for Champaign County (see below). |
+
+### The overview map
+
+The app carries one small base map of the whole region, so the map and the area picker have something to show before any county is downloaded. It is built by:
+
+```
+wsl -d Ubuntu -- bash pipeline/layers/overview.sh
+```
+
+- It is a `basemap` archive like a county's: the same Protomaps build source and tile layout, so the app's base map style draws it unchanged. Its files are `data/build/overview/basemap.pmtiles` and `basemap.meta.json` (`OUT_DIR=<dir>` writes elsewhere).
+- Its area is the bounding box of every county in `counties.json`, widened by 0.5 degrees on each side (`OVERVIEW_MARGIN`). Adding a county widens it with no code change. Tiles are whole, as in any vector archive.
+- Its top zoom is measured, not fixed. The area is cut once at the highest candidate zoom by range reads, each lower candidate is cut from that local copy, and the highest zoom whose archive is under 8,000,000 bytes is kept (`OVERVIEW_ZOOMS`, default `9 10 11 12`; `OVERVIEW_MAX_BYTES`; `OVERVIEW_MAXZOOM=<z>` forces one). Measured on 2026-11-17 with build `20261117.pmtiles`: zoom 0 to 9 is 1.6 MB, to 10 is 3.5 MB, to 11 is 6.9 MB, to 12 is 13.7 MB, so zoom 0 to 11 is kept.
+- Its metadata differs from a county archive's in three ways only: `county` is `"overview"`, `countyName` is `"Overview map"`, and `maxzoom` is the zoom the build kept, which must be above `minzoom` 0 and below the county base map's 15. `bounds` is the widened box. It has no `coverage`. The validator holds county archives to the zooms in the table below exactly as before.
+- It is not a county, so `build.sh` and `publish.py` leave it out.
 
 ### Fields of the `publicland` layer
 

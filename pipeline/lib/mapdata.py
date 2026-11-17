@@ -9,6 +9,7 @@ bash scripts:
     python3 -I pipeline/lib/mapdata.py outline <county-id>
     python3 -I pipeline/lib/mapdata.py write-meta <args...>
     python3 -I pipeline/lib/mapdata.py validate-meta <meta.json> [archive.pmtiles]
+    python3 -I pipeline/lib/mapdata.py region-bounds <margin in degrees>
 
 Nothing in this file names a county. Counties come from pipeline/counties.json.
 """
@@ -42,6 +43,14 @@ LAYERS = {
     "publicland": {"kind": "vector", "title": "Public land", "minzoom": 10, "maxzoom": 14},
     "parcels": {"kind": "vector", "title": "Parcels", "minzoom": 13, "maxzoom": 16},
 }
+
+# The overview map: one low-zoom base map of the area around all counties,
+# shipped inside the app. It is not a county. Its metadata uses this id in
+# 'county' and this name in 'countyName', and its maxzoom is whatever the
+# build chose, below the county base map's (pipeline/README.md).
+OVERVIEW_ID = "overview"
+OVERVIEW_NAME = "Overview map"
+OVERVIEW_LAYER = "basemap"
 
 # Census TIGERweb, current vintage, "Counties" layer. A single-county query is
 # about 60 KB, far lighter than the national cartographic boundary file.
@@ -78,6 +87,8 @@ def get_county(county_id):
 
 
 def county_label(county):
+    if county["id"] == OVERVIEW_ID:
+        return OVERVIEW_NAME
     return f"{county['name']}, {county['stateName']}"
 
 
@@ -364,6 +375,17 @@ def outline_bounds(county, digits=4):
             math.ceil(env[1] * f) / f, math.ceil(env[3] * f) / f]
 
 
+def region_bounds(margin, digits=4):
+    """Bounding box of all counties in counties.json, widened by margin
+    degrees on each side and rounded outward. Used for the overview map."""
+    boxes = [outline_bounds(c, digits) for c in load_counties()]
+    f = 10 ** digits
+    return [math.floor((min(b[0] for b in boxes) - margin) * f) / f,
+            math.floor((min(b[1] for b in boxes) - margin) * f) / f,
+            math.ceil((max(b[2] for b in boxes) + margin) * f) / f,
+            math.ceil((max(b[3] for b in boxes) + margin) * f) / f]
+
+
 # ---------------------------------------------------------------- tiles
 
 def lonlat_to_tile(lon, lat, z):
@@ -457,8 +479,16 @@ def source_entry(key, data_date=None, name_suffix="", **fields):
 def make_meta(layer, county, archive, sources, notes, bounds=None, provenance=None, coverage=None):
     """Metadata for an archive. For raster archives, tileSize is read back
     from a decoded tile. coverage, when given, is the area the archive's data
-    covers, as a GeoJSON geometry (see coverage_geometry)."""
+    covers, as a GeoJSON geometry (see coverage_geometry). For the overview
+    map, county is {"id": OVERVIEW_ID}, bounds are required and the zooms are
+    read from the archive header."""
     spec = LAYERS[layer]
+    minzoom, maxzoom = spec["minzoom"], spec["maxzoom"]
+    if county["id"] == OVERVIEW_ID:
+        if not bounds:
+            raise PipelineError("the overview map needs explicit bounds")
+        h = pmtiles_header(archive)
+        minzoom, maxzoom = h["minzoom"], h["maxzoom"]
     meta = {
         "schema": 1,
         "layer": layer,
@@ -466,8 +496,8 @@ def make_meta(layer, county, archive, sources, notes, bounds=None, provenance=No
         "countyName": county_label(county),
         "kind": spec["kind"],
         "title": spec["title"],
-        "minzoom": spec["minzoom"],
-        "maxzoom": spec["maxzoom"],
+        "minzoom": minzoom,
+        "maxzoom": maxzoom,
         "bounds": bounds or outline_bounds(county),
         "bytes": os.path.getsize(archive),
         "buildDate": datetime.date.today().isoformat(),
@@ -499,12 +529,27 @@ def validate_meta(meta, archive=None):
     if meta["schema"] != 1:
         p.append("schema must be 1")
     spec = LAYERS.get(meta["layer"])
-    if not spec:
+    overview = meta["county"] == OVERVIEW_ID
+    # The zooms the archive header must have: the contract's for a county
+    # archive, the metadata's own for the overview map (checked just below).
+    zooms = (spec["minzoom"], spec["maxzoom"]) if spec else None
+    if overview and meta["layer"] != OVERVIEW_LAYER:
+        p.append(f"the overview map must be layer '{OVERVIEW_LAYER}', not '{meta['layer']}'")
+        spec = None
+    elif not spec:
         p.append(f"unknown layer '{meta['layer']}'")
-    else:
-        for k in ("kind", "minzoom", "maxzoom"):
+    if spec:
+        for k in ("kind",) if overview else ("kind", "minzoom", "maxzoom"):
             if meta[k] != spec[k]:
                 p.append(f"{k} is {meta[k]!r}, the contract says {spec[k]!r}")
+        if overview:
+            mx = meta["maxzoom"]
+            if meta["minzoom"] != spec["minzoom"]:
+                p.append(f"minzoom is {meta['minzoom']!r}, the overview map starts at {spec['minzoom']}")
+            if not (isinstance(mx, int) and not isinstance(mx, bool) and spec["minzoom"] < mx < spec["maxzoom"]):
+                p.append(f"maxzoom is {mx!r}; the overview map's must be a whole number above "
+                         f"{spec['minzoom']} and below {spec['maxzoom']}")
+            zooms = (meta["minzoom"], mx)
         if spec["kind"] == "raster":
             ts = meta.get("tileSize")
             if not isinstance(ts, int) or ts <= 0:
@@ -513,12 +558,18 @@ def validate_meta(meta, archive=None):
                 p.append(f"tileSize is {ts} but a decoded tile is {raster_tile_size(archive)} pixels")
         elif "tileSize" in meta:
             p.append("tileSize must be absent for vector archives")
-    try:
-        c = get_county(meta["county"])
-        if meta["countyName"] != county_label(c):
-            p.append(f"countyName '{meta['countyName']}' does not match '{county_label(c)}'")
-    except PipelineError as e:
-        p.append(str(e))
+    if overview:
+        if meta["countyName"] != OVERVIEW_NAME:
+            p.append(f"countyName '{meta['countyName']}' does not match '{OVERVIEW_NAME}'")
+        if "coverage" in meta:
+            p.append("the overview map has no coverage")
+    else:
+        try:
+            c = get_county(meta["county"])
+            if meta["countyName"] != county_label(c):
+                p.append(f"countyName '{meta['countyName']}' does not match '{county_label(c)}'")
+        except PipelineError as e:
+            p.append(str(e))
     if not isinstance(meta["title"], str) or not meta["title"]:
         p.append("title must be a non-empty string")
     b = meta["bounds"]
@@ -557,8 +608,8 @@ def validate_meta(meta, archive=None):
             p.append(f"archive tile type is {h.get('tile_type')}, expected {want_type}")
         if spec["kind"] == "vector" and h.get("tile_compression") != "gzip":
             p.append(f"archive tile compression is {h.get('tile_compression')}, expected gzip")
-        if h.get("minzoom") != spec["minzoom"] or h.get("maxzoom") != spec["maxzoom"]:
-            p.append(f"archive zooms are {h.get('minzoom')} to {h.get('maxzoom')}, expected {spec['minzoom']} to {spec['maxzoom']}")
+        if (h.get("minzoom"), h.get("maxzoom")) != zooms:
+            p.append(f"archive zooms are {h.get('minzoom')} to {h.get('maxzoom')}, expected {zooms[0]} to {zooms[1]}")
         hb = h.get("bounds")
         if hb and isinstance(b, list) and len(b) == 4:
             if hb[0] > b[0] + 1e-3 or hb[1] > b[1] + 1e-3 or hb[2] < b[2] - 1e-3 or hb[3] < b[3] - 1e-3:
@@ -593,6 +644,9 @@ def main(argv):
     a.add_argument("--sources", required=True, help="JSON list of [source key, data date] pairs")
     a.add_argument("--notes", required=True)
     a.add_argument("--provenance", default=None, help="JSON object")
+    a.add_argument("--bounds", default=None, help="JSON [west, south, east, north]; required for the overview map")
+    a = sub.add_parser("region-bounds")
+    a.add_argument("margin", type=float, help="degrees added on each side")
     a = sub.add_parser("validate-meta")
     a.add_argument("meta")
     a.add_argument("archive", nargs="?")
@@ -604,11 +658,14 @@ def main(argv):
         print(county_outline(get_county(args.county))[0])
     elif args.cmd == "bounds":
         print(",".join(str(v) for v in outline_bounds(get_county(args.county))))
+    elif args.cmd == "region-bounds":
+        print(json.dumps(region_bounds(args.margin)))
     elif args.cmd == "write-meta":
-        county = get_county(args.county)
+        county = {"id": OVERVIEW_ID} if args.county == OVERVIEW_ID else get_county(args.county)
         sources = [source_entry(k, d) for k, d in json.loads(args.sources)]
         prov = json.loads(args.provenance) if args.provenance else None
-        meta = make_meta(args.layer, county, args.archive, sources, args.notes, provenance=prov)
+        bounds = json.loads(args.bounds) if args.bounds else None
+        meta = make_meta(args.layer, county, args.archive, sources, args.notes, bounds=bounds, provenance=prov)
         write_meta(args.out, meta, args.archive)
     elif args.cmd == "validate-meta":
         problems = validate_meta(read_json(args.meta), args.archive)

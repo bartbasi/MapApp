@@ -9,13 +9,15 @@
 # Layers are the scripts in pipeline/layers/<layer>.sh. Counties are the
 # entries of pipeline/counties.json. Downloads are cached in data/cache/,
 # outputs go to data/build/<county-id>/. Set REFRESH=1 to download again.
+# The overview map, which covers all counties, has its own entry point:
+# bash pipeline/layers/overview.sh
 
 set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
 
 usage() {
   local layers
-  layers=$(cd "$PIPELINE_DIR/layers" && ls -1 *.sh 2>/dev/null | sed 's/\.sh$//' | tr '\n' ' ')
+  layers=$(cd "$PIPELINE_DIR/layers" && ls -1 *.sh 2>/dev/null | sed 's/\.sh$//' | grep -vx overview | tr '\n' ' ')
   log "usage: bash pipeline/build.sh <layer> <county-id>"
   log "  layers:   $layers"
   log "  counties: $(jq -r '[.[].id] | join(" ")' "$PIPELINE_DIR/counties.json")"
@@ -28,6 +30,7 @@ COUNTY="$2"
 
 require_tools python3 jq curl
 [[ "$LAYER" =~ ^[a-z0-9_-]+$ ]] || { log "error: bad layer name '$LAYER'"; usage; }
+[ "$LAYER" != overview ] || die "the overview map is not a county layer. Run: bash pipeline/layers/overview.sh"
 SCRIPT="$PIPELINE_DIR/layers/$LAYER.sh"
 [ -f "$SCRIPT" ] || { log "error: unknown layer '$LAYER'"; usage; }
 jq -e --arg id "$COUNTY" 'any(.[]; .id == $id)' "$PIPELINE_DIR/counties.json" >/dev/null \
