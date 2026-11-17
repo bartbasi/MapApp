@@ -5,6 +5,10 @@
 // <layer>.meta.json) into the Android assets folder, so the next Gradle build
 // puts them inside the APK. Step 1 only: from Step 2 the app downloads them.
 //
+// Every layer is staged, parcels (property lines) included: any
+// <layer>.pmtiles with its meta.json beside it. Parcel archives reach a phone
+// only this way, inside a test build the owner installs himself (D25).
+//
 // The target folder is emptied first, so it always matches data/build. It is
 // ignored by git (android/.gitignore): county data never goes in the repository.
 //

@@ -185,23 +185,72 @@ export const selectionPalette = {
 } as const;
 
 /**
- * Reserved for private parcel outlines (a later step). Not used yet.
- * Thin neutral lines that sit under public land in weight: a fine dark line
- * on the map view, a fine light line with a dark edge on imagery. The
- * selected parcel uses selectionPalette, the same as a selected public site.
+ * Property lines (parcel outlines), the app's core layer (D26).
+ *
+ * A cased line: a chartreuse core on a near-black casing, the same in all
+ * three base views. Chartreuse is a hue nothing else on the map uses: roads
+ * are white, cream and amber, water is blue, woods are a pale soft green,
+ * public land runs purple, orange, crimson, brown, blue and teal, and the
+ * position marker is blue. The dark casing carries the line over pale fields
+ * and the pale map; the bright core carries it over dark woods. Under
+ * red-green colour blindness the core reads as a pale yellow; it is then
+ * told from the hybrid view's cream roads by its width (a road is three to
+ * six times wider) and by its dark casing on both sides at every zoom.
+ *
+ * Widths are in screen pixels: quiet at zoom 13 to 14, clear from 15, and
+ * heavy from 17 to 20, where a few meters fill the screen.
+ * The tapped parcel uses selectionPalette, as a tapped public land site does.
  */
 export const parcelPalette = {
-  line: '#5a524a',
-  lineOpacity: 0.75,
-  lineWidth: 0.9,
-  lineOnImagery: '#f7f3e8',
-  lineCasingOnImagery: '#1a1a1a',
-  lineWidthOnImagery: 1.1,
-  /** Dashed so a parcel edge is never mistaken for a road or a public land edge. */
-  dash: [3, 2],
-  /** Parcel ID labels, from zoom 16. */
-  labelText: '#3d3730',
-  labelHalo: '#ffffff',
+  core: '#c8f53a',
+  casing: '#161a08',
+  /** [zoom, core width] stops. */
+  coreWidth: [
+    [13, 0.6],
+    [14, 0.8],
+    [15, 1.4],
+    [17, 2.2],
+    [20, 3.4],
+  ] as ReadonlyArray<readonly [number, number]>,
+  /** Casing width beyond the core, on each side together, at zoom 13 and from zoom 15. */
+  casingExtraLow: 1.2,
+  casingExtraHigh: 2.4,
+  /** Quiet at the lowest zooms. */
+  opacityLow: 0.55,
+  opacityHigh: 1,
+} as const;
+
+/**
+ * The phone against the property lines (D26), drawn above the parcel
+ * outlines and below the marker:
+ * - here: the parcel the phone is in, a wide soft glow in the marker's blue
+ *   under its lines (unlike the tapped parcel's yellow and black), drawn
+ *   below the lines so it never tints them;
+ * - connector: dashes in the marker's blue on a white casing, from the
+ *   marker to the nearest line, with a short tick across the line;
+ * - near: in the caution state, the stretch of line the phone may be on, in
+ *   amber and black hazard stripes, matching the readout's caution colours.
+ */
+export const relationPalette = {
+  hereGlow: '#1559d6',
+  hereGlowOpacity: 0.35,
+  hereGlowOnImagery: '#8fc1ff',
+  hereGlowOpacityOnImagery: 0.6,
+  hereGlowWidth: 11,
+  connector: '#1559d6',
+  connectorCasing: '#ffffff',
+  connectorWidth: 2.4,
+  connectorCasingWidth: 5,
+  /** Dash and gap, in line widths. */
+  connectorDash: [2, 1.6],
+  tick: '#1559d6',
+  tickRim: '#ffffff',
+  nearStripe: '#ffb000',
+  nearDark: '#111111',
+  nearWidth: 6,
+  nearCasingWidth: 10,
+  /** Black stripes over the amber, in line widths. */
+  nearDash: [1, 1],
 } as const;
 
 /**

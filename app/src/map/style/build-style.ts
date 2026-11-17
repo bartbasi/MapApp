@@ -19,6 +19,13 @@
 //   source's minimum zoom it is not drawn; above its maximum MapLibre overzooms.
 // - In the aerial and hybrid views a plain base map is drawn under the imagery,
 //   so the screen is not blank where or when there is no imagery.
+// - Parcels (property lines) are one source per county archive, like imagery
+//   (D27): a county's parcel tile holds only that county's parcels.
+//
+// The order, bottom to top: background, base view, public land areas, the
+// glow on the parcel the phone is in, property lines, the tapped parcel,
+// labels, public land names, the phone's relation to the property lines
+// (connector, tick, the caution stretch of line), the position marker (D26).
 
 import type { FeatureCollection, Point } from 'geojson';
 import type { LayerSpecification, SourceSpecification, StyleSpecification } from 'maplibre-gl';
@@ -30,6 +37,16 @@ import { aerialLayer } from './aerial';
 import { baseMapGroundLayers, baseMapLabelLayers, labelsOnImagery, labelsOnMap, plainBaseMapLayers } from './base-map';
 import { hybridLineLayers } from './hybrid';
 import { basePalette, imageryPalette, plainPalette } from './palette';
+import {
+  PARCEL_RELATION_SOURCE,
+  PARCEL_SELECTED_SOURCE,
+  parcelHereLayers,
+  parcelLineLayers,
+  parcelRelationLayers,
+  parcelSelectedLayers,
+  parcelSource,
+  parcelSourceId,
+} from './parcels';
 import { POSITION_SOURCE, positionLayers } from './position';
 import { PUBLIC_LAND_LABELS_SOURCE, publicLandAreaLayers, publicLandLabelLayers, type PublicLandSelection } from './public-land';
 
@@ -38,9 +55,13 @@ export type BaseView = (typeof BASE_VIEWS)[number];
 
 export const BASEMAP_LAYER = 'basemap';
 export const AERIAL_LAYER = 'aerial';
+/** The archive layer ID of parcel archives (D27). */
+export const PARCELS_LAYER = 'parcels';
 
 export interface Overlays {
   publicland: boolean;
+  /** Property lines. Off when absent. */
+  parcels?: boolean;
 }
 
 export interface StyleOptions {
@@ -59,7 +80,14 @@ export interface StyleOptions {
    * base view never drops the marker. The map updates the data in place.
    */
   position?: FeatureCollection | null;
+  /** The tapped parcel's outline. Like the marker, always in the style and updated in place. */
+  parcelSelected?: FeatureCollection | null;
+  /** The phone's relation to the property lines (parcels/relation-features.ts). Always in the style, updated in place. */
+  parcelRelation?: FeatureCollection | null;
 }
+
+/** The GeoJSON sources the map updates in place, without a style rebuild. */
+export const LIVE_SOURCES = [POSITION_SOURCE, PARCEL_SELECTED_SOURCE, PARCEL_RELATION_SOURCE] as const;
 
 const EMPTY_LABELS: FeatureCollection<Point> = { type: 'FeatureCollection', features: [] };
 const EMPTY_FEATURES: FeatureCollection = { type: 'FeatureCollection', features: [] };
@@ -159,6 +187,24 @@ export function buildStyle(opts: StyleOptions): StyleSpecification {
     overlayLabels.push(...publicLandLabelLayers(PUBLIC_LAND_LABELS_SOURCE, onImagery ? labelsOnImagery : labelsOnMap, onImagery));
   }
 
+  // Property lines: above public land, below every label (D26).
+  const parcelLines: LayerSpecification[] = [];
+  const relation: LayerSpecification[] = [];
+  const parcels = opts.installed.get(PARCELS_LAYER);
+  sources[PARCEL_SELECTED_SOURCE] = { type: 'geojson', data: opts.parcelSelected ?? EMPTY_FEATURES };
+  sources[PARCEL_RELATION_SOURCE] = { type: 'geojson', data: opts.parcelRelation ?? EMPTY_FEATURES };
+  if (opts.overlays.parcels && parcels?.kind === 'vector') {
+    // The glow on the parcel the phone is in goes under the lines, so it never tints them.
+    parcelLines.push(...parcelHereLayers(PARCEL_RELATION_SOURCE, onImagery));
+    for (const entry of parcels.archives) {
+      const id = parcelSourceId(entry);
+      sources[id] = parcelSource(entry);
+      parcelLines.push(...parcelLineLayers(id, entry.meta.minzoom));
+    }
+    parcelLines.push(...parcelSelectedLayers(PARCEL_SELECTED_SOURCE));
+    relation.push(...parcelRelationLayers(PARCEL_RELATION_SOURCE));
+  }
+
   // The position marker goes last, above every other layer (D26).
   sources[POSITION_SOURCE] = { type: 'geojson', data: opts.position ?? EMPTY_FEATURES };
 
@@ -176,8 +222,10 @@ export function buildStyle(opts: StyleOptions): StyleSpecification {
       },
       ...ground,
       ...overlayAreas,
+      ...parcelLines,
       ...labels,
       ...overlayLabels,
+      ...relation,
       ...positionLayers(POSITION_SOURCE, onImagery),
     ],
   };

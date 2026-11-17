@@ -21,6 +21,20 @@ export interface InstalledLayer {
 
 export type InstalledLayers = ReadonlyMap<string, InstalledLayer>;
 
+/**
+ * The app's own name for a layer, where it differs from the archive's title,
+ * so every screen uses the same words. Parcel archives are titled "Parcels";
+ * the app calls the layer "Property lines" everywhere.
+ */
+const APP_LAYER_TITLES: Readonly<Record<string, string>> = {
+  parcels: 'Property lines',
+};
+
+/** The title a screen shows for an archive's layer. */
+export function layerTitle(entry: ArchiveEntry): string {
+  return APP_LAYER_TITLES[entry.layer] ?? entry.meta.title;
+}
+
 export function summarizeInstalled(entries: readonly ArchiveEntry[]): InstalledLayers {
   const groups = new Map<string, ArchiveEntry[]>();
   for (const e of entries) {
@@ -39,7 +53,7 @@ export function summarizeInstalled(entries: readonly ArchiveEntry[]): InstalledL
     out.set(layer, {
       layer,
       kind: first.meta.kind,
-      title: first.meta.title,
+      title: layerTitle(first),
       minzoom: Math.min(...sameKind.map((a) => a.meta.minzoom)),
       maxzoom: Math.max(...sameKind.map((a) => a.meta.maxzoom)),
       bounds: unionBounds(sameKind.map((a) => a.meta.bounds)) ?? [-180, -85, 180, 85],

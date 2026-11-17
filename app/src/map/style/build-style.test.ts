@@ -6,7 +6,9 @@ import type { FeatureCollection, Point } from 'geojson';
 import { describe, expect, it } from 'vitest';
 import type { ArchiveEntry, ArchiveMeta } from '../../platform/archive-meta';
 import { firstSentence, summarizeInstalled } from '../installed';
-import { availableBaseViews, buildStyle, effectiveBaseView, type StyleOptions } from './build-style';
+import { PARCEL_LAYER } from '../../parcels/stored-parcel-source';
+import { LIVE_SOURCES, PARCELS_LAYER, availableBaseViews, buildStyle, effectiveBaseView, type StyleOptions } from './build-style';
+import { PARCEL_RELATION_LAYER_IDS, PARCEL_RELATION_SOURCE, PARCEL_SELECTED_SOURCE } from './parcels';
 import { POSITION_LAYER_IDS, POSITION_SOURCE } from './position';
 
 const CHAMPAIGN: [number, number, number, number] = [-88.47, 39.87, -87.92, 40.41];
@@ -41,6 +43,16 @@ const everything = summarizeInstalled([
   entry('il-macon', 'publicland', 'vector', { minzoom: 10, maxzoom: 14, bounds: MACON }),
 ]);
 const baseOnly = summarizeInstalled([entry('il-champaign', 'basemap', 'vector')]);
+/** Both counties' base layers, and parcels for Macon County only. */
+const withParcels = summarizeInstalled([
+  entry('il-champaign', 'basemap', 'vector'),
+  entry('il-macon', 'basemap', 'vector', { bounds: MACON }),
+  entry('il-champaign', 'aerial', 'raster', { minzoom: 10, maxzoom: 16 }),
+  entry('il-macon', 'aerial', 'raster', { bounds: MACON }),
+  entry('il-champaign', 'publicland', 'vector', { minzoom: 10, maxzoom: 14 }),
+  entry('il-macon', 'publicland', 'vector', { minzoom: 10, maxzoom: 14, bounds: MACON }),
+  entry('il-macon', 'parcels', 'vector', { minzoom: 13, maxzoom: 16, bounds: MACON }),
+]);
 
 function opts(o: Partial<StyleOptions>): StyleOptions {
   return { base: 'map', overlays: { publicland: true }, installed: everything, glyphs: 'http://x/fonts/{fontstack}/{range}.pbf', ...o };
@@ -51,8 +63,8 @@ type Style = ReturnType<typeof buildStyle>;
 const allIds = (s: Style) => s.layers.map((l) => l.id);
 /** The map's own layers: the position marker is always there and is tested on its own below. */
 const ids = (s: Style) => allIds(s).filter((id) => !id.startsWith('position-'));
-/** The map data sources, leaving out the position marker's. */
-const dataSources = (s: Style) => Object.keys(s.sources).filter((k) => k !== POSITION_SOURCE);
+/** The map data sources, leaving out the ones the map fills in place (the marker, the tapped parcel, the relation). */
+const dataSources = (s: Style) => Object.keys(s.sources).filter((k) => !(LIVE_SOURCES as readonly string[]).includes(k));
 const sourceOf = (s: Style, id: string) => {
   const l = s.layers.find((x) => x.id === id);
   return l && 'source' in l ? l.source : undefined;
@@ -195,6 +207,78 @@ describe('buildStyle: public land', () => {
 
   it('outlines the selected site', () => {
     expect(ids(buildStyle(opts({ selection: { name: 'Lake of the Woods', manager: 'Someone' } })))).toContain('publicland-selected');
+  });
+});
+
+describe('buildStyle: property lines', () => {
+  const on = (o: Partial<StyleOptions> = {}) => opts({ installed: withParcels, overlays: { publicland: true, parcels: true }, ...o });
+
+  it('the archive layer ID matches the parcel source module', () => {
+    expect(PARCELS_LAYER).toBe(PARCEL_LAYER);
+  });
+
+  it('one source per county archive, addressed to that archive, with its own zooms and bounds', () => {
+    const s = buildStyle(on());
+    expect(s.sources['parcels:il-macon']).toEqual({ type: 'vector', tiles: ['mapapp://parcels@il-macon/{z}/{x}/{y}'], minzoom: 13, maxzoom: 16, bounds: MACON });
+    expect(dataSources(s).filter((k) => k.startsWith('parcels'))).toEqual(['parcels:il-macon']);
+    const two = summarizeInstalled([
+      entry('il-champaign', 'basemap', 'vector'),
+      entry('il-champaign', 'parcels', 'vector', { minzoom: 13, maxzoom: 16 }),
+      entry('il-macon', 'parcels', 'vector', { minzoom: 13, maxzoom: 16, bounds: MACON }),
+    ]);
+    const s2 = buildStyle(on({ installed: two }));
+    expect(dataSources(s2).filter((k) => k.startsWith('parcels')).sort()).toEqual(['parcels:il-champaign', 'parcels:il-macon']);
+    expect(ids(s2).filter((id) => id.startsWith('parcels-line:'))).toEqual(['parcels-line:parcels:il-champaign', 'parcels-line:parcels:il-macon']);
+  });
+
+  for (const base of ['map', 'aerial', 'hybrid'] as const) {
+    it(`${base} view: above public land and the base view, below labels; relation above labels, below the marker`, () => {
+      const order = allIds(buildStyle(on({ base })));
+      const casing = order.indexOf('parcels-casing:parcels:il-macon');
+      const line = order.indexOf('parcels-line:parcels:il-macon');
+      expect(casing).toBeGreaterThan(0);
+      expect(casing).toBeLessThan(line);
+      for (const id of order.filter((x) => x.startsWith('publicland-') && x !== 'publicland-label')) expect(order.indexOf(id), id).toBeLessThan(casing);
+      for (const id of order.filter((x) => x.startsWith('imagery:') || x.startsWith('hybrid-') || x.startsWith('base-'))) expect(order.indexOf(id), id).toBeLessThan(casing);
+      const labels = order.filter((x) => x.startsWith('label-') || x === 'publicland-label');
+      if (base !== 'aerial') expect(labels.length).toBeGreaterThan(0);
+      for (const id of labels) expect(order.indexOf(id), id).toBeGreaterThan(order.indexOf('parcel-selected'));
+      // The relation layers sit just under the marker, the marker stays last.
+      const tail = order.slice(-(PARCEL_RELATION_LAYER_IDS.length + POSITION_LAYER_IDS.length));
+      expect(tail).toEqual([...PARCEL_RELATION_LAYER_IDS, ...POSITION_LAYER_IDS]);
+      // The glow on the parcel the phone is in sits just under the lines, above public land.
+      expect(order.indexOf('parcel-here')).toBe(casing - 1);
+    });
+  }
+
+  it('starts at the archive minimum zoom', () => {
+    const s = buildStyle(on());
+    const l = s.layers.find((x) => x.id === 'parcels-line:parcels:il-macon') as { minzoom?: number };
+    expect(l.minzoom).toBe(13);
+  });
+
+  it('off: no parcel source or layer, but the in-place sources stay so a switch keeps their data', () => {
+    const s = buildStyle(on({ overlays: { publicland: true, parcels: false } }));
+    expect(Object.keys(s.sources).some((k) => k.startsWith('parcels:'))).toBe(false);
+    expect(allIds(s).some((id) => id.startsWith('parcel'))).toBe(false);
+    expect(s.sources[PARCEL_SELECTED_SOURCE]).toBeDefined();
+    expect(s.sources[PARCEL_RELATION_SOURCE]).toBeDefined();
+  });
+
+  it('not installed: no parcel layers even when switched on', () => {
+    expect(allIds(buildStyle(opts({ overlays: { publicland: true, parcels: true } }))).some((id) => id.startsWith('parcel'))).toBe(false);
+  });
+
+  it('carries the tapped outline and the relation data into a new style', () => {
+    const fc: FeatureCollection = { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { part: 'connector' }, geometry: { type: 'LineString', coordinates: [[-89, 39.8], [-89.001, 39.8]] } }] };
+    const s = buildStyle(on({ base: 'aerial', parcelSelected: fc, parcelRelation: fc }));
+    expect(s.sources[PARCEL_SELECTED_SOURCE]).toEqual({ type: 'geojson', data: fc });
+    expect(s.sources[PARCEL_RELATION_SOURCE]).toEqual({ type: 'geojson', data: fc });
+    expect(validateStyleMin(s)).toEqual([]);
+  });
+
+  it('passes the style validator in every base view', () => {
+    for (const base of ['map', 'aerial', 'hybrid'] as const) expect(validateStyleMin(buildStyle(on({ base }))).map((e) => e.message), base).toEqual([]);
   });
 });
 

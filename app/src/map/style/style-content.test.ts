@@ -11,7 +11,7 @@ import { summarizeInstalled } from '../installed';
 import { PUBLIC_LAND_CATEGORIES } from '../public-land';
 import { buildStyle, type BaseView, type StyleOptions } from './build-style';
 import { STYLE_IMAGE_IDS, styleImage } from './images';
-import { parcelPalette, publicLandDash, publicLandPalette, publicLandStyle, selectionPalette } from './palette';
+import { basePalette, imageryPalette, parcelPalette, positionPalette, publicLandDash, publicLandPalette, publicLandStyle, publicLandTextPalette, relationPalette, selectionPalette } from './palette';
 
 function entry(layer: string, kind: 'vector' | 'raster'): ArchiveEntry {
   const meta: ArchiveMeta = {
@@ -153,14 +153,57 @@ describe('style content: base map', () => {
   });
 });
 
-describe('style content: reserved for parcels', () => {
-  it('parcel colors exist and differ from every public land color and the selection', () => {
-    const taken = new Set<string>([...Object.values(publicLandPalette), selectionPalette.core]);
-    expect(taken.has(parcelPalette.line)).toBe(false);
-    expect(taken.has(parcelPalette.lineOnImagery)).toBe(false);
+describe('style content: property lines', () => {
+  const withParcels = summarizeInstalled([entry('basemap', 'vector'), entry('aerial', 'raster'), entry('publicland', 'vector'), entry('parcels', 'vector')]);
+  const parcelStyle = (base: BaseView) => style(base, { installed: withParcels, overlays: { publicland: true, parcels: true } });
+
+  it('a cased line in every base view: dark casing under a bright core, no fill', () => {
+    for (const base of ['map', 'aerial', 'hybrid'] as const) {
+      const layers = parcelStyle(base).layers;
+      const parcelLayers = layers.filter((l) => (l as { source?: string }).source === 'parcels:il-champaign');
+      expect(parcelLayers.map((l) => l.type)).toEqual(['line', 'line']);
+      expect(layer(layers, 'parcels-casing:parcels:il-champaign')?.paint?.['line-color']).toBe(parcelPalette.casing);
+      expect(layer(layers, 'parcels-line:parcels:il-champaign')?.paint?.['line-color']).toBe(parcelPalette.core);
+    }
   });
 
-  it('no layer draws parcels yet', () => {
+  it('the core color is not used by public land, roads, water, the marker or the selection', () => {
+    const taken = new Set<string>(
+      [
+        ...Object.values(publicLandPalette),
+        ...Object.values(publicLandTextPalette),
+        selectionPalette.core,
+        ...Object.values(basePalette),
+        ...Object.values(imageryPalette),
+        ...Object.values(positionPalette).filter((v) => typeof v === 'string'),
+      ].map((c) => String(c).toLowerCase()),
+    );
+    expect(taken.has(parcelPalette.core.toLowerCase())).toBe(false);
+  });
+
+  it('thin at zoom 13, clear at 15 and heavy at 20', () => {
+    const w = new Map(parcelPalette.coreWidth.map(([z, v]) => [z, v]));
+    expect(w.get(13)!).toBeLessThan(1);
+    expect(w.get(15)!).toBeGreaterThan(w.get(13)!);
+    expect(w.get(20)!).toBeGreaterThanOrEqual(3);
+  });
+
+  it('the tapped parcel uses the selection colors; the parcel the phone is in uses the marker blue, not the selection', () => {
+    const layers = parcelStyle('map').layers;
+    expect(layer(layers, 'parcel-selected')?.paint?.['line-color']).toBe(selectionPalette.core);
+    expect(layer(layers, 'parcel-here')?.paint?.['line-color']).toBe(relationPalette.hereGlow);
+    expect(relationPalette.hereGlow).not.toBe(selectionPalette.core);
+  });
+
+  it('the connector and tick show from zoom 15; the tick image can be drawn', () => {
+    const layers = parcelStyle('hybrid').layers;
+    expect((layer(layers, 'parcel-connector') as { minzoom?: number }).minzoom).toBe(15);
+    expect((layer(layers, 'parcel-tick') as { minzoom?: number }).minzoom).toBe(15);
+    expect(layer(layers, 'parcel-tick')?.layout?.['icon-image']).toBe('parcel-tick');
+    expect(STYLE_IMAGE_IDS as readonly string[]).toContain('parcel-tick');
+  });
+
+  it('no layer draws parcels when they are not installed', () => {
     for (const base of ['map', 'aerial', 'hybrid'] as const) expect(style(base).layers.some((l) => l.id.includes('parcel'))).toBe(false);
   });
 });

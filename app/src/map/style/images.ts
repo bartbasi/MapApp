@@ -6,16 +6,17 @@
 // there is no sprite file to fetch and nothing to keep in step with it. The
 // map adds an image the first time the style asks for it (map-view.ts).
 
-import { positionPalette as pos, publicLandStyle as pl, shieldPalette as sh } from './palette';
+import { positionPalette as pos, publicLandStyle as pl, relationPalette as rel, shieldPalette as sh } from './palette';
 
 export const IMAGE_HATCH_CLOSED = 'pl-hatch-closed';
 export const IMAGE_HATCH_RESTRICTED = 'pl-hatch-restricted';
 export const IMAGE_SHIELD_MAJOR = 'shield-major';
 export const IMAGE_SHIELD_COUNTY = 'shield-county';
 export const IMAGE_POSITION_HEADING = 'position-heading';
+export const IMAGE_PARCEL_TICK = 'parcel-tick';
 
 /** Every image the style may ask for. */
-export const STYLE_IMAGE_IDS = [IMAGE_HATCH_CLOSED, IMAGE_HATCH_RESTRICTED, IMAGE_SHIELD_MAJOR, IMAGE_SHIELD_COUNTY, IMAGE_POSITION_HEADING] as const;
+export const STYLE_IMAGE_IDS = [IMAGE_HATCH_CLOSED, IMAGE_HATCH_RESTRICTED, IMAGE_SHIELD_MAJOR, IMAGE_SHIELD_COUNTY, IMAGE_POSITION_HEADING, IMAGE_PARCEL_TICK] as const;
 
 export interface StyleImage {
   data: { width: number; height: number; data: Uint8ClampedArray };
@@ -137,6 +138,30 @@ function headingWedge(ratio: number): StyleImage {
   return { data, options: { pixelRatio: ratio } };
 }
 
+/**
+ * The tick where the connector meets the property line: a short bar lying
+ * east to west, in the connector's blue with a white rim. The map turns it to
+ * lie along the line.
+ */
+function tick(ratio: number): StyleImage {
+  const w = 24 * ratio;
+  const h = 10 * ratio;
+  const halfLen = 10 * ratio;
+  const halfThick = 1.8 * ratio;
+  const rimW = 1.6 * ratio;
+  const core = rgb(rel.tick);
+  const rim = rgb(rel.tickRim);
+  const data = image(w, h, (x, y) => {
+    // Distance outside a rounded bar centered in the image.
+    const qx = Math.max(Math.abs(x - w / 2) - (halfLen - halfThick), 0);
+    const d = Math.hypot(qx, Math.abs(y - h / 2)) - halfThick;
+    const inCore = clamp01(0.5 - d);
+    const inRim = clamp01(0.5 - (d - rimW));
+    return over([...core.slice(0, 3), inCore] as Rgba, [...rim.slice(0, 3), inRim] as Rgba);
+  });
+  return { data, options: { pixelRatio: ratio } };
+}
+
 /** The image the style asks for, drawn for the screen's pixel ratio, or null if the name is unknown. */
 export function styleImage(id: string, pixelRatio = 2): StyleImage | null {
   const ratio = Math.max(1, Math.min(4, Math.round(pixelRatio)));
@@ -151,6 +176,8 @@ export function styleImage(id: string, pixelRatio = 2): StyleImage | null {
       return shield(sh.county, sh.countyBorder, ratio);
     case IMAGE_POSITION_HEADING:
       return headingWedge(ratio);
+    case IMAGE_PARCEL_TICK:
+      return tick(ratio);
     default:
       return null;
   }
