@@ -300,3 +300,12 @@ Applied as:
 - **One map source per county archive**, as for imagery (D23), not one per layer. A county's parcel tile holds only that county's parcels, so two counties that share a tile must both be drawn.
 - **The position readout does not depend on what the map is showing.** It reads the zoom 16 tile under the phone straight from the archive, and the neighbouring tile when the phone is near a tile edge. It finds the parcel that holds the point and the nearest outline. Edges made by cutting a parcel at a tile boundary are not property lines and are ignored.
 - **The map can zoom to level 20**, so a few meters fill the screen.
+
+## D28. How the readout decides which side of a line the phone is on (2026-11-17, Step 2)
+
+- **The app never names a side the evidence cannot support.** The doubt around a position is the GPS accuracy the phone reports, plus 3 m for error in the county's lines. If the nearest property line is closer than that, the readout says the phone is on or near the line and names the parcels on both sides.
+- **The 3 m is a judgement, not a measurement.** County lines are drawn for tax assessment. Their error is not published and varies from place to place. The figure is one named constant in `app/src/parcels/readout.ts` and can be raised.
+- **A weak fix is said to be weak.** When the accuracy is worse than 50 m the readout says the GPS is too weak to place the phone, and marks any parcel it names as a guess.
+- **Each answer belongs to one fix.** The parcel lookup is made again for each new fix. An older answer is widened by how far the phone has moved since, and is dropped after 30 m.
+- **Every place is answered by the tile that owns it.** A tile's copy of a parcel beyond its own edge can sit a few centimeters off, which was found on the Macon County data to hide a real line and overstate the distance by more than a meter. The parcel code reads the neighbouring tile instead of trusting that copy.
+- **D8 is amended:** the two operations of `ParcelSource` are now the parcel at a point (for a tap) and the position query (for the readout). The map draws the outlines straight from the archive (D27).
