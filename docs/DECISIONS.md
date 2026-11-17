@@ -332,3 +332,10 @@ Applied as:
 - **Owner names in evidence.** A development build, or a test build made with `VITE_MAPAPP_MASK_OWNERS=1`, can show "OWNER NAME" in place of every owner, so screenshots can be kept. No other build can mask. The build given to the owner shows the real names.
 - **The distance check.** `pipeline/checks/parcels_line_distance.py` fetches named parcels from the county's service and measures test points against those outlines, without reading the archive. This is the independent side of the Step 2 distance check.
 
+## D31. The location library links a closed Google library (2026-11-17, found by the step review)
+
+- **What is there now.** The position marker reads the phone's location through the Capacitor geolocation plugin. On Android that plugin links Google's `play-services-location` library, which is not open source. With a network the plugin asks Google's fused location service for a high accuracy fix. With no network it asks the phone's GPS provider directly. Both paths were seen on the emulator.
+- **Why it matters.** MapApp is published under the GPL. An app that links a closed library cannot be listed on F-Droid, and the GPL's terms and a closed library sit badly together. The brief also says no data collection. The app sends nothing, but the fused service is Google's, and what it does with Wi-Fi and cell signals follows the phone's own settings.
+- **Recommendation, not yet decided:** replace the plugin with a small plugin of our own that uses only Android's own location interface (the GPS provider, and the platform's fused provider where the phone has one). It is about 200 lines. It removes the closed library, and for a hunter in the open the raw GPS fix is the one wanted anyway. The cost is a slower first fix indoors and in town.
+- **Until the owner answers,** the plugin stays, so that his outdoor check is not held up. This must be settled before any release.
+
