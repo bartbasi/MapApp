@@ -83,3 +83,22 @@ In the foreground the app holds one location request (BALANCED, 1 s). After the 
 - D3. Console error "Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')" at start (Capacitor/Console, line 6), seen in logcat. No visible effect.
 - D4. With location off system-wide, logcat shows the Geolocation plugin's `checkPermissions` rejecting with "Location services are not enabled." (OS-PLUG-GLOC-0007). The app shows the right message, so this is noise only.
 - Test note, not an app defect: after `adb emu fold` the cover display shows the lock screen and needs a swipe up before the app can be seen.
+
+## Addendum: the run with the network up
+
+The whole session above ran with the emulator in airplane mode. It was already on when the session began, left over from Step 1. So checks 1 to 10 show the app with no network, which is the case that matters in the field. They do not show the location path a phone takes when it has a network. That path was run afterwards, by the lead, on the same masked build.
+
+Setup: airplane mode off, wifi connected, a ping to the internet answered. The app's data was cleared, so the permission dialog came up again.
+
+- The first tap on the locate button showed the system dialog (`n1_network_up_permission_dialog.png`). "While using the app" was chosen. No other dialog appeared.
+- With the network up the app's location request is on the phone's fused provider at HIGH_ACCURACY, every 1 s, and the fused provider in turn runs the GPS at HIGH_ACCURACY. These are the lines from `dumpsys location`:
+  - `fused provider +registration 10216/io.github.bartbasi.mapapp -> Request[@+1s0ms HIGH_ACCURACY, minUpdateInterval=+500ms]`
+  - `gps provider +registration 10145/com.google.android.gms[fused_location_provider] -> Request[@+1s0ms HIGH_ACCURACY, hiddenFromAppOps, WorkSource{10216 io.github.bartbasi.mapapp}]`
+- In airplane mode the same build registers on the GPS provider directly. Its request is labelled BALANCED there, which is what check 10 recorded. The label has no effect on a GPS-only request: the fix is the GPS fix either way. The location library chooses this path itself when there is no network.
+- At (-89.0609, 39.9155) the readout said parcel 08-06-23-100-005, property line 213 ft (65 m) to the W, GPS accurate to about 16 ft (5 m) (`n2_network_up_readout_east.png`). At (-89.0625, 39.9155) it said parcel 08-06-23-100-007, 235 ft (72 m) to the E (`n3_network_up_readout_west.png`). Both match the expected 65.0 m and 71.8 m.
+- Right after a jump of 50 m between two fixes, the fused provider reported a position about 4 m short of the new fix for a second or two (68 m where 72 m was expected). With the fix held steady it read 72 m. This is the phone's own smoothing of a jump that a walking person cannot make, not the app.
+- Network use by the app with the network up: none. The phone's per-app traffic table (`dumpsys netstats`) had no entry for the app's user ID after the session.
+- After the Home button the request showed as `{bg, na}` and `(inactive)`, as in check 10.
+
+Not run with the network up: the deny path, the location-off path and the hard data cases. They do not depend on the network.
+

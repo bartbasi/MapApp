@@ -11,6 +11,8 @@ Its first job is to show where the phone is against the property lines, with no 
 - Android, in 2D.
 - Champaign County and Macon County, Illinois.
 - A map view, an aerial view and a hybrid view, and a public land layer.
+- The phone's GPS position, with a readout of the parcel it is in and the distance and direction to the nearest property line.
+- Property lines and parcel owners for Macon County. Champaign County has none yet.
 
 ## What it will never have
 
