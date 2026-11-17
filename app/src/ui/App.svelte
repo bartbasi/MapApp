@@ -100,7 +100,7 @@
   const parcelLayer = $derived(installed.get(PARCELS_LAYER));
   const countiesWithLines = $derived(((parcelLayer?.archives ?? []) as { meta: { countyName: string } }[]).map((a) => a.meta.countyName.replace(/, Illinois$/, '')));
   /** The readout's words, or null with no parcel data installed (then only the GPS accuracy shows). */
-  const readout = $derived(parcelLayer && trackerState ? readoutView(trackerState.readout, { masked, staleFix: pos.stale, countiesWithLines }) : null);
+  const readout = $derived(parcelLayer && trackerState ? readoutView(trackerState.readout, { masked, staleFix: pos.stale, fixTooOld: pos.tooOld, countiesWithLines }) : null);
   const parcelInfo = $derived(tapped ? parcelPanel(tapped.lookup, masked, countiesWithLines) : null);
   /** The parcel part of the details panel: shown alone, or under a public land site when it names a parcel. */
   const showParcelInfo = $derived(!!parcelInfo && (!site || parcelInfo.kind === 'parcels'));

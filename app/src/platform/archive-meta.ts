@@ -38,6 +38,35 @@ export interface ArchiveMeta {
    * raster tiles are 512 pixels, so that is the value when the field is absent.
    */
   tileSize?: number;
+  /** The area the archive's data covers (the county outline), when the metadata gives it. */
+  coverage?: CoverageGeometry;
+}
+
+/** A GeoJSON Polygon or MultiPolygon in longitude and latitude. */
+export type CoverageGeometry =
+  | { type: 'Polygon'; coordinates: [number, number][][] }
+  | { type: 'MultiPolygon'; coordinates: [number, number][][][] };
+
+function isRing(r: unknown): r is [number, number][] {
+  return (
+    Array.isArray(r) &&
+    r.length >= 4 &&
+    r.every((p) => Array.isArray(p) && p.length >= 2 && typeof p[0] === 'number' && typeof p[1] === 'number' && Number.isFinite(p[0]) && Number.isFinite(p[1]) && Math.abs(p[0]) <= 180 && Math.abs(p[1]) <= 90)
+  );
+}
+
+const isPolygon = (p: unknown): p is [number, number][][] => Array.isArray(p) && p.length > 0 && p.every(isRing);
+
+/** The metadata's coverage geometry, or undefined when it is absent or not a valid polygon. */
+export function parseCoverage(raw: unknown): CoverageGeometry | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const o = raw as { type?: unknown; coordinates?: unknown };
+  const strip = (r: [number, number][]) => r.map((p) => [p[0], p[1]] as [number, number]);
+  if (o.type === 'Polygon' && isPolygon(o.coordinates)) return { type: 'Polygon', coordinates: o.coordinates.map(strip) };
+  if (o.type === 'MultiPolygon' && Array.isArray(o.coordinates) && o.coordinates.length > 0 && o.coordinates.every(isPolygon)) {
+    return { type: 'MultiPolygon', coordinates: (o.coordinates as [number, number][][][]).map((poly) => poly.map(strip)) };
+  }
+  return undefined;
 }
 
 /** The raster tile size the contract fixes, used when metadata does not say. */
@@ -112,6 +141,10 @@ export function parseArchiveMeta(raw: unknown): ArchiveMeta {
   });
   const layer = str(o, 'layer');
   const county = str(o, 'county');
+  // A malformed outline is left out, not fatal: the app then decides coverage
+  // as it did before the field existed.
+  const coverage = parseCoverage(o['coverage']);
+  if (o['coverage'] !== undefined && !coverage) console.warn(`metadata of ${county}/${layer}: coverage is not a valid polygon, ignored`);
   if (!ARCHIVE_ID_PATTERN.test(layer) || !ARCHIVE_ID_PATTERN.test(county)) {
     throw new Error('metadata layer or county is not a valid ID');
   }
@@ -130,5 +163,6 @@ export function parseArchiveMeta(raw: unknown): ArchiveMeta {
     sources,
     notes: str(o, 'notes', ''),
     ...(typeof o['tileSize'] === 'number' && [256, 512].includes(o['tileSize']) ? { tileSize: o['tileSize'] } : {}),
+    ...(coverage ? { coverage } : {}),
   };
 }

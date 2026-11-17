@@ -20,7 +20,7 @@ const B = details('B');
 
 /** A north-south line 'distance' meters east of the phone, 1 km long. */
 function line(distanceM: number): PropertyLine {
-  return { distanceM, bearingDeg: 90, point: east(distanceM), thisSide: [A], otherSide: [B], segment: [east(distanceM, -500), east(distanceM, 500)] };
+  return { distanceM, bearingDeg: 90, point: east(distanceM), thisSide: [A], otherSide: [B], thisSideCovered: true, otherSideCovered: true, segment: [east(distanceM, -500), east(distanceM, 500)] };
 }
 const query = (l: PropertyLine | null, inside: ParcelDetails[] | null = [A]): PositionQuery => ({ at, coverage: 'ok', searchRadiusM: 150, inside, nearestLine: l });
 const here: HereOutline = { county: 'il-test', pid: 'A', lines: { type: 'MultiLineString', coordinates: [[[at.lng, at.lat], [at.lng, at.lat + 0.001]]] } };

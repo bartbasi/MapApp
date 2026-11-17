@@ -57,7 +57,7 @@ describe('tap panel: parcels', () => {
 describe('tap panel: no parcel', () => {
   it('a record with no parcel ID is not a parcel: the plain message, no owner', () => {
     const strip = details(' ', { pid: '', owner: '', acres: null });
-    expect(parcelPanel(lookup([strip]), false, [])).toEqual({ kind: 'gap', title: 'Not in a parcel.', text: 'This is often a road or a railway.' });
+    expect(parcelPanel(lookup([strip]), false, [])).toEqual({ kind: 'gap', title: 'Not in a parcel.', text: 'This is often a road, a railway or water.' });
     expect(parcelPanel(lookup([]), false, []).kind).toBe('gap');
     // A real parcel under a strip is still shown.
     const p = parcelPanel(lookup([strip, details('R')]), false, []);
@@ -71,5 +71,13 @@ describe('tap panel: no parcel', () => {
       text: 'Property lines are installed for Macon County only.',
     });
     expect(parcelPanel(lookup([], 'read-error'), false, []).kind).toBe('no-data');
+  });
+
+  it('a tap in no parcel outside the area the data covers says there are no property lines here, not that it is no parcel', () => {
+    expect(parcelPanel(lookup([], 'outside'), false, ['Macon County'])).toEqual({
+      kind: 'no-data',
+      title: 'No property lines for this place yet.',
+      text: 'Property lines are installed for Macon County only.',
+    });
   });
 });

@@ -8,24 +8,36 @@
 
 import { PMTiles, type RangeResponse, type Source } from 'pmtiles';
 import { describe, expect, it } from 'vitest';
+import { parseArchiveMeta } from '../platform/archive-meta';
+import { CoverageArea } from './coverage-area';
 import { decodeParcelTile, decompressTile } from './parcel-tile';
 import { PARCEL_RECORD_FIELDS } from './parcel-record';
 import { insideRings, signedArea } from './planar';
+import { positionReadout } from './readout';
 import { StoredParcelSource, type ParcelArchive } from './stored-parcel-source';
 import { PARCEL_ZOOM, lngLatToTileUnits, tileAt, tileUnitsToLngLat } from './tile-coords';
 
 interface Fs {
   existsSync(p: URL): boolean;
   readFileSync(p: URL): Uint8Array;
+  readFileSync(p: URL, encoding: 'utf8'): string;
 }
 
 // The app's type settings carry no Node types, so the file system is reached
 // through the one Node call needed, typed by hand.
 const fs = (globalThis as { process?: { getBuiltinModule?(id: string): unknown } }).process?.getBuiltinModule?.('node:fs') as Fs | undefined;
 const file = new URL('../../../data/build/il-macon/parcels.pmtiles', import.meta.url);
+const metaFile = new URL('../../../data/build/il-macon/parcels.meta.json', import.meta.url);
 const present = !!fs && fs.existsSync(file);
 
-function archive(): ParcelArchive {
+/** The county outline from the metadata on disk, or null if the file or its coverage is not there. */
+function coverageFromMeta(): CoverageArea | null {
+  if (!fs?.existsSync(metaFile)) return null;
+  const meta = parseArchiveMeta(JSON.parse(fs.readFileSync(metaFile, 'utf8')));
+  return meta.coverage ? new CoverageArea(meta.coverage) : null;
+}
+
+function archive(coverage: CoverageArea | null = null): ParcelArchive {
   // Copied into a plain Uint8Array: a Node Buffer's slice is a view, not a copy.
   const bytes = new Uint8Array(fs!.readFileSync(file));
   const source: Source = {
@@ -42,6 +54,7 @@ function archive(): ParcelArchive {
     minzoom: 13,
     maxzoom: 16,
     bounds: [-89.2179, 39.6526, -88.745, 40.0554],
+    coverage,
     getTile: async (z, x, y) => (await pm.getZxy(z, x, y))?.data,
   };
 }
@@ -155,10 +168,51 @@ describe.skipIf(!present)('real Macon County parcel archive', () => {
     }
     console.log(`clip edge cross-check, zoom 16 against zoom 15 at ${compared} points beside two tile edges: largest distance difference ${maxDiff.toFixed(2)} m, ${sideMismatch} with different parcels at the line, ${insideMismatch} with a different containing parcel`);
     expect(maxDiff).toBeLessThan(0.5);
+    expect(insideMismatch).toBe(0);
+    // sideMismatch is 1 on the 2026-10-28 data and stays a logged number: at
+    // that point two lines lie within 0.05 m of the same distance, and the
+    // slightly simplified zoom 15 picks the other one.
 
     // Timing: a fix a second must be cheap once the tiles are in the cache.
     const start = performance.now();
     for (let k = 0; k < 20; k++) await src.positionQuery({ lng: centre.lng + k * 1e-5, lat: centre.lat });
     console.log(`20 cached queries: ${((performance.now() - start) / 20).toFixed(1)} ms each`);
+  }, 60000);
+
+  const coverage = present ? coverageFromMeta() : null;
+
+  it.skipIf(!coverage)('tells land outside the county from a gap inside it, with the county outline from the metadata', async () => {
+    const src = new StoredParcelSource([archive(coverage)]);
+    const read = async (lng: number, lat: number, accuracyM = 5) => {
+      const q = await src.positionQuery({ lng, lat });
+      return { q, r: positionReadout({ lng, lat, accuracyM }, q) };
+    };
+    // 394 m outside the county, where a tile that straddles the county line
+    // exists: this read "Not in a parcel" before the outline was used.
+    const outside = await read(-89.14271, 39.6529);
+    expect(outside.q.coverage).toBe('outside');
+    expect(outside.r.kind).not.toBe('no-parcel');
+    expect(outside.r).toEqual({ kind: 'no-data', reason: 'outside' });
+    // Lake Decatur, inside the county, where there is no tile at all: this
+    // read "No property lines for this place yet" before.
+    const lake = await read(-88.939, 39.819);
+    expect(lake.q.coverage).toBe('ok');
+    expect(lake.r.kind).not.toBe('no-data');
+    expect(lake.r.kind).toBe('no-parcel');
+    const tap = await src.parcelsAt({ lng: -89.14271, lat: 39.6529 });
+    expect(tap.coverage).toBe('outside');
+    console.log(`outside the county: ${outside.r.kind}; the lake: ${lake.r.kind}, ${lake.q.nearestLine ? `line ${lake.q.nearestLine.distanceM.toFixed(0)} m` : 'no line within 150 m'}`);
+  }, 60000);
+
+  it('names the outer parcel across the edge of a parcel lying inside it', async () => {
+    const src = new StoredParcelSource([archive()]);
+    const at = { lng: -88.96018, lat: 39.91608 };
+    const q = await src.positionQuery(at);
+    const r = positionReadout({ ...at, accuracyM: 4 }, q);
+    expect(r.kind).toBe('inside');
+    if (r.kind !== 'inside') return;
+    expect(r.parcel.pid).toBe('07-07-22-226-008');
+    expect(r.alsoIn.map((p) => p.pid)).toEqual(['07-07-22-226-006']);
+    expect(r.neighbour?.pid).toBe('07-07-22-226-006');
   }, 60000);
 });

@@ -15,15 +15,15 @@ function details(pid: string, owner = `PERSON ${pid}`): ParcelDetails {
   return { pid, owner, acres: 12.34, county: 'il-test', countyName: 'Test County, Illinois', dataDate: '2026-10-28' };
 }
 
-function line(distanceM: number, thisSide: ParcelDetails[], otherSide: ParcelDetails[], bearingDeg = 45): PropertyLine {
-  return { distanceM, bearingDeg, point: at, thisSide, otherSide, segment: [at, at] };
+function line(distanceM: number, thisSide: ParcelDetails[], otherSide: ParcelDetails[], bearingDeg = 45, covered: { thisSide?: boolean; otherSide?: boolean } = {}): PropertyLine {
+  return { distanceM, bearingDeg, point: at, thisSide, otherSide, thisSideCovered: covered.thisSide ?? true, otherSideCovered: covered.otherSide ?? true, segment: [at, at] };
 }
 
 function query(inside: ParcelDetails[] | null, nearestLine: PropertyLine | null, coverage: PositionQuery['coverage'] = 'ok'): PositionQuery {
   return { at, coverage, searchRadiusM: 150, inside, nearestLine };
 }
 
-const opts: ReadoutViewOptions = { masked: false, staleFix: false, countiesWithLines: ['Macon County'] };
+const opts: ReadoutViewOptions = { masked: false, staleFix: false, fixTooOld: false, countiesWithLines: ['Macon County'] };
 const view = (accuracyM: number, q: PositionQuery, o: Partial<ReadoutViewOptions> = {}) => readoutView(positionReadout({ ...at, accuracyM }, q), { ...opts, ...o });
 const A = details('11-22-333-001');
 const B = details('11-22-333-002');
@@ -68,16 +68,56 @@ describe('readout words: on or near a line', () => {
 
   it('says no parcel for a side that is a gap', () => {
     const v = view(5, query([A], line(3, [A], [])));
-    expect(v.sides[1]).toBe('No parcel. Often a road or a railway.');
+    expect(v.sides[1]).toBe('No parcel. Often a road, a railway or water.');
+  });
+
+  it('outside the data, says the near side has no property lines installed, not that it is a road', () => {
+    const v = view(5, query(null, line(4, [], [B], 270), 'outside'));
+    expect(v).toMatchObject({ kind: 'near-line', title: 'On or near a property line.' });
+    expect(v.sides).toEqual(['No property lines are installed on that side.', 'PERSON 11-22-333-002, parcel 11-22-333-002']);
+    expect(v.more).toContain('Property lines are installed for Macon County only.');
+    expect(JSON.stringify(v)).not.toContain('road');
   });
 });
 
 describe('readout words: in no parcel', () => {
   it('says not in a parcel, what that usually is, and the nearest line', () => {
     const v = view(2, query(null, line(12, [], [B], 90)));
-    expect(v).toMatchObject({ kind: 'no-parcel', tone: 'clear', icon: 'gap', title: 'Not in a parcel.', lines: ['This is often a road or a railway.'] });
+    expect(v).toMatchObject({ kind: 'no-parcel', tone: 'clear', icon: 'gap', title: 'Not in a parcel.', lines: ['This is often a road, a railway or water.'] });
     expect(v.small[0]).toBe(`Nearest property line 39${NB}ft${NB}(12${NB}m)${NB}to${NB}the${NB}E`);
     expect(v.more[0]).toBe('Across that line: PERSON 11-22-333-002, parcel 11-22-333-002.');
+  });
+
+  it('says when no line is within the search radius', () => {
+    expect(view(2, query(null, null)).small[0]).toBe(`No property line within 492${NB}ft${NB}(150${NB}m)`);
+  });
+});
+
+describe('readout words: at the edge of the parcel data', () => {
+  it('outside the data with no line near, says no property lines for this place, never not in a parcel', () => {
+    const v = view(4, query(null, line(40, [], [B], 270, { thisSide: false }), 'outside'));
+    expect(v).toMatchObject({ kind: 'no-data', tone: 'none', title: 'No property lines for this place yet.', lines: ['Property lines are installed for Macon County only.'] });
+  });
+
+  it('inside a parcel at the edge of the data, says plainly that no property lines are installed across the line', () => {
+    const v = view(4, query([A], line(30, [A], [], 90, { otherSide: false })));
+    expect(v.kind).toBe('inside');
+    expect(v.more).toContain('No property lines are installed across that line.');
+    expect(v.more).toContain('Property lines are installed for Macon County only.');
+    expect(JSON.stringify(v.more)).not.toContain('road');
+  });
+
+  it('inside a parcel with a gap across the line inside the data, says no parcel, often a road', () => {
+    const v = view(4, query([A], line(30, [A], [])));
+    expect(v.more).toContain('Across that line: no parcel. Often a road, a railway or water.');
+  });
+
+  it('names the outer parcel across the edge of a parcel inside it', () => {
+    const inner = details('07-07-22-226-008');
+    const outer = details('07-07-22-226-006');
+    const v = view(4, query([inner, outer], line(10, [inner, outer], [outer], 348)));
+    expect(v.more).toContain('Across that line: PERSON 07-07-22-226-006, parcel 07-07-22-226-006.');
+    expect(JSON.stringify(v.more)).not.toContain('Often a road');
   });
 });
 
@@ -91,6 +131,20 @@ describe('readout words: poor fix', () => {
   it('guesses near a line by parcel ID only', () => {
     const v = view(60, query([A], line(20, [A], [B])));
     expect(v.lines[1]).toBe('Probably: near the line between parcel 11-22-333-001 and parcel 11-22-333-002.');
+  });
+
+  it('names no owner and no parcel from a very poor fix', () => {
+    const v = view(2000, query([A], null));
+    expect(v.kind).toBe('poor-fix');
+    expect(v.lines).toEqual([`Accurate to about 1.2${NB}mi (2.0${NB}km).`, 'No parcel can be named until the signal improves.']);
+    expect(JSON.stringify(v)).not.toContain('PERSON');
+    expect(JSON.stringify(v)).not.toContain('11-22-333');
+  });
+
+  it('says the accuracy is not known for an accuracy of 0, and names nothing', () => {
+    const v = view(0, query([A], line(40, [A], [B])));
+    expect(v.lines).toEqual(['Its accuracy is not known.', 'No parcel can be named until the signal improves.']);
+    expect(JSON.stringify(v)).not.toContain('PERSON');
   });
 });
 
@@ -116,6 +170,16 @@ describe('readout words: no data', () => {
 describe('readout words: an old fix and masked owners', () => {
   it('says the answer is from the last GPS position', () => {
     expect(view(4, query([A], null), { staleFix: true }).small).toContain('From the last GPS position.');
+  });
+
+  it('names no parcel and no distance once the fix is too old', () => {
+    const v = view(4, query([A], line(26, [A], [B])), { staleFix: true, fixTooOld: true });
+    expect(v).toMatchObject({ kind: 'no-position', tone: 'none', title: 'No current position.', expandable: false });
+    expect(v.lines).toEqual(['The parcel and the distance to the line show again when the GPS reports.']);
+    const text = JSON.stringify(v);
+    expect(text).not.toContain('PERSON');
+    expect(text).not.toContain('11-22-333');
+    expect(text).not.toContain('ft');
   });
 
   it('masks every owner name when asked, in every state', () => {

@@ -2,6 +2,7 @@
 // Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE.
 
 import { describe, expect, it, vi } from 'vitest';
+import { CoverageArea } from './coverage-area';
 import type { PositionQuery } from './parcel-source';
 import type { OpenArchive } from '../map/archives';
 import { StoredParcelSource, parcelArchivesFrom } from './stored-parcel-source';
@@ -339,5 +340,78 @@ describe('field allowlist', () => {
     expect(all).not.toContain('1 TEST LANE');
     expect(all).not.toContain('555-0100');
     expect(all).not.toContain('TEST SITE');
+  });
+});
+
+describe('the coverage area: a gap inside the county against land outside it', () => {
+  // The county lies west of a Census line 10 m east of the origin. Parcel A
+  // stops at x = 0, as county parcels stop at the edge of a county line road.
+  // C lies west of a 30 m road. E reaches past the Census line.
+  const coverage = new CoverageArea(world.coverageGeometry([rect(-2000, -2000, 10, 2000)]));
+  const parcels = [parcel('A', rect(-100, -100, 0, 100)), parcel('C', rect(-300, -100, -130, 100)), parcel('E', rect(0, 200, 40, 300))];
+  const covered = new StoredParcelSource([world.archive(parcels, { coverage })]);
+  const plain = new StoredParcelSource([world.archive(parcels)]);
+
+  it('outside the county, in no parcel, is outside, not a gap: the reviewer probe case', async () => {
+    const q = await covered.positionQuery(world.at(60, 0));
+    expect(q.coverage).toBe('outside');
+    expect(q.inside).toBeNull();
+    expect(Math.abs(q.nearestLine!.distanceM - 60)).toBeLessThan(0.2);
+    expect(q.nearestLine).toMatchObject({ thisSide: [], thisSideCovered: false, otherSideCovered: true });
+    // Without a coverage area it is answered as before.
+    expect((await plain.positionQuery(world.at(60, 0))).coverage).toBe('ok');
+  });
+
+  it('just inside the Census line but within the edge band, in no parcel, is outside too', async () => {
+    expect((await covered.positionQuery(world.at(5, 0))).coverage).toBe('outside');
+  });
+
+  it('inside a parcel at the county edge: the far side of its edge has no data', async () => {
+    const q = await covered.positionQuery(world.at(-20, 0));
+    expect(q.coverage).toBe('ok');
+    expect(pids(q.inside)).toEqual(['A']);
+    expect(q.nearestLine).toMatchObject({ otherSide: [], otherSideCovered: false, thisSideCovered: true });
+  });
+
+  it('a road well inside the county is a gap with data on both sides', async () => {
+    const q = await covered.positionQuery(world.at(-110, 0));
+    expect(q.coverage).toBe('ok');
+    expect(q.inside).toBeNull();
+    expect(q.nearestLine).toMatchObject({ thisSide: [], thisSideCovered: true, otherSideCovered: true });
+    expect(pids(q.nearestLine!.otherSide)).toEqual(['A']);
+  });
+
+  it('a point inside a parcel is answered whatever the coverage area says', async () => {
+    const q = await covered.positionQuery(world.at(30, 250));
+    expect(q.coverage).toBe('ok');
+    expect(pids(q.inside)).toEqual(['E']);
+  });
+
+  it('a missing tile well inside the county is a gap, not a place without data', async () => {
+    // Every tile of the 3 by 3 block but the ones west and east of the centre.
+    const tiles = [-1, 0, 1].flatMap((dx) => [-1, 0, 1].map((dy) => world.neighbour(dx, dy))).filter((t) => t.y !== world.center.y || t.x === world.center.x);
+    const one = new StoredParcelSource([world.archive(parcels, { coverage, tiles })]);
+    const lake = await one.positionQuery(world.at(-400, 0));
+    expect(lake.coverage).toBe('ok');
+    expect(lake.inside).toBeNull();
+    expect((await one.parcelsAt(world.at(-400, 0))).coverage).toBe('ok');
+    // East of the county the same missing tile is outside.
+    expect((await one.positionQuery(world.at(400, 0))).coverage).toBe('outside');
+    // Without a coverage area nothing can be said there, as before.
+    const bare = new StoredParcelSource([world.archive(parcels, { tiles })]);
+    expect((await bare.positionQuery(world.at(-400, 0))).coverage).toBe('no-tile');
+  });
+
+  it('a tap follows the same rule', async () => {
+    expect(await covered.parcelsAt(world.at(60, 0))).toMatchObject({ coverage: 'outside', parcels: [] });
+    expect(await covered.parcelsAt(world.at(-110, 0))).toMatchObject({ coverage: 'ok', parcels: [] });
+    expect(pids((await covered.parcelsAt(world.at(-20, 0))).parcels)).toEqual(['A']);
+    expect(pids((await covered.parcelsAt(world.at(30, 250))).parcels)).toEqual(['E']);
+  });
+
+  it('just past the archive box, a source with a coverage area still looks for lines', async () => {
+    const east = (await covered.positionQuery(world.at(E.east + 500, 0))).coverage;
+    expect(east).toBe('outside');
+    expect((await plain.positionQuery(world.at(E.east + 500, 0))).coverage).toBe('no-archive');
   });
 });

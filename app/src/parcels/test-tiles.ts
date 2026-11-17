@@ -12,6 +12,7 @@
 
 import { PbfWriter } from 'pbf';
 import { tileBounds } from '../map/tile-math';
+import type { CoverageArea } from './coverage-area';
 import { clipRing } from './planar';
 import { PARCEL_ZOOM, lngLatToTileUnits, tileAt, tileKey, tileUnitsToLngLat, type TileId } from './tile-coords';
 import type { LngLat } from './parcel-source';
@@ -197,7 +198,7 @@ export class SynthWorld {
   }
 
   /** A fake archive holding the given parcels in the centre tile and its eight neighbours. */
-  archive(parcels: readonly MeterParcel[], options: TileOptions & { county?: string; tiles?: TileId[] } = {}): FakeArchive {
+  archive(parcels: readonly MeterParcel[], options: TileOptions & { county?: string; tiles?: TileId[]; coverage?: CoverageArea } = {}): FakeArchive {
     const county = options.county ?? 'il-test';
     const tiles = options.tiles ?? [-1, 0, 1].flatMap((dx) => [-1, 0, 1].map((dy) => this.neighbour(dx, dy)));
     const store = new Map<string, Uint8Array>();
@@ -205,7 +206,21 @@ export class SynthWorld {
       const bytes = this.encode(t, parcels, options);
       if (bytes) store.set(tileKey(t), bytes);
     }
-    return fakeArchive(county, store, this.boundsOf(tiles));
+    return fakeArchive(county, store, this.boundsOf(tiles), options.coverage ?? null);
+  }
+
+  /** A coverage outline as GeoJSON, from rings in meters east and north of the origin. */
+  coverageGeometry(rings: readonly [number, number][][]): { type: 'Polygon'; coordinates: [number, number][][] } {
+    return {
+      type: 'Polygon',
+      coordinates: rings.map((r) => {
+        const ring = r.map(([e, n]) => {
+          const ll = this.at(e, n);
+          return [ll.lng, ll.lat] as [number, number];
+        });
+        return [...ring, ring[0]!];
+      }),
+    };
   }
 
   boundsOf(tiles: readonly TileId[]): [number, number, number, number] {
@@ -215,7 +230,12 @@ export class SynthWorld {
 }
 
 /** An archive answering from a map of "z/x/y" to tile bytes. */
-export function fakeArchive(county: string, store: ReadonlyMap<string, Uint8Array>, bounds: [number, number, number, number]): FakeArchive {
+export function fakeArchive(
+  county: string,
+  store: ReadonlyMap<string, Uint8Array>,
+  bounds: [number, number, number, number],
+  coverage: CoverageArea | null = null,
+): FakeArchive {
   const a: FakeArchive = {
     id: `${county}/parcels`,
     layer: 'parcels',
@@ -225,6 +245,7 @@ export function fakeArchive(county: string, store: ReadonlyMap<string, Uint8Arra
     minzoom: 13,
     maxzoom: 16,
     bounds,
+    coverage,
     reads: 0,
     async getTile(z, x, y) {
       a.reads++;

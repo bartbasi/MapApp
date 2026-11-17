@@ -18,6 +18,7 @@ import type { ParcelRecord } from './parcel-record';
 import type { LngLat } from './parcel-source';
 import { parcelKey, type DecodedParcelTile, type TileParcel } from './parcel-tile';
 import { clipRing, clipSegment, insideRings, signedArea, type Box } from './planar';
+import { sideProbes } from './side-probe';
 import { PARCEL_ZOOM, tileAt, tileKey, tileUnitsToLngLat, type TileId } from './tile-coords';
 
 export interface OutlineOptions {
@@ -37,8 +38,6 @@ export interface ParcelOutline {
   /** False when the parcel reaches past the tile limit, so part of it is missing. */
   complete: boolean;
 }
-
-const SIDE_PROBE_M = 0.02;
 
 interface Found {
   tile: DecodedParcelTile;
@@ -157,13 +156,9 @@ export async function assembleParcelOutline(
         const ay = lr[2 * i + 1]!;
         const bx = lr[2 * j]!;
         const by = lr[2 * j + 1]!;
-        const len = Math.hypot(bx - ax, by - ay);
         const tm = (t0 + t1) / 2;
-        const mx = ax + (bx - ax) * tm;
-        const my = ay + (by - ay) * tm;
-        const nx = len === 0 ? 0 : (-(by - ay) / len) * SIDE_PROBE_M;
-        const ny = len === 0 ? 0 : ((bx - ax) / len) * SIDE_PROBE_M;
-        if (len === 0 || inParcel(mx + nx, my + ny) === inParcel(mx - nx, my - ny)) {
+        const probes = sideProbes(ax, ay, bx, by, ax + (bx - ax) * tm, ay + (by - ay) * tm);
+        if (!probes || inParcel(...probes.left) === inParcel(...probes.right)) {
           open = null;
           continue;
         }

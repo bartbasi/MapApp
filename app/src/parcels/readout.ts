@@ -10,10 +10,12 @@
 //    fresh query arrives.
 // 3. The fix is poor: give the best guess, marked as a guess. Inside the
 //    guess the same rules apply, so even a guess never names a side the
-//    accuracy cannot support.
+//    accuracy cannot support. When the uncertainty reaches the search radius
+//    the search has not looked far enough to support any guess: none is made.
 // 4. A property line lies within the uncertainty: the phone may be on either
 //    side. This wins over "inside" whenever it applies.
-// 5. Otherwise the phone is inside a parcel, or in a gap with no parcel.
+// 5. The phone is in no parcel outside the area the data covers: no data.
+// 6. Otherwise the phone is inside a parcel, or in a gap with no parcel.
 //
 // The uncertainty is the fix's accuracy radius, plus how far the fix is from
 // the point the query was made for (so a slightly old query can only make the
@@ -21,12 +23,17 @@
 // own lines (LINE_DATA_MARGIN_M): tax maps are drawn for assessment, not
 // surveyed, and can sit a few meters off the true line (D26).
 
+import { accuracyKnown } from '../position/types';
 import { LocalFrame } from './local-frame';
 import { compassPoint, type CompassPoint } from './format';
 import { isNamedParcel } from './parcel-record';
 import type { LngLat, ParcelCoverage, ParcelDetails, PositionQuery, PropertyLine } from './parcel-source';
 
-/** A GPS fix. accuracyM is the radius in meters the platform reports (68% confidence on Android). */
+/**
+ * A GPS fix. accuracyM is the radius in meters the platform reports (68%
+ * confidence on Android). Zero, a negative or a non-finite value means the
+ * accuracy is not known: Android reports 0 for a fix with no accuracy.
+ */
 export interface PositionFix {
   lng: number;
   lat: number;
@@ -80,6 +87,8 @@ export interface InsideReadout extends Measured {
   line: LineReadout | null;
   /** The parcel across the nearest line, if any. */
   neighbour: ParcelDetails | null;
+  /** False when across the line there is no parcel and no parcel data: the line is the edge of what is installed. */
+  acrossCovered: boolean;
 }
 
 /** A line lies within the uncertainty: the phone may be on either side of it. */
@@ -90,6 +99,9 @@ export interface NearLineReadout extends Measured {
   thisSide: ParcelDetails[];
   /** Parcels across the line. Empty for a gap. */
   otherSide: ParcelDetails[];
+  /** False for a side with no parcel that lies outside the parcel data: nothing is known there. */
+  thisSideCovered: boolean;
+  otherSideCovered: boolean;
 }
 
 /** The phone is in no parcel, often a road, and no line is within the uncertainty. */
@@ -98,14 +110,20 @@ export interface NoParcelReadout extends Measured {
   line: LineReadout | null;
   /** The parcel across the nearest line, if any. */
   nearest: ParcelDetails | null;
+  /** False when across the line there is no parcel and no parcel data. */
+  acrossCovered: boolean;
 }
 
 export type PlaceReadout = InsideReadout | NearLineReadout | NoParcelReadout;
 
-/** The fix is too poor to name a parcel. `guess` is what would be said otherwise. */
+/**
+ * The fix is too poor to name a parcel. `guess` is what would be said
+ * otherwise, or null when the uncertainty reaches the search radius, so the
+ * search has not looked far enough to support any guess.
+ */
 export interface PoorFixReadout extends Measured {
   kind: 'poor-fix';
-  guess: PlaceReadout;
+  guess: PlaceReadout | null;
 }
 
 export interface NoDataReadout {
@@ -122,35 +140,54 @@ function lineReadout(l: PropertyLine): LineReadout {
 
 const same = (a: ParcelDetails, b: ParcelDetails) => a.county === b.county && a.pid === b.pid;
 
-function place(q: PositionQuery, m: Measured): PlaceReadout {
+/**
+ * The parcel to name across a line from `here`: one that is across it and not
+ * on this side if there is one, else one that is across it and is not `here`.
+ * Where one parcel lies inside another and the line is the inner one's edge,
+ * the outer parcel is on both sides, and it is what lies across.
+ */
+function across(thisSide: readonly ParcelDetails[], otherSide: readonly ParcelDetails[], here: ParcelDetails | undefined): ParcelDetails | null {
+  return otherSide.find((p) => !thisSide.some((t) => same(t, p))) ?? otherSide.find((p) => !here || !same(p, here)) ?? null;
+}
+
+function place(q: PositionQuery, m: Measured): PlaceReadout | NoDataReadout {
   const nl = q.nearestLine;
   // Records with no parcel ID (right of way strips) are never named: a point
   // in one alone is in no parcel. Their edges still count as lines.
   const thisSide = nl?.thisSide.filter(isNamedParcel) ?? [];
   const otherSide = nl?.otherSide.filter(isNamedParcel) ?? [];
+  const otherSideCovered = nl ? nl.otherSideCovered : true;
   if (nl && nl.distanceM <= m.uncertaintyM) {
-    return { kind: 'near-line', ...m, line: lineReadout(nl), thisSide, otherSide };
+    // The phone may be on either side. Outside the data, the fix's own side
+    // has no data, whatever the side test found 2 cm from the line.
+    const thisSideCovered = q.coverage === 'outside' && thisSide.length === 0 ? false : nl.thisSideCovered;
+    return { kind: 'near-line', ...m, line: lineReadout(nl), thisSide, otherSide, thisSideCovered, otherSideCovered };
   }
+  if (q.coverage === 'outside') return { kind: 'no-data', reason: 'outside' };
   const line = nl ? lineReadout(nl) : null;
   const inside = q.inside?.filter(isNamedParcel) ?? [];
   if (inside[0]) {
-    const neighbour = otherSide.find((p) => !inside.some((i) => same(i, p))) ?? null;
-    return { kind: 'inside', ...m, parcel: inside[0], alsoIn: inside.slice(1), line, neighbour };
+    const neighbour = nl ? across(thisSide, otherSide, inside[0]) : null;
+    return { kind: 'inside', ...m, parcel: inside[0], alsoIn: inside.slice(1), line, neighbour, acrossCovered: neighbour !== null || otherSideCovered };
   }
-  return { kind: 'no-parcel', ...m, line, nearest: otherSide[0] ?? null };
+  const nearest = nl ? across(thisSide, otherSide, undefined) : null;
+  return { kind: 'no-parcel', ...m, line, nearest, acrossCovered: nearest !== null || otherSideCovered };
 }
 
 /** What the readout says for a fix, given the parcel query made for (about) that fix. */
 export function positionReadout(fix: PositionFix, query: PositionQuery, options: ReadoutOptions = {}): Readout {
-  if (query.coverage !== 'ok') return { kind: 'no-data', reason: query.coverage };
+  if (query.coverage !== 'ok' && query.coverage !== 'outside') return { kind: 'no-data', reason: query.coverage };
   const offset = Math.hypot(...new LocalFrame(query.at.lng, query.at.lat).toLocal(fix.lng, fix.lat));
   if (!(offset <= STALE_QUERY_M)) return { kind: 'no-data', reason: 'stale' };
-  const known = Number.isFinite(fix.accuracyM) && fix.accuracyM >= 0;
-  const accuracyM = known ? fix.accuracyM : Infinity;
+  const accuracyM = accuracyKnown(fix.accuracyM) ? fix.accuracyM : Infinity;
   const m: Measured = { accuracyM, uncertaintyM: accuracyM + offset + LINE_DATA_MARGIN_M, searchRadiusM: query.searchRadiusM };
   const poorFixM = Math.min(options.poorFixM ?? POOR_FIX_M, query.searchRadiusM);
-  // A fix whose uncertainty reaches past the search radius could be near a
-  // line the search never looked at, so it too is only a guess.
-  if (!(accuracyM <= poorFixM) || !(m.uncertaintyM < query.searchRadiusM)) return { kind: 'poor-fix', ...m, guess: place(query, m) };
-  return place(query, m);
+  // The search looked this far for lines. An uncertainty that reaches it
+  // could hide a line the search never saw: then not even a guess is made.
+  const searched = m.uncertaintyM < query.searchRadiusM;
+  if (accuracyM <= poorFixM && searched) return place(query, m);
+  const guess = searched ? place(query, m) : null;
+  // A poor fix outside the data with no line near it: there is nothing to guess from.
+  if (guess?.kind === 'no-data') return guess;
+  return { kind: 'poor-fix', ...m, guess };
 }

@@ -49,10 +49,9 @@ import { LocalFrame } from './local-frame';
 import type { DecodedParcelTile } from './parcel-tile';
 import type { ParcelRecord } from './parcel-record';
 import { clipRing, clipSegment, insideRings, nearestT, signedArea, type Box, type Ring } from './planar';
+import { sideProbes } from './side-probe';
 import { lngLatToTileUnits, tileUnitsToLngLat } from './tile-coords';
 
-/** How far to each side of a line the parcels are looked up, in meters. */
-const SIDE_PROBE_M = 0.02;
 /** How far from a segment's end the side test is made, at most, in meters. */
 const END_INSET_M = 0.05;
 
@@ -76,8 +75,18 @@ export interface RawLine {
   /** Parcel keys on the phone's side and on the far side, smallest area first. */
   thisSide: string[];
   otherSide: string[];
+  /** Where the two sides were looked up, in local meters: just on the origin's side, and just across. */
+  thisProbe: [number, number];
+  otherProbe: [number, number];
   /** The straight piece of outline the nearest point lies on, in local meters: [ax, ay, bx, by]. */
   segment: [number, number, number, number];
+}
+
+interface Sides {
+  thisSide: string[];
+  otherSide: string[];
+  thisProbe: [number, number];
+  otherProbe: [number, number];
 }
 
 interface Candidate {
@@ -227,32 +236,29 @@ export class ParcelScene {
     candidates.sort((a, b) => a.d - b.d);
     for (const c of candidates) {
       const sides = this.sides(c);
-      if (sameKeys(sides.thisSide, sides.otherSide)) continue; // Rule 2
+      if (!sides || sameKeys(sides.thisSide, sides.otherSide)) continue; // Rule 2
       return { distanceM: c.d, x: c.ax + (c.bx - c.ax) * c.t, y: c.ay + (c.by - c.ay) * c.t, ...sides, segment: [c.ax, c.ay, c.bx, c.by] };
     }
     return null;
   }
 
   /** The parcels just to each side of a candidate, near its point closest to the origin. */
-  private sides(c: Candidate): { thisSide: string[]; otherSide: string[] } {
+  private sides(c: Candidate): Sides | null {
     const dx = c.bx - c.ax;
     const dy = c.by - c.ay;
     const len = Math.hypot(dx, dy);
     const inset = Math.min(END_INSET_M, len / 2);
     const along = Math.min(Math.max(c.t * len, inset), len - inset);
-    const baseX = c.ax + (dx / len) * along;
-    const baseY = c.ay + (dy / len) * along;
-    // Unit normal to the left of A to B, then turned toward the origin.
-    let nx = -dy / len;
-    let ny = dx / len;
+    const probes = sideProbes(c.ax, c.ay, c.bx, c.by, c.ax + (dx / len) * along, c.ay + (dy / len) * along);
+    if (!probes) return null;
+    // The origin's side: left of A to B when the cross product is positive.
     const cross = dx * (0 - c.ay) - dy * (0 - c.ax);
-    if (cross < 0) {
-      nx = -nx;
-      ny = -ny;
-    }
+    const [thisProbe, otherProbe] = cross < 0 ? [probes.right, probes.left] : [probes.left, probes.right];
     return {
-      thisSide: this.containing(baseX + nx * SIDE_PROBE_M, baseY + ny * SIDE_PROBE_M),
-      otherSide: this.containing(baseX - nx * SIDE_PROBE_M, baseY - ny * SIDE_PROBE_M),
+      thisSide: this.containing(...thisProbe),
+      otherSide: this.containing(...otherProbe),
+      thisProbe,
+      otherProbe,
     };
   }
 }

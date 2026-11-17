@@ -26,14 +26,19 @@ export interface ParcelDetails extends ParcelRecord {
  * - no-archive: no installed parcel data covers the point.
  * - no-tile: data covers the area but holds nothing at the point.
  * - read-error: a tile needed for the answer could not be read.
+ * - outside: the point is in no parcel, and it lies outside the area the
+ *   parcel data covers (or too near its edge to tell, COVERAGE_EDGE_M). The
+ *   data cannot say what is there. Lines nearby are still reported. Only a
+ *   source that knows its coverage area gives this; inside a parcel the
+ *   answer is 'ok' wherever the point is.
  */
-export type ParcelCoverage = 'ok' | 'no-archive' | 'no-tile' | 'read-error';
+export type ParcelCoverage = 'ok' | 'no-archive' | 'no-tile' | 'read-error' | 'outside';
 
 /** The answer to "what parcel is here", for a tap. */
 export interface ParcelLookup {
   at: LngLat;
   coverage: ParcelCoverage;
-  /** The parcels holding the point, smallest area first. Empty in a gap or without coverage. */
+  /** The parcels holding the point, smallest area first. Empty in a gap, outside the data, or without coverage. */
   parcels: ParcelDetails[];
 }
 
@@ -49,6 +54,13 @@ export interface PropertyLine {
   thisSide: ParcelDetails[];
   /** Parcels just across the line, smallest first. Empty for a gap such as a road. */
   otherSide: ParcelDetails[];
+  /**
+   * Whether the parcel data covers each side. False only for a side with no
+   * parcel that lies outside the data's coverage area (or near its edge), so
+   * its emptiness means "no data", not "no parcel".
+   */
+  thisSideCovered: boolean;
+  otherSideCovered: boolean;
   /**
    * The straight piece of the line that `point` lies on, end to end, for
    * drawing it. Cut at tile edges, so a long line may be given in parts.

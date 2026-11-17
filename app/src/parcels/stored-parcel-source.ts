@@ -5,10 +5,19 @@
 // county (D25, D27). It reads the zoom 16 tile under a point straight from the
 // archives, whatever the map is showing, plus the neighbouring tiles the
 // search circle reaches, and answers from those.
+//
+// Where an archive's metadata gives its coverage area (the county outline),
+// a point in no parcel is judged by it: well inside, it is a gap such as a
+// road or a lake, even where the tile under it is missing; outside or near
+// the edge, the data cannot say what is there ('outside'). A point inside a
+// parcel is answered as such wherever it is: the parcel is better evidence
+// than the Census line. Without a coverage area, the archive's bounding box
+// and the tile under the point decide, as before.
 
 import type { OpenArchive } from '../map/archives';
 import { boundsOverlap, tileBounds } from '../map/tile-math';
 import type { TileArchive } from '../map/tile-resolver';
+import { CoverageArea } from './coverage-area';
 import { bearingOf } from './local-frame';
 import { LruCache } from './lru-cache';
 import { assembleParcelOutline, type OutlineOptions, type ParcelOutline } from './parcel-outline';
@@ -34,6 +43,8 @@ export interface ParcelArchive extends TileArchive {
   readonly countyName: string;
   /** The county data's date, or empty if the metadata gives none. */
   readonly dataDate: string;
+  /** The area the data covers, or null when the metadata does not give it. */
+  readonly coverage: CoverageArea | null;
 }
 
 /** The parcel archives among the open archives of a data session. */
@@ -50,6 +61,7 @@ export function parcelArchivesFrom(archives: readonly OpenArchive[]): ParcelArch
       getTile: (z: number, x: number, y: number, signal?: AbortSignal) => a.getTile(z, x, y, signal),
       countyName: a.entry.meta.countyName,
       dataDate: a.entry.meta.sources.map((s) => s.dataDate).find((d) => d) ?? '',
+      coverage: a.entry.meta.coverage ? new CoverageArea(a.entry.meta.coverage) : null,
     }));
 }
 
@@ -61,6 +73,22 @@ const REACH_MARGIN_M = 1;
 
 /** The reach for a tap: the tile under the point, and a neighbour only if the point is within a meter of its edge. */
 const TAP_REACH_M = 1;
+
+/**
+ * How far past its bounding box, in degrees, an archive with a coverage area
+ * is still read (about 1 km). Some parcels reach past the county outline,
+ * and near the county line a line within reach must still be found.
+ */
+const COVERAGE_BOUNDS_MARGIN_DEG = 0.01;
+
+/**
+ * What the coverage areas say about a point:
+ * - covered: well inside an archive's coverage area;
+ * - uncovered: outside every coverage area or near its edge, and no archive
+ *   without a coverage area holds the point in its bounding box;
+ * - unknown: an archive without a coverage area holds the point in its box.
+ */
+type CoverageAt = 'covered' | 'uncovered' | 'unknown';
 
 export interface StoredParcelSourceOptions {
   /** How many decoded tiles to keep. Default 12. */
@@ -75,6 +103,14 @@ export interface StoredParcelSourceOptions {
 interface Loaded {
   coverage: ParcelCoverage;
   tiles: DecodedParcelTile[];
+}
+
+function inBox(b: readonly number[], lng: number, lat: number, margin = 0): boolean {
+  return lng >= b[0]! - margin && lng <= b[2]! + margin && lat >= b[1]! - margin && lat <= b[3]! + margin;
+}
+
+function grow(b: readonly [number, number, number, number], d: number): [number, number, number, number] {
+  return [b[0] - d, b[1] - d, b[2] + d, b[3] + d];
 }
 
 function sameTile(a: TileId, b: TileId): boolean {
@@ -92,13 +128,43 @@ export class StoredParcelSource implements ParcelSource {
     this.cache = new LruCache(options.cacheTiles ?? 12);
   }
 
+  /** How far past its bounding box an archive is read. */
+  private static margin(a: ParcelArchive): number {
+    return a.coverage ? COVERAGE_BOUNDS_MARGIN_DEG : 0;
+  }
+
   private covering(at: LngLat): ParcelArchive[] {
-    return this.archives.filter((a) => at.lng >= a.bounds[0] && at.lng <= a.bounds[2] && at.lat >= a.bounds[1] && at.lat <= a.bounds[3]);
+    return this.archives.filter((a) => inBox(a.bounds, at.lng, at.lat, StoredParcelSource.margin(a)));
   }
 
   private archivesFor(t: TileId): ParcelArchive[] {
     const tb = tileBounds(t.z, t.x, t.y);
-    return this.archives.filter((a) => boundsOverlap(a.bounds, tb));
+    return this.archives.filter((a) => boundsOverlap(grow(a.bounds, StoredParcelSource.margin(a)), tb));
+  }
+
+  /** What the coverage areas say about a point (see CoverageAt). */
+  private coverageAt(lng: number, lat: number): CoverageAt {
+    let unknown = false;
+    for (const a of this.archives) {
+      if (a.coverage) {
+        if (a.coverage.covers(lng, lat)) return 'covered';
+      } else if (inBox(a.bounds, lng, lat)) {
+        unknown = true;
+      }
+    }
+    return unknown ? 'unknown' : 'uncovered';
+  }
+
+  /** Whether the side of a line at a probe point (scene meters) has data: it holds a parcel, or it is covered. */
+  private sideCovered(scene: ParcelScene, keys: readonly string[], probe: [number, number]): boolean {
+    if (keys.length > 0) return true;
+    const [lng, lat] = scene.frame.toLngLat(probe[0], probe[1]);
+    return this.coverageAt(lng, lat) !== 'uncovered';
+  }
+
+  /** The coverage of a point that is in no parcel. */
+  private gapCoverage(at: LngLat): ParcelCoverage {
+    return this.coverageAt(at.lng, at.lat) === 'uncovered' ? 'outside' : 'ok';
   }
 
   /** One archive's copy of a tile, decoded, or null if the archive does not hold it. Cached. */
@@ -152,7 +218,9 @@ export class StoredParcelSource implements ParcelSource {
       }
       tiles.push(...s.value);
     }
-    if (!tiles.some((t) => sameTile(t.tile, center))) return { coverage: 'no-tile', tiles: [] };
+    // No tile under the point: with a coverage area that decides; without
+    // one, nothing can be said here.
+    if (!tiles.some((t) => sameTile(t.tile, center)) && this.coverageAt(at.lng, at.lat) === 'unknown') return { coverage: 'no-tile', tiles: [] };
     return { coverage: 'ok', tiles };
   }
 
@@ -167,7 +235,9 @@ export class StoredParcelSource implements ParcelSource {
     const loaded = await this.loadAround(at, TAP_REACH_M, signal);
     if (loaded.coverage !== 'ok') return { at, coverage: loaded.coverage, parcels: [] };
     const scene = new ParcelScene(loaded.tiles, at, TAP_REACH_M);
-    return { at, coverage: 'ok', parcels: scene.containing(0, 0).map((k) => this.details(scene, k)) };
+    const keys = scene.containing(0, 0);
+    if (keys.length === 0) return { at, coverage: this.gapCoverage(at), parcels: [] };
+    return { at, coverage: 'ok', parcels: keys.map((k) => this.details(scene, k)) };
   }
 
   async positionQuery(at: LngLat, options: PositionQueryOptions = {}, signal?: AbortSignal): Promise<PositionQuery> {
@@ -194,9 +264,12 @@ export class StoredParcelSource implements ParcelSource {
         bearingDeg: bearingOf(raw.x, raw.y),
         thisSide: raw.thisSide.map((k) => this.details(scene, k)),
         otherSide: raw.otherSide.map((k) => this.details(scene, k)),
+        thisSideCovered: this.sideCovered(scene, raw.thisSide, raw.thisProbe),
+        otherSideCovered: this.sideCovered(scene, raw.otherSide, raw.otherProbe),
       };
     }
-    return { ...base, inside: insideKeys.length ? insideKeys.map((k) => this.details(scene, k)) : null, nearestLine };
+    if (insideKeys.length === 0) return { ...base, coverage: this.gapCoverage(at), nearestLine };
+    return { ...base, inside: insideKeys.map((k) => this.details(scene, k)), nearestLine };
   }
 
   /**

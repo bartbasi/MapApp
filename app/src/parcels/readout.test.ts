@@ -13,8 +13,17 @@ function details(pid: string): ParcelDetails {
   return { pid, owner: `OWNER ${pid}`, acres: 10, county: 'il-test', countyName: 'Test County', dataDate: '2026-10-28' };
 }
 
-function line(distanceM: number, thisSide: string[], otherSide: string[], bearingDeg = 90): PropertyLine {
-  return { distanceM, bearingDeg, point: at, thisSide: thisSide.map(details), otherSide: otherSide.map(details), segment: [at, at] };
+function line(distanceM: number, thisSide: string[], otherSide: string[], bearingDeg = 90, covered: { thisSide?: boolean; otherSide?: boolean } = {}): PropertyLine {
+  return {
+    distanceM,
+    bearingDeg,
+    point: at,
+    thisSide: thisSide.map(details),
+    otherSide: otherSide.map(details),
+    thisSideCovered: covered.thisSide ?? true,
+    otherSideCovered: covered.otherSide ?? true,
+    segment: [at, at],
+  };
 }
 
 function q(inside: string[] | null, nearestLine: PropertyLine | null): PositionQuery {
@@ -72,13 +81,25 @@ describe('position readout', () => {
     expect(r).toMatchObject({ kind: 'no-parcel', line: null, nearest: null });
   });
 
-  it('lists overlapping parcels and finds the neighbour among the others', () => {
+  it('lists overlapping parcels, and across the edge of the small one names the big one, which is what lies there', () => {
     const r = positionReadout(fix(3), q(['SMALL', 'BIG'], line(10, ['SMALL', 'BIG'], ['BIG'])));
     expect(r.kind).toBe('inside');
     if (r.kind !== 'inside') return;
     expect(r.parcel.pid).toBe('SMALL');
     expect(r.alsoIn.map((p) => p.pid)).toEqual(['BIG']);
-    expect(r.neighbour).toBeNull();
+    expect(r.neighbour?.pid).toBe('BIG');
+  });
+
+  it('names the outer parcel across the edge of a parcel that lies inside it', () => {
+    // As at parcel 07-07-22-226-008, which lies inside 07-07-22-226-006 in Macon County.
+    const r = positionReadout(fix(4), q(['INNER', 'OUTER'], line(10, ['INNER', 'OUTER'], ['OUTER'], 348)));
+    expect(r).toMatchObject({ kind: 'inside', parcel: { pid: 'INNER' }, neighbour: { pid: 'OUTER' }, acrossCovered: true });
+  });
+
+  it('names a parcel across the line that is not on this side before one that is', () => {
+    // Across the line lie A again (it overlaps there) and C. C is what is new across the line.
+    const r = positionReadout(fix(3), q(['A'], line(10, ['A'], ['A', 'C'])));
+    expect(r).toMatchObject({ kind: 'inside', parcel: { pid: 'A' }, neighbour: { pid: 'C' } });
   });
 
   it('says inside with no line when none is within the search radius', () => {
@@ -90,9 +111,9 @@ describe('position readout', () => {
     const r = positionReadout(fix(POOR_FIX_M + 1), q(['A'], line(20, ['A'], ['B'])));
     expect(r.kind).toBe('poor-fix');
     if (r.kind !== 'poor-fix') return;
-    expect(r.guess.kind).toBe('near-line');
+    expect(r.guess?.kind).toBe('near-line');
     const far = positionReadout(fix(60), q(['A'], line(100, ['A'], ['B'])));
-    expect(far.kind === 'poor-fix' && far.guess.kind).toBe('inside');
+    expect(far.kind === 'poor-fix' && far.guess?.kind).toBe('inside');
     expect(positionReadout(fix(POOR_FIX_M), q(['A'], line(100, ['A'], ['B']))).kind).toBe('inside');
   });
 
@@ -100,6 +121,20 @@ describe('position readout', () => {
     expect(positionReadout(fix(NaN), q(['A'], null)).kind).toBe('poor-fix');
     expect(positionReadout(fix(-1), q(['A'], null)).kind).toBe('poor-fix');
     expect(positionReadout(fix(Infinity), q(['A'], null)).kind).toBe('poor-fix');
+  });
+
+  it('treats an accuracy of 0, which Android reports for a fix with no accuracy, as not known', () => {
+    const r = positionReadout(fix(0), q(['A'], line(40, ['A'], ['B'])));
+    expect(r).toMatchObject({ kind: 'poor-fix', accuracyM: Infinity, guess: null });
+  });
+
+  it('makes no guess when the uncertainty reaches the search radius', () => {
+    // A 2 km fix in a large field: the search looked 150 m, so no owner can be named.
+    expect(positionReadout(fix(2000), q(['A'], null))).toMatchObject({ kind: 'poor-fix', guess: null });
+    // 146 + 3 = 149 m is still inside the 150 m searched: a marked guess.
+    expect(positionReadout(fix(146), q(['A'], null))).toMatchObject({ kind: 'poor-fix', guess: { kind: 'inside' } });
+    // 147 + 3 = 150 m reaches it: no guess.
+    expect(positionReadout(fix(147), q(['A'], null))).toMatchObject({ kind: 'poor-fix', guess: null });
   });
 
   it('passes on missing data', () => {
@@ -135,6 +170,34 @@ describe('position readout', () => {
     const small: PositionQuery = { ...q(['A'], null), searchRadiusM: 20 };
     const r = positionReadout(fix(15, 10), small);
     expect(r.kind).toBe('poor-fix');
+  });
+});
+
+describe('position readout at the edge of the parcel data', () => {
+  const outside = (nearestLine: PropertyLine | null): PositionQuery => ({ ...q(null, nearestLine), coverage: 'outside' });
+
+  it('outside the data with no line near, says there is no data, never "not in a parcel"', () => {
+    expect(positionReadout(fix(5), outside(null))).toEqual({ kind: 'no-data', reason: 'outside' });
+    expect(positionReadout(fix(5), outside(line(40, [], ['A'], 270, { thisSide: false })))).toEqual({ kind: 'no-data', reason: 'outside' });
+  });
+
+  it('outside the data with a line within the uncertainty, says near the line, and the outside side has no data', () => {
+    // The side test 2 cm from the line may land inside the data; the fix's own side still has none.
+    const r = positionReadout(fix(5), outside(line(6, [], ['A'], 270)));
+    expect(r).toMatchObject({ kind: 'near-line', thisSide: [], otherSide: [{ pid: 'A' }], thisSideCovered: false, otherSideCovered: true });
+  });
+
+  it('inside a parcel at the edge of the data, says no data across the line, not no parcel', () => {
+    const r = positionReadout(fix(4), q(['A'], line(20, ['A'], [], 90, { otherSide: false })));
+    expect(r).toMatchObject({ kind: 'inside', parcel: { pid: 'A' }, neighbour: null, acrossCovered: false });
+    const inner = positionReadout(fix(4), q(['A'], line(20, ['A'], [])));
+    expect(inner).toMatchObject({ kind: 'inside', neighbour: null, acrossCovered: true });
+  });
+
+  it('a poor fix outside the data makes no guess about parcels', () => {
+    expect(positionReadout(fix(80), outside(null))).toEqual({ kind: 'no-data', reason: 'outside' });
+    expect(positionReadout(fix(2000), outside(null))).toMatchObject({ kind: 'poor-fix', guess: null });
+    expect(positionReadout(fix(80), outside(line(60, [], ['A'])))).toMatchObject({ kind: 'poor-fix', guess: { kind: 'near-line', thisSideCovered: false } });
   });
 });
 

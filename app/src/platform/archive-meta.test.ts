@@ -51,4 +51,25 @@ describe('parseArchiveMeta', () => {
     expect(() => parseArchiveMeta({ ...good, sources: undefined })).toThrow();
     expect(() => parseArchiveMeta({ ...good, layer: '../x' })).toThrow();
   });
+
+  it('reads the coverage outline, and leaves out one that is not a polygon', () => {
+    const ring: [number, number][] = [
+      [-89, 39.7],
+      [-88.8, 39.7],
+      [-88.8, 40],
+      [-89, 39.7],
+    ];
+    expect(parseArchiveMeta({ ...good, coverage: { type: 'Polygon', coordinates: [ring] } }).coverage).toEqual({ type: 'Polygon', coordinates: [ring] });
+    expect(parseArchiveMeta({ ...good, coverage: { type: 'MultiPolygon', coordinates: [[ring], [ring]] } }).coverage?.type).toBe('MultiPolygon');
+    expect(parseArchiveMeta(good).coverage).toBeUndefined();
+    const warn = console.warn;
+    console.warn = () => {};
+    try {
+      expect(parseArchiveMeta({ ...good, coverage: { type: 'Point', coordinates: [-89, 39.7] } }).coverage).toBeUndefined();
+      expect(parseArchiveMeta({ ...good, coverage: { type: 'Polygon', coordinates: [ring.slice(0, 2)] } }).coverage).toBeUndefined();
+      expect(parseArchiveMeta({ ...good, coverage: { type: 'Polygon', coordinates: [[[39.7, -200], ...ring]] } }).coverage).toBeUndefined();
+    } finally {
+      console.warn = warn;
+    }
+  });
 });
