@@ -22,6 +22,13 @@ export interface PositionFix {
   speedMps: number | null;
   /** When the reading was taken, in milliseconds since 1970, by the source's clock. */
   timeMs: number;
+  /**
+   * How old the reading already was when the source delivered it, in
+   * milliseconds, by the phone's own steady clock. The fix's age is counted
+   * from when it was taken, not from when it arrived. Absent or 0 when the
+   * source cannot tell: the age then counts from arrival.
+   */
+  ageAtDeliveryMs?: number;
 }
 
 /**

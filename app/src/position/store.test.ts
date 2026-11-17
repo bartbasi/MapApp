@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CompassSensor } from './compass';
 import { LOCATE_ZOOM, locateZoom, nextFollowMode } from './follow';
-import { NO_POSITION_AFTER_MS, STALE_AFTER_MS, PositionStore, fixAgeMs, isStale, isTooOld, type CameraCommand, type PositionSnapshot } from './store';
+import { NO_POSITION_AFTER_MS, STALE_AFTER_MS, PositionStore, fixAgeMs, fixTakenAt, isStale, isTooOld, type CameraCommand, type PositionSnapshot } from './store';
 import { TestClock } from './test-clock';
 import { BasePositionSource, type PositionErrorKind, type PositionFix } from './types';
 
@@ -130,6 +130,27 @@ describe('a fix too old to use', () => {
     t.clock.jump(NO_POSITION_AFTER_MS);
     t.becomeVisible();
     expect(t.snap().tooOld).toBe(true);
+  });
+
+  it('counts the age from when the fix was taken, when the source knows it', () => {
+    const t = setup();
+    t.store.tapLocate();
+    t.source.send({ ageAtDeliveryMs: 1500 });
+    expect(t.snap().ageMs).toBe(1500);
+    // A fix that was already 9 s old turns stale 1 s and a bit later, not 10 s later.
+    t.source.send({ ageAtDeliveryMs: 9000 });
+    t.clock.advance(1000);
+    expect(t.snap()).toMatchObject({ ageMs: 10_000, stale: false });
+    t.clock.advance(1000);
+    expect(t.snap()).toMatchObject({ ageMs: 11_000, stale: true });
+  });
+
+  it('counts from arrival when the source gives no age, or a nonsense one', () => {
+    expect(fixTakenAt({ lng: 0, lat: 0, accuracyM: 5, headingDeg: null, speedMps: null, timeMs: 0 }, 5000)).toBe(5000);
+    for (const bad of [0, -20, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(fixTakenAt({ lng: 0, lat: 0, accuracyM: 5, headingDeg: null, speedMps: null, timeMs: 0, ageAtDeliveryMs: bad }, 5000)).toBe(5000);
+    }
+    expect(fixTakenAt({ lng: 0, lat: 0, accuracyM: 5, headingDeg: null, speedMps: null, timeMs: 0, ageAtDeliveryMs: 250 }, 5000)).toBe(4750);
   });
 
   it('stops listening for the app coming back when destroyed', () => {

@@ -17,9 +17,22 @@ import type { PermissionState, PositionError, PositionEvent, PositionFix, Positi
 /** A fix older than this is stale: the marker turns gray and the app says how old it is. */
 export const STALE_AFTER_MS = 10_000;
 
-/** How old the latest fix is, by this phone's clock, or null with no fix. */
-export function fixAgeMs(receivedAt: number | null, now: number): number | null {
-  return receivedAt === null ? null : Math.max(0, now - receivedAt);
+/**
+ * How old the latest fix is, by this phone's clock, or null with no fix.
+ * takenAt is when the fix was taken, by the same clock as now.
+ */
+export function fixAgeMs(takenAt: number | null, now: number): number | null {
+  return takenAt === null ? null : Math.max(0, now - takenAt);
+}
+
+/**
+ * When a fix that arrives now was taken, by the app's clock: now, less the
+ * age the source says the fix already had. A missing, negative or
+ * non-finite age counts as none.
+ */
+export function fixTakenAt(fix: PositionFix, now: number): number {
+  const age = fix.ageAtDeliveryMs;
+  return typeof age === 'number' && Number.isFinite(age) && age > 0 ? now - age : now;
 }
 
 /**
@@ -30,14 +43,14 @@ export function fixAgeMs(receivedAt: number | null, now: number): number | null 
 export const NO_POSITION_AFTER_MS = 5 * 60_000;
 
 /** True when there was a fix and none has come for more than STALE_AFTER_MS. */
-export function isStale(receivedAt: number | null, now: number): boolean {
-  const age = fixAgeMs(receivedAt, now);
+export function isStale(takenAt: number | null, now: number): boolean {
+  const age = fixAgeMs(takenAt, now);
   return age !== null && age > STALE_AFTER_MS;
 }
 
 /** True when there was a fix and none has come for more than NO_POSITION_AFTER_MS. */
-export function isTooOld(receivedAt: number | null, now: number): boolean {
-  const age = fixAgeMs(receivedAt, now);
+export function isTooOld(takenAt: number | null, now: number): boolean {
+  const age = fixAgeMs(takenAt, now);
   return age !== null && age > NO_POSITION_AFTER_MS;
 }
 
@@ -51,7 +64,7 @@ export interface PositionSnapshot {
   permission: PermissionState;
   /** The latest fix since position was turned on, or null. */
   fix: PositionFix | null;
-  /** Milliseconds since that fix arrived, or null. */
+  /** Milliseconds since that fix was taken (from arrival when the source cannot tell), or null. */
   ageMs: number | null;
   /** Older than STALE_AFTER_MS: the marker is gray. */
   stale: boolean;
@@ -113,7 +126,8 @@ export class PositionStore {
   private on = false;
   private follow: FollowMode = 'off';
   private fix: PositionFix | null = null;
-  private receivedAt: number | null = null;
+  /** When the latest fix was taken, by this.now()'s clock. */
+  private takenAt: number | null = null;
   private error: PositionError | null = null;
   private heading: Heading | null = null;
   private compassDeg: number | null = null;
@@ -210,7 +224,7 @@ export class PositionStore {
     this.source = source;
     this.unsubscribeSource = source.subscribe((e) => this.onSourceEvent(e));
     this.fix = null;
-    this.receivedAt = null;
+    this.takenAt = null;
     if (wasOn) {
       this.centerOnNextFix = this.follow === 'following';
       void source.start();
@@ -230,7 +244,7 @@ export class PositionStore {
     this.on = true;
     this.error = null;
     this.fix = null;
-    this.receivedAt = null;
+    this.takenAt = null;
     this.heading = null;
     this.centerOnNextFix = true;
     this.ticker = this.setIntervalFn(() => this.notify(), TICK_MS);
@@ -247,7 +261,7 @@ export class PositionStore {
     this.ticker = null;
     this.compass?.stop();
     this.fix = null;
-    this.receivedAt = null;
+    this.takenAt = null;
     this.heading = null;
     this.compassDeg = null;
     this.compassAt = null;
@@ -275,7 +289,7 @@ export class PositionStore {
   private onFix(fix: PositionFix): void {
     if (!this.on) return;
     this.fix = fix;
-    this.receivedAt = this.now();
+    this.takenAt = fixTakenAt(fix, this.now());
     this.error = null;
     this.updateHeading();
     if (this.follow === 'following') {
@@ -320,15 +334,15 @@ export class PositionStore {
 
   private makeSnapshot(): PositionSnapshot {
     const now = this.now();
-    const stale = isStale(this.receivedAt, now);
-    const tooOld = isTooOld(this.receivedAt, now);
+    const stale = isStale(this.takenAt, now);
+    const tooOld = isTooOld(this.takenAt, now);
     return {
       on: this.on,
       follow: this.follow,
       following: this.follow === 'following',
       permission: this.source.permission,
       fix: this.fix,
-      ageMs: fixAgeMs(this.receivedAt, now),
+      ageMs: fixAgeMs(this.takenAt, now),
       stale,
       tooOld,
       // A stale fix shows no heading: the phone may have turned since.

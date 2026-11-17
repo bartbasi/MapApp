@@ -1,10 +1,12 @@
 // MapApp. Copyright 2026 Play, Inc.
 // Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE.
 
-// The Android position source, through the Capacitor geolocation plugin. The
-// plugin asks Android for permission with its own system prompt and then
-// watches the phone's GPS. An emulator's `adb emu geo fix` arrives here the
-// same way a real GPS reading does.
+// The Android position source, through MapApp's own "DeviceLocation" plugin
+// (android/app/src/main/java/io/github/bartbasi/mapapp/location/). The plugin
+// uses only Android's own location service: the GPS, and the platform's fused
+// provider where the phone has one, with GPS fixes always preferred
+// (DECISIONS D31). It links no closed library. An emulator's
+// `adb emu geo fix` arrives here the same way a real GPS reading does.
 //
 // PRECISE OR APPROXIMATE
 //
@@ -19,109 +21,180 @@
 // shows its usual prompt. With Approximate already granted, Android 12 and
 // later show the prompt to change to precise, unless the user has turned it
 // down often enough that Android answers at once without showing anything.
-// Either way, if the answer is still approximate only, the
-// app says it needs the precise location and offers the app's settings
-// page. It never starts the watch then: the plugin's watchPosition with
-// enableHighAccuracy would ask for the precise permission again on its own
-// and then watch with the approximate one anyway.
+// Either way, if the answer is still approximate only, the app says it needs
+// the precise location and offers the app's settings page. It never starts
+// the watch then.
+//
+// LOCATION SWITCHED OFF
+//
+// Before anything else the source asks whether the phone's Location switch is
+// on, and says so if it is off. While watching, the plugin hears the switch
+// go off and ends the watch with "location-off".
 
-import { Geolocation, type PermissionStatus, type Position, type WatchPositionCallback } from '@capacitor/geolocation';
+import { registerPlugin, type PermissionState as CapacitorPermissionState } from '@capacitor/core';
 import { BasePositionSource, finiteOrNull, type PositionErrorKind, type PositionFix } from './types';
 
-/**
- * Watch settings: GPS on (high accuracy), a reading about every second, and
- * never a cached reading older than a second.
- */
-export const NATIVE_WATCH_OPTIONS = {
-  enableHighAccuracy: true,
-  maximumAge: 1000,
-  timeout: 30000,
-  interval: 1000,
-  minimumUpdateInterval: 500,
-} as const;
+/** The two permission aliases the plugin declares, as Capacitor reports them. */
+export interface LocationPermissionStatus {
+  /** Precise: fine and coarse both granted. */
+  location: CapacitorPermissionState;
+  /** Approximate. */
+  coarseLocation: CapacitorPermissionState;
+}
 
-/** The plugin's error codes (GeolocationErrors.kt in @capacitor/geolocation 8.2.5), in the app's words. */
+/** Whether Location is on, and which providers the phone has. */
+export interface LocationStatus {
+  locationEnabled: boolean;
+  gps: boolean;
+  fused: boolean;
+}
+
+/**
+ * One fix as the plugin sends it. Fields Android does not report for a fix
+ * are absent: accuracy, bearing and speed.
+ */
+export interface NativeFix {
+  type: 'fix';
+  provider: 'gps' | 'fused';
+  lng: number;
+  lat: number;
+  accuracyM?: number;
+  /** Direction of travel, degrees clockwise from true north. */
+  bearingDeg?: number;
+  speedMps?: number;
+  /** When the fix was taken, milliseconds since 1970, by the fix's own clock. */
+  timeMs: number;
+  /** How old the fix was when the plugin sent it, by the phone's monotonic clock. */
+  ageMs: number;
+}
+
+/** The watch's last event: it could not start, or it stopped. */
+export interface NativeWatchError {
+  type: 'error';
+  code: 'denied' | 'location-off' | 'unavailable' | string;
+}
+
+export type NativeWatchEvent = NativeFix | NativeWatchError;
+
+export type NativeWatchCallback = (event: NativeWatchEvent | null, err?: unknown) => void;
+
+/** The plugin's methods this source uses, so tests can give a fake. */
+export interface DeviceLocationPlugin {
+  status(): Promise<LocationStatus>;
+  checkPermissions(): Promise<LocationPermissionStatus>;
+  requestPermissions(options: { permissions: ('location' | 'coarseLocation')[] }): Promise<LocationPermissionStatus>;
+  /** Resolves with the watch's id. Every event after that arrives through the callback. */
+  watch(options: Record<string, never>, callback: NativeWatchCallback): Promise<string>;
+  clearWatch(options: { id: string }): Promise<void>;
+}
+
+const DeviceLocation = registerPlugin<DeviceLocationPlugin>('DeviceLocation');
+
+/** The plugin's error codes, in the app's words. */
 export function nativeErrorKind(code: string | undefined): PositionErrorKind {
   switch (code) {
-    case 'OS-PLUG-GLOC-0003':
+    case 'denied':
       return 'denied';
-    case 'OS-PLUG-GLOC-0007': // Location services are off.
-    case 'OS-PLUG-GLOC-0009': // The user said no to turning Location on.
-    case 'OS-PLUG-GLOC-0016': // Location settings do not allow the request.
-    case 'OS-PLUG-GLOC-0017': // Location and network both off.
+    case 'location-off':
       return 'location-off';
-    case 'OS-PLUG-GLOC-0010':
-      return 'timeout';
     default:
       return 'unavailable';
   }
 }
 
-/** One plugin reading as a fix. The course is the direction of travel; the plugin's `heading` may be a compass, so it is only a fallback. */
-export function fixFromPlugin(p: Position): PositionFix {
-  const c = p.coords;
+/**
+ * One plugin fix as the app's fix. A missing accuracy becomes 0, which the
+ * app reads as not known (DECISIONS D32).
+ */
+export function fixFromNative(f: NativeFix): PositionFix {
+  const accuracy = finiteOrNull(f.accuracyM);
+  const age = finiteOrNull(f.ageMs);
   return {
-    lng: c.longitude,
-    lat: c.latitude,
-    accuracyM: c.accuracy,
-    headingDeg: finiteOrNull(c.course) ?? finiteOrNull(c.heading),
-    speedMps: finiteOrNull(c.speed),
-    timeMs: p.timestamp,
+    lng: f.lng,
+    lat: f.lat,
+    accuracyM: accuracy ?? 0,
+    headingDeg: finiteOrNull(f.bearingDeg),
+    speedMps: finiteOrNull(f.speedMps),
+    timeMs: f.timeMs,
+    ageAtDeliveryMs: age !== null && age > 0 ? age : 0,
   };
-}
-
-function errorCode(e: unknown): string | undefined {
-  return typeof e === 'object' && e !== null && 'code' in e ? String((e as { code: unknown }).code) : undefined;
 }
 
 function errorText(e: unknown): string {
   return e instanceof Error ? e.message : typeof e === 'object' && e !== null && 'message' in e ? String((e as { message: unknown }).message) : String(e);
 }
 
-/** The parts of the plugin this source uses, so tests can give a fake. */
-export interface GeolocationPlugin {
-  checkPermissions(): Promise<PermissionStatus>;
-  requestPermissions(options: { permissions: ('location' | 'coarseLocation')[] }): Promise<PermissionStatus>;
-  watchPosition(options: typeof NATIVE_WATCH_OPTIONS, callback: WatchPositionCallback): Promise<string>;
-  clearWatch(options: { id: string }): Promise<void>;
+/** One watch, from the moment it is asked for. */
+interface Watch {
+  /** The plugin's id, once the plugin has given it. */
+  id: string | null;
 }
 
 export class NativePositionSource extends BasePositionSource {
   readonly kind = 'android' as const;
-  private watchId: string | null = null;
+  /** The running or starting watch, or null. Events from any other watch are ignored. */
+  private watch: Watch | null = null;
   private starting = false;
+  /** Counts stop() calls, so a start() that a stop() overtook gives up. */
+  private stops = 0;
 
-  constructor(private readonly plugin: GeolocationPlugin = Geolocation) {
+  constructor(private readonly plugin: DeviceLocationPlugin = DeviceLocation) {
     super();
   }
 
   async start(): Promise<void> {
-    if (this.watchId !== null || this.starting) return;
+    if (this.watch !== null || this.starting) return;
     this.starting = true;
+    const stops = this.stops;
     try {
-      if (!(await this.ensurePermission())) return;
-      this.watchId = await this.plugin.watchPosition({ ...NATIVE_WATCH_OPTIONS }, (position, err) => {
-        if (err) {
-          this.onWatchError(err);
-          return;
-        }
-        if (position) this.emitFix(fixFromPlugin(position));
-      });
+      const status = await this.plugin.status();
+      if (!status.locationEnabled) {
+        this.emitError('location-off', 'Location is switched off');
+        return;
+      }
+      if (!(await this.ensurePermission()) || this.stops !== stops) return;
+      const watch: Watch = { id: null };
+      this.watch = watch;
+      watch.id = await this.plugin.watch({}, (event, err) => this.onWatchEvent(watch, event, err));
+      // Stopped while the plugin was starting it: stop it there too.
+      if (this.watch !== watch) await this.clear(watch.id);
     } catch (e) {
-      this.fail(e);
+      this.watch = null;
+      this.emitError('unavailable', errorText(e));
     } finally {
       this.starting = false;
     }
   }
 
   async stop(): Promise<void> {
-    const id = this.watchId;
-    this.watchId = null;
-    if (id === null) return;
+    this.stops++;
+    const watch = this.watch;
+    this.watch = null;
+    if (watch?.id) await this.clear(watch.id);
+  }
+
+  private async clear(id: string): Promise<void> {
     try {
       await this.plugin.clearWatch({ id });
     } catch (e) {
       console.warn('position: clearing the watch failed:', errorText(e));
+    }
+  }
+
+  private onWatchEvent(watch: Watch, event: NativeWatchEvent | null, err: unknown): void {
+    if (this.watch !== watch) return;
+    if (event?.type === 'fix') {
+      this.emitFix(fixFromNative(event));
+      return;
+    }
+    // Any other event is the watch's last: the plugin has already ended it.
+    this.watch = null;
+    if (event?.type === 'error') {
+      const kind = nativeErrorKind(event.code);
+      if (kind === 'denied') this.emitPermission('denied');
+      this.emitError(kind, `watch ended: ${event.code}`);
+    } else {
+      this.emitError('unavailable', errorText(err ?? 'no event'));
     }
   }
 
@@ -130,7 +203,6 @@ export class NativePositionSource extends BasePositionSource {
    * position. See "Precise or approximate" at the top of this file.
    */
   private async ensurePermission(): Promise<boolean> {
-    // Both calls throw when the phone's Location switch is off.
     let status = await this.plugin.checkPermissions();
     if (status.location !== 'granted') {
       // "denied" here means Android will not show its prompt again: only the
@@ -149,22 +221,5 @@ export class NativePositionSource extends BasePositionSource {
     this.emitPermission('denied');
     this.emitError('denied', `permission ${status.location}`);
     return false;
-  }
-
-  private onWatchError(err: unknown): void {
-    const kind = nativeErrorKind(errorCode(err));
-    // A slow first reading is not a failure: keep watching.
-    if (kind === 'timeout') {
-      this.emitError(kind, errorText(err));
-      return;
-    }
-    this.fail(err);
-    void this.stop();
-  }
-
-  private fail(e: unknown): void {
-    const kind = nativeErrorKind(errorCode(e));
-    if (kind === 'denied') this.emitPermission('denied');
-    this.emitError(kind, `${errorCode(e) ?? ''} ${errorText(e)}`.trim());
   }
 }

@@ -5,36 +5,31 @@
 
 import { describe, expect, it } from 'vitest';
 import { browserErrorKind } from './browser-source';
-import { fixFromPlugin, nativeErrorKind, NATIVE_WATCH_OPTIONS } from './native-source';
+import { fixFromNative, nativeErrorKind, type NativeFix } from './native-source';
 
 describe('native source', () => {
   it('maps the plugin error codes to the app’s kinds', () => {
-    expect(nativeErrorKind('OS-PLUG-GLOC-0003')).toBe('denied');
-    expect(nativeErrorKind('OS-PLUG-GLOC-0007')).toBe('location-off');
-    expect(nativeErrorKind('OS-PLUG-GLOC-0009')).toBe('location-off');
-    expect(nativeErrorKind('OS-PLUG-GLOC-0017')).toBe('location-off');
-    expect(nativeErrorKind('OS-PLUG-GLOC-0010')).toBe('timeout');
-    expect(nativeErrorKind('OS-PLUG-GLOC-0002')).toBe('unavailable');
+    expect(nativeErrorKind('denied')).toBe('denied');
+    expect(nativeErrorKind('location-off')).toBe('location-off');
+    expect(nativeErrorKind('unavailable')).toBe('unavailable');
+    expect(nativeErrorKind('something new')).toBe('unavailable');
     expect(nativeErrorKind(undefined)).toBe('unavailable');
   });
 
-  it('watches with GPS on and no old cached reading', () => {
-    expect(NATIVE_WATCH_OPTIONS.enableHighAccuracy).toBe(true);
-    expect(NATIVE_WATCH_OPTIONS.maximumAge).toBeLessThanOrEqual(2000);
+  const full: NativeFix = { type: 'fix', provider: 'gps', lng: -88.2, lat: 40.1, accuracyM: 6, bearingDeg: 180, speedMps: 1.2, timeMs: 5, ageMs: 40 };
+
+  it('reads every field of a plugin fix, with the age it already had', () => {
+    expect(fixFromNative(full)).toEqual({ lng: -88.2, lat: 40.1, accuracyM: 6, headingDeg: 180, speedMps: 1.2, timeMs: 5, ageAtDeliveryMs: 40 });
   });
 
-  it('prefers the course over the plugin heading, which may be a compass', () => {
-    const base = { latitude: 40.1, longitude: -88.2, accuracy: 6, altitude: null, altitudeAccuracy: null, speed: 1.2, magneticHeading: null, trueHeading: null, headingAccuracy: null };
-    expect(fixFromPlugin({ timestamp: 5, coords: { ...base, heading: 90, course: 180 } })).toEqual({
-      lng: -88.2,
-      lat: 40.1,
-      accuracyM: 6,
-      headingDeg: 180,
-      speedMps: 1.2,
-      timeMs: 5,
-    });
-    expect(fixFromPlugin({ timestamp: 5, coords: { ...base, heading: 90, course: undefined } }).headingDeg).toBe(90);
-    expect(fixFromPlugin({ timestamp: 5, coords: { ...base, speed: null, heading: null, course: null } })).toMatchObject({ headingDeg: null, speedMps: null });
+  it('a fix with no accuracy reads as accuracy not known (0), and no bearing or speed as none', () => {
+    const bare: NativeFix = { type: 'fix', provider: 'fused', lng: -88.2, lat: 40.1, timeMs: 5, ageMs: 0 };
+    expect(fixFromNative(bare)).toMatchObject({ accuracyM: 0, headingDeg: null, speedMps: null });
+  });
+
+  it('a nonsense age counts as none', () => {
+    expect(fixFromNative({ ...full, ageMs: -3 }).ageAtDeliveryMs).toBe(0);
+    expect(fixFromNative({ ...full, ageMs: Number.NaN }).ageAtDeliveryMs).toBe(0);
   });
 });
 
