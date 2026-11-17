@@ -77,6 +77,12 @@ export interface ArchiveEntry {
   county: string;
   layer: string;
   meta: ArchiveMeta;
+  /**
+   * The downloaded area the archive belongs to (its ID), when it is not one
+   * that came with the app. Several areas can each hold an archive of the same
+   * county and layer.
+   */
+  area?: string;
 }
 
 /**
