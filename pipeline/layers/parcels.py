@@ -15,7 +15,13 @@ The raw service pages are cached in data/cache/parcels/<county-id>/ so a
 rebuild does not ask the service again (REFRESH=1 downloads again). Every
 request is logged to data/logs/parcels/requests-<county-id>.log.
 
+The metadata carries the county outline as 'coverage', so the app can tell
+a place with no parcel inside the county from a place outside it.
+
 Usage: python3 -I pipeline/layers/parcels.py <county-id>   (normally via build.sh)
+       python3 -I pipeline/layers/parcels.py --update-meta <county-id>
+           Rewrites the metadata of an existing archive (notes, source entry,
+           coverage) from local files only. No request, archive unchanged.
 """
 
 import datetime
@@ -237,10 +243,6 @@ def build(county_id):
         log(f"  zoom {z}: {s['tiles']} tiles, {s['bytes']} bytes, largest {s['largest']} bytes (gzip) at {s['largestTile']}")
     log("\n".join(subprocess.run([md.PMTILES, "show", final], capture_output=True, text=True).stdout.splitlines()[:13]))
 
-    notes = ("Property lines from the county's tax assessment map. They are not a legal survey and can sit several "
-             "meters off the true line. Owner names are as the county wrote them on the data date. Each tile holds "
-             "only this county's parcels. Edges where a parcel is cut at a tile boundary are not property lines. "
-             "Not to be published on any public host until the project owner says so (D25).")
     prov = {
         "service": manifest["service"], "layerName": manifest["layerName"], "outFields": manifest["outFields"],
         "pidField": svc_cfg["pid"], "pidReason": svc_cfg.get("pidReason", ""),
@@ -249,18 +251,75 @@ def build(county_id):
         "serviceSpatialReference": manifest["spatialReference"],
         "tiles": {str(z): {"tiles": s["tiles"], "largestBytes": s["largest"]} for z, s in sorted(per_zoom.items())},
         "countyOutline": outline_prov,
+        "buildNotes": BUILD_NOTES,
     }
-    meta = md.make_meta(LAYER, county, final, sources, notes, provenance=prov)
+    meta = md.make_meta(LAYER, county, final, sources, user_notes(county), provenance=prov,
+                        coverage=md.coverage_geometry(county))
     md.write_meta(os.path.join(out_dir, f"{LAYER}.meta.json"), meta, final)
     log(f"Wrote {os.path.join(out_dir, LAYER + '.meta.json')}")
 
 
+# ------------------------------------------------------------------ metadata text
+
+def user_notes(county):
+    """The 'notes' the app shows on its sources screen. Written for a user:
+    where the lines come from and what they are not. Nothing about the build."""
+    return (f"Property lines and owner names from the tax assessment records of {md.county_label(county)}, "
+            "as of the data date above. They are not a legal survey. A line can sit several meters off the "
+            "true property line.")
+
+
+# Notes for the people who build and check the archive. Kept in 'provenance',
+# which the app does not show.
+BUILD_NOTES = ("Each tile holds only this county's parcels. Edges where a parcel is cut at a tile boundary are not "
+               "property lines. Not to be published on any public host until the project owner says so (D25).")
+
+
+def update_meta(county_id):
+    """Brings an existing parcel metadata file up to date without rebuilding
+    the archive and without any request: the user notes, the source entry
+    from sources.json (same data date), the build notes, and the 'coverage'
+    outline from the cached county outline. The archive is not touched."""
+    county = md.get_county(county_id)
+    svc_cfg = parcelsvc.load_config(county_id)
+    out_dir = os.environ.get("OUT_DIR") or os.path.join(md.BUILD, county_id)
+    final = os.path.join(out_dir, f"{LAYER}.pmtiles")
+    meta_path = os.path.join(out_dir, f"{LAYER}.meta.json")
+    if not (os.path.exists(final) and os.path.exists(meta_path)):
+        raise md.PipelineError(f"no parcel archive and metadata in {out_dir} to update")
+    meta = md.read_json(meta_path)
+    old = meta["sources"][0]
+    meta["sources"] = [md.source_entry(svc_cfg["source"], old["dataDate"])]
+    meta["notes"] = user_notes(county)
+    meta["coverage"] = md.coverage_geometry(county)
+    prov = meta.setdefault("provenance", {})
+    prov["buildNotes"] = BUILD_NOTES
+    prov["metaUpdated"] = datetime.date.today().isoformat()
+    # The members in the contract's order, with provenance last.
+    order = ["schema", "layer", "county", "countyName", "kind", "title", "minzoom", "maxzoom", "bounds", "bytes",
+             "buildDate", "sources", "notes", "coverage", "provenance"]
+    meta = {k: meta[k] for k in order if k in meta} | {k: v for k, v in meta.items() if k not in order}
+    md.write_meta(meta_path, meta, final)
+    rings = meta["coverage"]["coordinates"] if meta["coverage"]["type"] == "MultiPolygon" else [meta["coverage"]["coordinates"]]
+    points = sum(len(r) for poly in rings for r in poly)
+    log(f"Updated {meta_path}: notes, source entry, coverage ({meta['coverage']['type']}, {points} points). "
+        "The archive is unchanged and no request was made.")
+
+
+USAGE = ("usage: python3 -I pipeline/layers/parcels.py <county-id>\n"
+         "       python3 -I pipeline/layers/parcels.py --update-meta <county-id>   (no request, archive unchanged)")
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        log("usage: python3 -I pipeline/layers/parcels.py <county-id>")
-        sys.exit(2)
+    args = sys.argv[1:]
     try:
-        build(sys.argv[1])
+        if len(args) == 2 and args[0] == "--update-meta":
+            update_meta(args[1])
+        elif len(args) == 1 and not args[0].startswith("-"):
+            build(args[0])
+        else:
+            log(USAGE)
+            sys.exit(2)
     except md.PipelineError as e:
         log(f"error: {e}")
         sys.exit(1)

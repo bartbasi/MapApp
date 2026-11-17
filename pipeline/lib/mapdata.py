@@ -277,6 +277,85 @@ def polygonal_simplify(geom, tolerance_deg=0.001):
     return g
 
 
+def cached_outline_path(county):
+    """The cached county outline file, or a PipelineError if it is not cached.
+    Never downloads: for steps that must make no request."""
+    path = os.path.join(CACHE, "census", f"county-{county['fips']}.geojson")
+    if not os.path.exists(path):
+        raise PipelineError(f"the county outline is not cached at {path}. A full build fetches it once.")
+    return path
+
+
+def round_coords(coords, digits):
+    if coords and isinstance(coords[0], (int, float)):
+        return [round(coords[0], digits), round(coords[1], digits)]
+    return [round_coords(c, digits) for c in coords]
+
+
+# The county outline in the metadata 'coverage' member is simplified to this
+# tolerance, in meters. The Census line and a county's own parcel edges differ
+# by more than this anyway, so nothing the app decides is changed by it.
+COVERAGE_TOLERANCE_M = 5.0
+
+
+def coverage_geometry(county, tolerance_m=COVERAGE_TOLERANCE_M):
+    """The county outline as a GeoJSON geometry for the metadata 'coverage'
+    member: Polygon or MultiPolygon, WGS84, longitude first, simplified to
+    about tolerance_m meters, coordinates rounded to 6 decimals (about 0.1 m).
+    Read from the cached outline only, so it never makes a request."""
+    _, ogr, osr = gdal_modules()
+    fc = read_json(cached_outline_path(county))
+    g = ogr.CreateGeometryFromJson(json.dumps(fc["features"][0]["geometry"]))
+    g.AssignSpatialReference(wgs84())
+    c = g.Centroid()
+    local = osr.SpatialReference()
+    local.ImportFromProj4(f"+proj=aeqd +lat_0={c.GetY()} +lon_0={c.GetX()} +datum=WGS84 +units=m +no_defs")
+    g.Transform(osr.CoordinateTransformation(wgs84(), local))
+    g = g.SimplifyPreserveTopology(tolerance_m)
+    g.AssignSpatialReference(local)
+    g.Transform(osr.CoordinateTransformation(local, wgs84()))
+    out = json.loads(g.ExportToJson())
+    if out.get("type") not in ("Polygon", "MultiPolygon"):
+        raise PipelineError(f"the simplified county outline is a {out.get('type')}, expected a polygon")
+    out = {"type": out["type"], "coordinates": round_coords(out["coordinates"], 6)}
+    problems = validate_coverage(out)
+    if problems:
+        raise PipelineError("the simplified county outline is not usable: " + "; ".join(problems))
+    return out
+
+
+def validate_coverage(geom, bounds=None):
+    """Problems with a metadata 'coverage' geometry; empty means valid."""
+    p = []
+    if not isinstance(geom, dict) or geom.get("type") not in ("Polygon", "MultiPolygon"):
+        return ["coverage must be a GeoJSON Polygon or MultiPolygon"]
+    polys = [geom.get("coordinates")] if geom["type"] == "Polygon" else geom.get("coordinates")
+    if not isinstance(polys, list) or not polys:
+        return ["coverage has no coordinates"]
+    xs, ys = [], []
+    for poly in polys:
+        if not isinstance(poly, list) or not poly:
+            p.append("coverage has an empty polygon")
+            continue
+        for ring in poly:
+            if not isinstance(ring, list) or len(ring) < 4:
+                p.append("coverage has a ring with fewer than 4 positions")
+                continue
+            for pos in ring:
+                if not (isinstance(pos, list) and len(pos) == 2 and all(isinstance(v, (int, float)) for v in pos)
+                        and -180 <= pos[0] <= 180 and -90 <= pos[1] <= 90):
+                    p.append(f"coverage position {pos!r} is not [longitude, latitude]")
+                    return p
+                xs.append(pos[0])
+                ys.append(pos[1])
+            if ring[0] != ring[-1]:
+                p.append("coverage has a ring that is not closed")
+    if bounds and xs and (min(xs) < bounds[0] - 1e-3 or min(ys) < bounds[1] - 1e-3
+                          or max(xs) > bounds[2] + 1e-3 or max(ys) > bounds[3] + 1e-3):
+        p.append(f"coverage reaches outside the metadata bounds {bounds}")
+    return p
+
+
 def outline_bounds(county, digits=4):
     """Bounding box of the county outline, rounded outward."""
     env = outline_geometry(county).GetEnvelope()  # minx, maxx, miny, maxy
@@ -375,9 +454,10 @@ def source_entry(key, data_date=None, name_suffix="", **fields):
             "credit": s["credit"].format(**fields), "url": s["url"], "dataDate": date}
 
 
-def make_meta(layer, county, archive, sources, notes, bounds=None, provenance=None):
+def make_meta(layer, county, archive, sources, notes, bounds=None, provenance=None, coverage=None):
     """Metadata for an archive. For raster archives, tileSize is read back
-    from a decoded tile."""
+    from a decoded tile. coverage, when given, is the area the archive's data
+    covers, as a GeoJSON geometry (see coverage_geometry)."""
     spec = LAYERS[layer]
     meta = {
         "schema": 1,
@@ -396,6 +476,8 @@ def make_meta(layer, county, archive, sources, notes, bounds=None, provenance=No
     }
     if spec["kind"] == "raster":
         meta["tileSize"] = raster_tile_size(archive)
+    if coverage:
+        meta["coverage"] = coverage
     if provenance:
         meta["provenance"] = provenance
     return meta
@@ -406,8 +488,8 @@ def validate_meta(meta, archive=None):
     Returns a list of problems; empty means valid."""
     p = []
     allowed = {"schema", "layer", "county", "countyName", "kind", "title", "minzoom", "maxzoom",
-               "bounds", "bytes", "buildDate", "sources", "notes", "provenance", "tileSize"}
-    required = allowed - {"provenance", "tileSize"}
+               "bounds", "bytes", "buildDate", "sources", "notes", "provenance", "tileSize", "coverage"}
+    required = allowed - {"provenance", "tileSize", "coverage"}
     for k in sorted(required - meta.keys()):
         p.append(f"missing '{k}'")
     for k in sorted(meta.keys() - allowed):
@@ -465,6 +547,8 @@ def validate_meta(meta, archive=None):
         p.append("notes must be a string")
     if "provenance" in meta and not isinstance(meta["provenance"], dict):
         p.append("provenance must be an object")
+    if "coverage" in meta:
+        p.extend(validate_coverage(meta["coverage"], b if isinstance(b, list) and len(b) == 4 else None))
 
     if archive and spec:
         h = pmtiles_header(archive)

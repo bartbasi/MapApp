@@ -31,7 +31,7 @@ Files:
 | `layers/publicland.sh`, `layers/publicland.py` | The `publicland` layer. |
 | `layers/publicland-mapping.json` | Every PAD-US mapping table: manager names, categories, access, filter thresholds, corrections. |
 | `layers/aerial.sh`, `layers/aerial.py` | The `aerial` layer: NAIP images found by a catalog search of the county, read at the 1.2 m level, cached per image in `data/cache/naip/`, tiled to WebP. `AERIAL_MAX_GB` (default 15) stops a county whose projected download is larger. |
-| `layers/parcels.sh`, `layers/parcels.py` | The `parcels` layer: every parcel of the county from the county's own service, cached in `data/cache/parcels/<county-id>/`. |
+| `layers/parcels.sh`, `layers/parcels.py` | The `parcels` layer: every parcel of the county from the county's own service, cached in `data/cache/parcels/<county-id>/`. `--update-meta <county-id>` refreshes the metadata of an existing archive with no request. |
 | `layers/parcels-services.json` | Where each county's parcels come from: service address, the exact field list, which fields become `pid`, `owner` and `acres`, and whether the county is approved or blocked. |
 | `lib/parcelsvc.py` | Parcel service access shared by the layer and the checks: the field list, refusal of address, phone, tax and legal fields, one request at a time with a pause, and the request log. |
 | `lib/vtiles.py` | A small pure-Python reader for PMTiles archives and vector tiles, used by the checks. |
@@ -100,7 +100,9 @@ data/build/<county-id>/<layer>.meta.json
 - `dataDate` is the date of the data itself, not the day it was downloaded.
 - `bounds` is the bounding box of the county outline, rounded outward to 4 decimals.
 - `tileSize` is the tile size in pixels, for example `512`. It is required for raster archives and absent for vector archives. The pipeline reads it back from a decoded tile rather than assuming it.
+- `notes` is shown to users on the app's sources screen, word for word. Write it for a user: where the data comes from and what it is not. Build details, project rules and decision numbers go in `provenance`, never in `notes`.
 - `provenance` (optional, added in Step 1) is an object with build details for people, not for the app: the county outline source and vintage, the Protomaps build key and OpenStreetMap data time, the PAD-US service, and how many features each filter removed. The app should ignore it.
+- `coverage` (optional, added in Step 2, written for the `parcels` layer) is the area the archive's data covers: the county outline as a GeoJSON geometry, `Polygon` or `MultiPolygon`, WGS84, longitude first. It is the same Census outline the other layers are clipped with, simplified with a tolerance of 5 m (`mapdata.coverage_geometry`), coordinates to 6 decimals. The app uses it to tell a place in no parcel inside the county (a road, a lake) from a place outside the county, where the archive simply has no parcels. Without it the app falls back to the bounding box and the tiles, which cannot tell the two apart near the county line.
 
 ### Layers
 
@@ -161,6 +163,7 @@ How it is built:
 - **Permission, not a license.** The metadata `license` says the data is used with the county's permission as stated by the owner. **Parcel archives are not put on GitHub or any other public host until the owner says so in plain words (D25).**
 - The download asks only for the fields listed in `layers/parcels-services.json`. `lib/parcelsvc.py` refuses any field name that looks like an address, phone, tax or legal description, and refuses a response that carries any field not asked for. Every request goes into `data/logs/parcels/requests-<county-id>.log`.
 - The raw pages are cached in `data/cache/parcels/<county-id>/`. A rebuild reuses them and makes no request. `REFRESH=1` downloads again.
+- The metadata carries `coverage`, the county outline (see the metadata file above). `python3 -I pipeline/layers/parcels.py --update-meta <county-id>` rewrites the metadata of an existing archive (the user notes, the source entry from `sources.json` with the same data date, and `coverage` from the cached county outline) without touching the archive and without any request. It stops if the county outline is not cached.
 - A county whose entry in `layers/parcels-services.json` is `blocked` stops with the reason and makes no request. Champaign County is blocked: its parcel services need a login (see `docs/research/county-parcel-terms.md`).
 
 Checks, run in WSL after a build:
