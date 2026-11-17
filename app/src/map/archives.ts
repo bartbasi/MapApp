@@ -5,7 +5,7 @@
 // byte-range reader, and wraps them for the TileResolver.
 
 import { PMTiles } from 'pmtiles';
-import type { ArchiveEntry } from '../platform/archive-meta';
+import { archiveLabel, type ArchiveEntry } from '../platform/archive-meta';
 import type { ArchiveAccess } from '../platform/platform';
 import type { TileArchive } from './tile-resolver';
 
@@ -19,10 +19,11 @@ export function openArchives(access: ArchiveAccess, entries: readonly ArchiveEnt
   return entries.map((entry) => {
     const pm = new PMTiles(access.open(entry));
     return {
-      id: `${entry.county}/${entry.layer}`,
+      id: archiveLabel(entry),
       entry,
       layer: entry.layer,
       county: entry.county,
+      ...(entry.area !== undefined ? { area: entry.area } : {}),
       minzoom: entry.meta.minzoom,
       maxzoom: entry.meta.maxzoom,
       bounds: entry.meta.bounds,

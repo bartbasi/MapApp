@@ -86,6 +86,16 @@ export interface ArchiveEntry {
 }
 
 /**
+ * A name for one installed archive, for messages and list keys. It stays
+ * unique when several downloaded areas hold the same county and layer:
+ * "il-macon/aerial" for an archive that came with the app,
+ * "il-macon/aerial@<area ID>" for one of a downloaded area.
+ */
+export function archiveLabel(entry: Pick<ArchiveEntry, 'county' | 'layer' | 'area'>): string {
+  return entry.area === undefined ? `${entry.county}/${entry.layer}` : `${entry.county}/${entry.layer}@${entry.area}`;
+}
+
+/**
  * County IDs and layer names are lower case letters, digits and hyphens.
  * Anything else in a request path is refused, which also rules out "..".
  */

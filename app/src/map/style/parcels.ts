@@ -30,14 +30,14 @@ export const CONNECTOR_MINZOOM = 15;
 
 /** The map source ID of one county's parcel archive. Made from the installed list, never written in code. */
 export function parcelSourceId(entry: ArchiveEntry): string {
-  return `${entry.layer}:${entry.county}`;
+  return entry.area === undefined ? `${entry.layer}:${entry.county}` : `${entry.layer}:${entry.county}@${entry.area}`;
 }
 
 /** One county archive's map source. Parcel data is credited in the layers panel, the details panel and the sources screen. */
 export function parcelSource(entry: ArchiveEntry): SourceSpecification {
   return {
     type: 'vector',
-    tiles: [tileUrlTemplate(entry.layer, entry.county)],
+    tiles: [tileUrlTemplate(entry.layer, entry.county, entry.area)],
     minzoom: entry.meta.minzoom,
     maxzoom: entry.meta.maxzoom,
     bounds: entry.meta.bounds,

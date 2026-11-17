@@ -15,6 +15,8 @@ import {
   type GeoJSONSource,
   type LngLat,
   type LngLatBoundsLike,
+  type RasterTileSource,
+  type VectorTileSource,
 } from 'maplibre-gl';
 // MapLibre GL JS 6 loads its worker from a file next to its own module. The
 // bundler moves that module, so the worker is bundled as its own file and its
@@ -285,6 +287,22 @@ export class MapView {
     if (key === this.lastStyleKey) return;
     this.lastStyleKey = key;
     this.map.setStyle(buildStyle(this.withLabels(options)), { diff: true });
+  }
+
+  /**
+   * Drops the tiles the map holds for every archive source and fetches them
+   * again, keeping the camera. Call it after the installed archives changed
+   * (data-session.ts reloadDataSession): a source whose address did not
+   * change would otherwise keep the empty tiles it got before an area was
+   * downloaded, or the tiles of an area that was removed.
+   */
+  reloadTiles(): void {
+    const sources = this.map.getStyle()?.sources ?? {};
+    for (const [id, spec] of Object.entries(sources)) {
+      if ((spec.type === 'vector' || spec.type === 'raster') && spec.tiles) {
+        this.map.getSource<VectorTileSource | RasterTileSource>(id)?.setTiles(spec.tiles);
+      }
+    }
   }
 
   get styleOptions(): StyleOptions {

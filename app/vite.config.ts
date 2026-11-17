@@ -5,6 +5,7 @@ import { delimiter, resolve } from 'node:path';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vite';
 import { archiveServer } from './vite-plugins/archive-server.ts';
+import { remotePassThrough } from './vite-plugins/remote-pass-through.ts';
 
 // Built archives from the pipeline. MAPAPP_ARCHIVES overrides this with one
 // or more folders, separated by ";" on Windows and ":" elsewhere; the first
@@ -17,7 +18,8 @@ const archiveDirs = (process.env['MAPAPP_ARCHIVES'] ?? '../data/build')
   .map((d) => resolve(import.meta.dirname, d));
 
 export default defineConfig({
-  plugins: [svelte(), archiveServer(archiveDirs)],
+  // remotePassThrough is for the download stand-in, in the development server only.
+  plugins: [svelte(), archiveServer(archiveDirs), remotePassThrough()],
   build: {
     target: 'es2022',
     // MapLibre is one large module. Splitting it gains nothing offline.

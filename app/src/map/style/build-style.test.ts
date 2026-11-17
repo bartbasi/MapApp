@@ -137,7 +137,8 @@ describe('buildStyle: raster layers get one source per archive', () => {
       attribution: 'credit for aerial',
     });
     expect(s.sources['aerial:il-macon']).toMatchObject({ tiles: ['mapapp://aerial@il-macon/{z}/{x}/{y}'], tileSize: 256, minzoom: 11, maxzoom: 15, bounds: MACON });
-    expect(rasterLayers(s).map((l) => (l as { source: string }).source)).toEqual(['aerial:il-champaign', 'aerial:il-macon']);
+    // The less detailed imagery (Macon, to zoom 15) is drawn first, under the sharper.
+    expect(rasterLayers(s).map((l) => (l as { source: string }).source)).toEqual(['aerial:il-macon', 'aerial:il-champaign']);
   });
 
   it('the raster tile size defaults to the contract value of 512', () => {

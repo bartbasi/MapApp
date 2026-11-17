@@ -186,6 +186,7 @@ export interface LayerEstimate {
   layer: string;
   title: string;
   bytes: number;
+  /** Tiles in the new archive. 0 for a file taken whole (a whole county), whose directories are not read. */
   tiles: number;
 }
 

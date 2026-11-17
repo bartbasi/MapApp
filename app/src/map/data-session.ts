@@ -6,6 +6,7 @@
 
 import type { ArchiveEntry } from '../platform/archive-meta';
 import type { Platform } from '../platform/platform';
+import { orderArchives } from './archive-order';
 import { openArchives, type OpenArchive } from './archives';
 import { summarizeInstalled, type InstalledLayers } from './installed';
 import { PUBLIC_LAND_CATEGORIES, PUBLIC_LAND_LAYER, categoriesFromTilestats, type PublicLandCategory } from './public-land';
@@ -18,14 +19,30 @@ export interface DataSession {
   resolver: TileResolver;
 }
 
-export async function loadDataSession(platform: Platform): Promise<DataSession> {
-  const entries = await platform.archives.list();
+/**
+ * Lists what is installed and opens it. `entries` are in lookup order:
+ * downloaded areas newest first, then what came with the app, then the
+ * overview map (archive-order.ts).
+ */
+export async function loadDataSession(platform: Platform, resolver: TileResolver = new TileResolver()): Promise<DataSession> {
+  const entries = orderArchives(await platform.archives.list());
   const installed = summarizeInstalled(entries);
   const usable = [...installed.values()].flatMap((l) => l.archives);
   const archives = openArchives(platform.archives, usable);
-  const resolver = new TileResolver();
   resolver.setArchives(archives);
   return { entries, installed, archives, resolver };
+}
+
+/**
+ * Loads the session again after the installed archives changed (the download
+ * service's onArchivesChanged). The new session keeps the old one's resolver,
+ * which the map's tile protocol was registered with once, and only swaps the
+ * archives it answers from. The caller then takes the new session's
+ * `installed` into the style and calls MapView.reloadTiles(), so tiles the map
+ * already holds (empty ones where nothing was installed) are fetched again.
+ */
+export function reloadDataSession(platform: Platform, previous: DataSession): Promise<DataSession> {
+  return loadDataSession(platform, previous.resolver);
 }
 
 export interface CategoryList {

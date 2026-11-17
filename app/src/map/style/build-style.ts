@@ -126,16 +126,33 @@ function vectorSource(layer: InstalledLayer, creditOnMap: boolean): SourceSpecif
   };
 }
 
-/** The source ID of one raster archive. Made from the installed list, never written in code. */
+/**
+ * The source ID of one raster archive. Made from the installed list, never
+ * written in code. An area's archive carries its area ID, so several areas
+ * holding the same county's imagery each get their own source.
+ */
 export function rasterSourceId(entry: ArchiveEntry): string {
-  return `${entry.layer}:${entry.county}`;
+  return entry.area === undefined ? `${entry.layer}:${entry.county}` : `${entry.layer}:${entry.county}@${entry.area}`;
+}
+
+/**
+ * The order imagery archives are drawn in, bottom to top: the least detailed
+ * first, so where a downloaded area at a lower detail overlaps sharper
+ * imagery, the sharper imagery stays on top. Among equals the installed
+ * order is kept (the same imagery either way).
+ */
+export function rasterDrawOrder(archives: readonly ArchiveEntry[]): ArchiveEntry[] {
+  return archives
+    .map((entry, i) => ({ entry, i }))
+    .sort((a, b) => a.entry.meta.maxzoom - b.entry.meta.maxzoom || a.i - b.i)
+    .map((x) => x.entry);
 }
 
 /** One map source for one raster archive, with that archive's own bounds and zoom range. */
 function rasterSource(entry: ArchiveEntry): SourceSpecification {
   return {
     type: 'raster',
-    tiles: [tileUrlTemplate(entry.layer, entry.county)],
+    tiles: [tileUrlTemplate(entry.layer, entry.county, entry.area)],
     tileSize: entry.meta.tileSize ?? DEFAULT_RASTER_TILE_SIZE,
     minzoom: entry.meta.minzoom,
     maxzoom: entry.meta.maxzoom,
@@ -166,7 +183,7 @@ export function buildStyle(opts: StyleOptions): StyleSpecification {
     // The plain base map goes first, under the imagery.
     if (hasBase) ground.push(...plainBaseMapLayers(BASEMAP_LAYER));
     if (aerial?.kind === 'raster') {
-      for (const entry of aerial.archives) {
+      for (const entry of rasterDrawOrder(aerial.archives)) {
         const id = rasterSourceId(entry);
         sources[id] = rasterSource(entry);
         ground.push(aerialLayer(id));
