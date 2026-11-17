@@ -291,3 +291,12 @@ Applied as:
 - **The app tells the user where they stand, in words as well as on the map.** A position readout names the parcel the phone is in and gives the distance and direction to the nearest property line.
 - **The app is honest about how exact it can be.** A phone's GPS is usually good to 3 to 10 m in the open and worse under trees. County parcel lines are drawn for tax assessment and can sit several meters off the true line. So the readout shows the GPS accuracy beside the distance, and when the accuracy is larger than the distance to the line it says the phone may be on either side. The "not a legal survey" statement is shown with it.
 - **When a choice has to be made between features, this one wins**: the marker and the parcel lines are drawn above every other layer, are readable in all three base views, and are tested hardest.
+
+## D27. The parcel archive and how the app reads it (2026-11-17, Step 2)
+
+- **One archive per county**, `data/build/<county-id>/parcels.pmtiles`, with its metadata file, on the same contract as the other layers (`pipeline/README.md`). The layer id is `parcels` and the tile layer inside is named `parcels`.
+- **Four properties per parcel and no others:** `pid` (the parcel ID as the county writes it, text), `owner` (the owner name as the county writes it, text, may be empty), `acres` (a number, or absent if the county has none) and `county` (the county id). Any other field in a parcel tile is a defect.
+- **Zoom 13 to 16.** Zoom 16 holds every parcel at full detail with nothing dropped or simplified. One tile unit there is about 0.11 m on the ground, which is finer than the data. Closer zooms are drawn from the zoom 16 tiles.
+- **One map source per county archive**, as for imagery (D23), not one per layer. A county's parcel tile holds only that county's parcels, so two counties that share a tile must both be drawn.
+- **The position readout does not depend on what the map is showing.** It reads the zoom 16 tile under the phone straight from the archive, and the neighbouring tile when the phone is near a tile edge. It finds the parcel that holds the point and the nearest outline. Edges made by cutting a parcel at a tile boundary are not property lines and are ignored.
+- **The map can zoom to level 20**, so a few meters fill the screen.
