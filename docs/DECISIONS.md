@@ -339,3 +339,19 @@ Applied as:
 - **Recommendation, not yet decided:** replace the plugin with a small plugin of our own that uses only Android's own location interface (the GPS provider, and the platform's fused provider where the phone has one). It is about 200 lines. It removes the closed library, and for a hunter in the open the raw GPS fix is the one wanted anyway. The cost is a slower first fix indoors and in town.
 - **Until the owner answers,** the plugin stays, so that his outdoor check is not held up. This must be settled before any release.
 
+## D32. Where a parcel archive can speak, and other limits on the readout (2026-11-17, after the step review)
+
+The step review found that the readout could say more than its data supports. These rules were added. Each has a unit test.
+
+- **An archive speaks only for its own county.** The parcel archive's metadata now carries the county outline (the Census outline, simplified to 5 m), under the name `coverage`. Before this, the app took any place inside the archive's map tiles as covered. A tile that crosses the county line made land in the next county read "Not in a parcel. This is often a road or a railway." That was wrong for up to about 475 m outside Macon County. Now a place in no parcel and outside the outline reads "No property lines for this place yet."
+- **A parcel that contains the position is believed wherever it is.** The Census line and the county's own parcel edges differ by some meters, and the parcel is the better evidence.
+- **A band of 25 m inside the outline counts as outside, for a place in no parcel.** Along the county line the nearest parcel sits a median 8 m inside the Census line, and 23 m at the 99th percentile, mostly the half of a road that runs on the line. Inside that band the data cannot tell a Macon County road from the next county, so the app says it has no property lines there. The figure is `COVERAGE_EDGE_M` in `app/src/parcels/coverage-area.ts`.
+- **Across a line at the county edge** the opened card says "No property lines are installed across that line." It no longer says "no parcel".
+- **A place inside the county with no map tile** (Lake Decatur) reads "Not in a parcel", with "often a road, a railway or water".
+- **A parcel inside another parcel:** the card names the parcel that is really across the line. Before, it could say "no parcel".
+- **An accuracy of 0 means unknown.** Android reports 0 when a fix has no accuracy. The readout treats it as a fix too weak to place the phone.
+- **No guess from a very poor fix.** When the accuracy plus 3 m reaches the 150 m search distance, the card names no parcel.
+- **Approximate location is refused.** If the user gives only approximate location, the app says it needs precise location and shows no marker and no readout. An approximate fix can be off by a mile.
+- **A position older than 5 minutes names nothing.** The card says "No current position." (`NO_POSITION_AFTER_MS` in `app/src/position/store.ts`.)
+- **Notes written for the project are not shown to users.** The Sources screen showed a build note about not publishing the archive. Build notes now live in a part of the metadata the app does not show.
+
