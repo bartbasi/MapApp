@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-14, end of Step 1.
+Last updated: 2026-11-17, end of Step 1, frame test on the phone half done.
 
 ## Where the project stands
 
@@ -24,7 +24,7 @@ Last updated: 2026-11-14, end of Step 1.
 
 ## Waiting on the owner
 
-1. The frame rate on his Galaxy Z Fold 5, from the frame test in the Step 1 build. If the Map view averages well under 30 frames per second, DECISIONS D2 (the map engine) is revisited before anything else.
+1. The frame rate on his Galaxy Z Fold 5 with the phone **unfolded**. Folded is done: 119.9 frames per second in the Map view and 119.7 in the Hybrid view, with no slow frames (`docs/evidence/step1/phone/README.md`). The test build is installed on the phone. When it is connected and unfolded, run the frame test over adb as that file describes. If the unfolded Map view averages well under 30 frames per second, DECISIONS D2 (the map engine) is revisited before anything else.
 2. **Whether he accepts the terms of Microsoft's Planetary Computer**, where the aerial imagery was fetched from. They were read only after the download, and using the service counts as accepting them (`docs/DATA_SOURCES.md`, "The terms of the service the imagery was fetched from"). **No aerial archive may be published or hosted until he decides.** If he says no, delete `data/build/*/aerial.*`, `data/cache/naip/` and the test build, and build the imagery another way.
 3. What to do about the patchwork of imagery years and flight dates, worst in Champaign County.
 4. Whether the eight hunting notes in `app/src/content/hunting-notes.json` are right.
@@ -44,7 +44,7 @@ Read a service's terms before the first request to it, not only the license of t
 
 ## Known defects and open risks
 
-- **The frame rate on the real phone is unmeasured.** The emulator gave 15 to 24 frames per second in the first Step 1 run, 55.8 in one later run after a fresh emulator start, and 27 to 41 in Step 0. The emulator number moves with the state of the laptop and settles nothing.
+- **The frame rate on the real phone is measured folded only** (about 120 frames per second). Unfolded is still to run. The emulator gave 15 to 24 frames per second in the first Step 1 run, 55.8 in one later run after a fresh emulator start, and 27 to 41 in Step 0. The emulator number moves with the state of the laptop and settles nothing.
 - **Aerial imagery is two years joined.** About a quarter of Champaign County and half of Macon County is 2023 imagery, because the cloud copy lacks the 2025 images there. The joins are obvious in Champaign County and visible in Macon County when zoomed out.
 - **Aerial imagery is at half detail** (1.2 m). Full detail needs about 50 GB of reading or the MrSID decoder.
 - **Closed sites.** PAD-US lists state nature preserves as closed even where people may walk in. The app shows "do not enter or hunt" for every closed record, ahead of the manager's own note. Seven such records are in or at the two counties.
