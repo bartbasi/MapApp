@@ -1,0 +1,22 @@
+App user ID: 10216
+
+WebView resource list, count per host (the page since the last app start; the browser keeps at most 250 entries, so 250 means the buffer is full, not an exact total. Every entry it holds is https://localhost, the app's own bundled files and tiles):
+{"localhost":250}
+
+dumpsys netstats --full, mAppUidStatsMap section, taken 15:28 after the session (network up, wifi, airplane mode off). Table printed in full, one row per user ID:
+  mAppUidStatsMap:
+    uid rxBytes rxPackets txBytes txPackets
+    1020 150482 403 70200 205
+    10202 5720 11 1603 12
+    10160 7333613 5832 57639 734
+    0 0 0 9024 129
+    2000 84 1 84 1
+    1000 15225 91 5125 15
+    10147 64468 226 37058 238
+    10145 535094 835 353343 712
+    1073 25915 176 20331 178
+    1051 18079 40 3976 51
+
+Row for user ID 10216 in mAppUidStatsMap: NONE (absent).
+User ID 10216 appears once elsewhere in the dump, as the line "uid=10216 set=1" in a list of counter sets (line 155). That line carries no byte counts. mStatsMapA and mStatsMapB hold no rows on this build, so the per-uid table above is the only place with byte counts.
+Meaning: the phone's traffic counters show zero bytes sent or received by the app, over wifi or mobile, during the whole second session, including the parcel taps and fixes.
