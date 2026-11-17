@@ -20,7 +20,8 @@ Discovery requests looked for a parcel service that can be read without a login.
 |---|---|---|---|---|---|
 | services1.arcgis.com | build | 64 | 2026-11-17 | `(none)` (5); `PIN,ParcelNumb,Acreage,PrimaryNam` (59) | ok 64 |
 | services1.arcgis.com | sample-check | 40 | 2026-11-17 | `PIN,ParcelNumb,Acreage,PrimaryNam` (40) | ok 40 |
-| services1.arcgis.com | datum-check | 2 | 2026-11-17 | `PIN,ParcelNumb,Acreage,PrimaryNam` (2) | ok 2 |
+| services1.arcgis.com | datum-check | 4 | 2026-11-17 | `PIN,ParcelNumb,Acreage,PrimaryNam` (4) | ok 4 |
+| services1.arcgis.com | line-distance-check | 3 | 2026-11-17 | `PIN,ParcelNumb,Acreage,PrimaryNam` (3) | ok 3 |
 
-106 requests in all.
+111 requests in all.
 
