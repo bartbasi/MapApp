@@ -16,7 +16,16 @@ export interface ArchiveAccess {
   open(entry: ArchiveEntry): Source;
 }
 
+/** The phone's own settings pages, where a refused permission is turned back on. */
+export interface SystemSettings {
+  /** False where no settings page can be opened from the app (a browser). */
+  readonly canOpen: boolean;
+  /** Opens this app's settings page or the phone's Location page. True if it opened. */
+  open(page: 'app' | 'location'): Promise<boolean>;
+}
+
 export interface Platform {
   readonly kind: 'android' | 'browser';
   readonly archives: ArchiveAccess;
+  readonly settings: SystemSettings;
 }

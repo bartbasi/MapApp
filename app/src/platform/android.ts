@@ -13,7 +13,7 @@
 import { registerPlugin } from '@capacitor/core';
 import type { RangeResponse, Source } from 'pmtiles';
 import { archivePath, parseArchiveMeta, type ArchiveEntry } from './archive-meta';
-import type { ArchiveAccess, Platform } from './platform';
+import type { ArchiveAccess, Platform, SystemSettings } from './platform';
 
 interface NativeArchiveRow {
   county: string;
@@ -66,4 +66,24 @@ const androidArchives: ArchiveAccess = {
   },
 };
 
-export const androidPlatform: Platform = { kind: 'android', archives: androidArchives };
+/** The "SystemSettings" native plugin (android/.../settings/SystemSettingsPlugin.java). */
+interface SystemSettingsPlugin {
+  open(options: { page: 'app' | 'location' }): Promise<void>;
+}
+
+const NativeSettings = registerPlugin<SystemSettingsPlugin>('SystemSettings');
+
+const androidSettings: SystemSettings = {
+  canOpen: true,
+  async open(page) {
+    try {
+      await NativeSettings.open({ page });
+      return true;
+    } catch (e) {
+      console.warn(`could not open the ${page} settings page:`, (e as Error).message);
+      return false;
+    }
+  },
+};
+
+export const androidPlatform: Platform = { kind: 'android', archives: androidArchives, settings: androidSettings };

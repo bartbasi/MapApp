@@ -6,7 +6,7 @@ import { androidPlatform } from './android';
 import { browserPlatform } from './browser';
 import type { Platform } from './platform';
 
-export type { Platform, ArchiveAccess } from './platform';
+export type { Platform, ArchiveAccess, SystemSettings } from './platform';
 export type { ArchiveEntry, ArchiveMeta, ArchiveSource } from './archive-meta';
 
 /** Picks the platform implementation once, at startup. */

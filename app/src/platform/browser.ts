@@ -7,7 +7,7 @@
 
 import { FetchSource } from 'pmtiles';
 import { archivePath, parseArchiveMeta, type ArchiveEntry } from './archive-meta';
-import type { ArchiveAccess, Platform } from './platform';
+import type { ArchiveAccess, Platform, SystemSettings } from './platform';
 
 const browserArchives: ArchiveAccess = {
   async list() {
@@ -32,4 +32,10 @@ const browserArchives: ArchiveAccess = {
   },
 };
 
-export const browserPlatform: Platform = { kind: 'browser', archives: browserArchives };
+/** A web page cannot open the browser's or the system's settings. */
+const browserSettings: SystemSettings = {
+  canOpen: false,
+  open: async () => false,
+};
+
+export const browserPlatform: Platform = { kind: 'browser', archives: browserArchives, settings: browserSettings };

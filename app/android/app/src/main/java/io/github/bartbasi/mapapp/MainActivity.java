@@ -13,12 +13,14 @@ import com.getcapacitor.BridgeWebViewClient;
 import io.github.bartbasi.mapapp.archives.ArchiveCatalog;
 import io.github.bartbasi.mapapp.archives.ArchiveRequestHandler;
 import io.github.bartbasi.mapapp.archives.ArchivesPlugin;
+import io.github.bartbasi.mapapp.settings.SystemSettingsPlugin;
 
 public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(ArchivesPlugin.class);
+        registerPlugin(SystemSettingsPlugin.class);
         super.onCreate(savedInstanceState);
         ArchiveRequestHandler archives = new ArchiveRequestHandler(ArchiveCatalog.get(this));
         bridge.setWebViewClient(new MapAppWebViewClient(bridge, archives));
