@@ -1,6 +1,17 @@
 # Status
 
-Last updated: 2026-11-17, end of Step 2, waiting for the owner.
+Last updated: 2026-11-17, Step 3 in progress.
+
+## Step 3 in progress (read this first)
+
+The owner answered on 2026-11-17: the Step 2 screenshots may be pushed (done, `origin/main` at 5c706d9), the location plugin may be replaced (done, D31), and Step 3 may start. The Step 2 outdoor check on his phone is still open. `build/step2-debug.apk` is on his phone. `build/location-debug.apk` has the new location plugin and is not on his phone yet.
+
+Step 3 is offline downloads. The design is D33. The contract between its parts is `app/src/downloads/contract.ts`.
+
+- Done and committed, not pushed: the extract planner (`app/src/downloads/`), `pipeline/publish.py` (stages archives and writes the catalog; `upload` publishes and needs `--yes-publish`), the test file server `app/scripts/release-test-server.mjs`, the overview map (`pipeline/layers/overview.sh`, built into `data/build/overview/`), the new location plugin (`app/android/.../location/`, evidence in `docs/evidence/step3/location/`).
+- Being built: the download manager (TypeScript), the native Android downloader, the download screens. Then the lead wires them together in `App.svelte`, the qa-tester runs the Step 3 checks, and the step-reviewer reviews.
+- **Nothing is published as a release file.** The owner has been asked to say yes to publishing the six map archives (base map, imagery, public land per county, 383 MB, no parcel data). Until then all tests use the test server on this laptop (`data/publish/data-2026-11-17-test/`).
+- The sections below describe the end of Step 2 and are still true except where this section says otherwise.
 
 ## Where the project stands
 
