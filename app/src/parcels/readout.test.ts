@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { ParcelDetails, PositionQuery, PropertyLine } from './parcel-source';
-import { POOR_FIX_M, STALE_QUERY_M, positionReadout, type PositionFix } from './readout';
+import { LINE_DATA_MARGIN_M, POOR_FIX_M, STALE_QUERY_M, positionReadout, type PositionFix } from './readout';
 import { StoredParcelSource } from './stored-parcel-source';
 import { M_PER_DEG_LNG, SynthWorld, rect } from './test-tiles';
 
@@ -14,7 +14,7 @@ function details(pid: string): ParcelDetails {
 }
 
 function line(distanceM: number, thisSide: string[], otherSide: string[], bearingDeg = 90): PropertyLine {
-  return { distanceM, bearingDeg, point: at, thisSide: thisSide.map(details), otherSide: otherSide.map(details) };
+  return { distanceM, bearingDeg, point: at, thisSide: thisSide.map(details), otherSide: otherSide.map(details), segment: [at, at] };
 }
 
 function q(inside: string[] | null, nearestLine: PropertyLine | null): PositionQuery {
@@ -42,14 +42,27 @@ describe('position readout', () => {
     expect(r.otherSide.map((p) => p.pid)).toEqual(['B']);
   });
 
-  it('treats a line exactly at the accuracy radius as near', () => {
-    expect(positionReadout(fix(5), q(['A'], line(5, ['A'], ['B']))).kind).toBe('near-line');
-    expect(positionReadout(fix(5), q(['A'], line(5.01, ['A'], ['B']))).kind).toBe('inside');
+  it('treats a line exactly at the accuracy radius plus the line margin as near', () => {
+    const edge = 5 + LINE_DATA_MARGIN_M;
+    expect(positionReadout(fix(5), q(['A'], line(edge, ['A'], ['B']))).kind).toBe('near-line');
+    expect(positionReadout(fix(5), q(['A'], line(edge + 0.01, ['A'], ['B']))).kind).toBe('inside');
+  });
+
+  it('allows 3 m for error in the county lines on top of the GPS accuracy', () => {
+    expect(LINE_DATA_MARGIN_M).toBe(3);
+    // 4 m from a line with 2 m accuracy: the line may be off by 3 m, so either side.
+    expect(positionReadout(fix(2), q(['A'], line(4, ['A'], ['B']))).kind).toBe('near-line');
+    // 6 m from a line with 2 m accuracy: clear of 2 + 3 = 5 m.
+    expect(positionReadout(fix(2), q(['A'], line(6, ['A'], ['B']))).kind).toBe('inside');
+    const r = positionReadout(fix(2), q(['A'], line(6, ['A'], ['B'])));
+    expect(r.kind === 'inside' && r.uncertaintyM).toBe(5);
+    expect(r.kind === 'inside' && r.accuracyM).toBe(2);
   });
 
   it('prefers near-line over no-parcel in a gap', () => {
     expect(positionReadout(fix(8), q(null, line(6, [], ['B']))).kind).toBe('near-line');
-    const r = positionReadout(fix(4), q(null, line(6, [], ['B'])));
+    expect(positionReadout(fix(4), q(null, line(6, [], ['B']))).kind).toBe('near-line');
+    const r = positionReadout(fix(2), q(null, line(6, [], ['B'])));
     expect(r.kind).toBe('no-parcel');
     if (r.kind === 'no-parcel') expect(r.nearest?.pid).toBe('B');
   });
@@ -96,11 +109,26 @@ describe('position readout', () => {
   });
 
   it('widens the uncertainty by how far the fix has moved from the query, and drops a stale query', () => {
-    // Accuracy 5 m, line 8 m from the queried point, fix 4 m from it: may be on either side.
-    const r = positionReadout(fix(5, 4), q(['A'], line(8, ['A'], ['B'])));
+    // Accuracy 5 m, line 11 m from the queried point, fix 4 m from it: 5 + 4 + 3 reaches the line.
+    const r = positionReadout(fix(5, 4), q(['A'], line(11, ['A'], ['B'])));
     expect(r.kind).toBe('near-line');
-    if (r.kind === 'near-line') expect(Math.abs(r.uncertaintyM - 9)).toBeLessThan(0.01);
+    if (r.kind === 'near-line') expect(Math.abs(r.uncertaintyM - 12)).toBeLessThan(0.01);
+    expect(positionReadout(fix(5), q(['A'], line(11, ['A'], ['B']))).kind).toBe('inside');
     expect(positionReadout(fix(5, STALE_QUERY_M + 1), q(['A'], null))).toEqual({ kind: 'no-data', reason: 'stale' });
+  });
+
+  it('never names a record with no parcel ID: a point in such a strip is in no parcel', () => {
+    const strip = { ...details(''), owner: '', acres: null };
+    const query: PositionQuery = { ...q(null, line(20, [], ['B'])), inside: [strip] };
+    const r = positionReadout(fix(3), query);
+    expect(r).toMatchObject({ kind: 'no-parcel', nearest: { pid: 'B' } });
+    // A real parcel under the strip is still named, and a strip across the line is not a neighbour.
+    const both: PositionQuery = { ...q(['A'], { ...line(20, ['A'], []), otherSide: [strip] }), inside: [strip, details('A')] };
+    const r2 = positionReadout(fix(3), both);
+    expect(r2).toMatchObject({ kind: 'inside', parcel: { pid: 'A' }, alsoIn: [], neighbour: null });
+    // Its edge is still a line: near it, the phone may be on either side.
+    const near = positionReadout(fix(3), { ...q(['A'], { ...line(2, ['A'], []), otherSide: [strip] }) });
+    expect(near).toMatchObject({ kind: 'near-line', thisSide: [{ pid: 'A' }], otherSide: [] });
   });
 
   it('does not claim inside when the uncertainty reaches past the search radius', () => {

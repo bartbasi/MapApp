@@ -76,6 +76,8 @@ export interface RawLine {
   /** Parcel keys on the phone's side and on the far side, smallest area first. */
   thisSide: string[];
   otherSide: string[];
+  /** The straight piece of outline the nearest point lies on, in local meters: [ax, ay, bx, by]. */
+  segment: [number, number, number, number];
 }
 
 interface Candidate {
@@ -226,7 +228,7 @@ export class ParcelScene {
     for (const c of candidates) {
       const sides = this.sides(c);
       if (sameKeys(sides.thisSide, sides.otherSide)) continue; // Rule 2
-      return { distanceM: c.d, x: c.ax + (c.bx - c.ax) * c.t, y: c.ay + (c.by - c.ay) * c.t, ...sides };
+      return { distanceM: c.d, x: c.ax + (c.bx - c.ax) * c.t, y: c.ay + (c.by - c.ay) * c.t, ...sides, segment: [c.ax, c.ay, c.bx, c.by] };
     }
     return null;
   }

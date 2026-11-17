@@ -49,6 +49,11 @@ export interface PropertyLine {
   thisSide: ParcelDetails[];
   /** Parcels just across the line, smallest first. Empty for a gap such as a road. */
   otherSide: ParcelDetails[];
+  /**
+   * The straight piece of the line that `point` lies on, end to end, for
+   * drawing it. Cut at tile edges, so a long line may be given in parts.
+   */
+  segment: [LngLat, LngLat];
 }
 
 /** Everything the position readout needs about one point. */

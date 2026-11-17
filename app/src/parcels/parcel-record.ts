@@ -18,6 +18,16 @@ export interface ParcelRecord {
   county: string;
 }
 
+/**
+ * Whether a record is a parcel the screens may name. A county record with no
+ * parcel ID is not one: in Macon County these are long thin strips with no
+ * owner or acreage, most likely road or rail right of way. Their edges are
+ * still real lines, so the line search keeps them; only naming skips them.
+ */
+export function isNamedParcel(record: Pick<ParcelRecord, 'pid'>): boolean {
+  return record.pid.trim() !== '';
+}
+
 /** The allowlist, in the order the record holds them. */
 export const PARCEL_RECORD_FIELDS = ['pid', 'owner', 'acres', 'county'] as const;
 

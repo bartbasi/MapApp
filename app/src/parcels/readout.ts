@@ -15,12 +15,15 @@
 //    side. This wins over "inside" whenever it applies.
 // 5. Otherwise the phone is inside a parcel, or in a gap with no parcel.
 //
-// The uncertainty is the fix's accuracy radius plus how far the fix is from
-// the point the query was made for, so a slightly old query can only make the
-// readout more cautious.
+// The uncertainty is the fix's accuracy radius, plus how far the fix is from
+// the point the query was made for (so a slightly old query can only make the
+// readout more cautious), plus a fixed allowance for error in the county's
+// own lines (LINE_DATA_MARGIN_M): tax maps are drawn for assessment, not
+// surveyed, and can sit a few meters off the true line (D26).
 
 import { LocalFrame } from './local-frame';
 import { compassPoint, type CompassPoint } from './format';
+import { isNamedParcel } from './parcel-record';
 import type { LngLat, ParcelCoverage, ParcelDetails, PositionQuery, PropertyLine } from './parcel-source';
 
 /** A GPS fix. accuracyM is the radius in meters the platform reports (68% confidence on Android). */
@@ -36,6 +39,13 @@ export const POOR_FIX_M = 50;
 /** A query made further than this, in meters, from the fix is not used. */
 export const STALE_QUERY_M = 30;
 
+/**
+ * A fixed allowance, in meters, for error in the county's parcel lines. It is
+ * added to the GPS accuracy when deciding whether the phone may be on either
+ * side of a line.
+ */
+export const LINE_DATA_MARGIN_M = 3;
+
 export interface ReadoutOptions {
   /** Default POOR_FIX_M. */
   poorFixM?: number;
@@ -47,12 +57,14 @@ export interface LineReadout {
   compass: CompassPoint;
   /** The nearest point on the line. */
   point: LngLat;
+  /** The straight piece of the line that point lies on. */
+  segment: [LngLat, LngLat];
 }
 
 interface Measured {
   /** The accuracy the platform reported. */
   accuracyM: number;
-  /** Accuracy plus the distance between the fix and the queried point. */
+  /** Accuracy, plus the distance between the fix and the queried point, plus LINE_DATA_MARGIN_M. */
   uncertaintyM: number;
   /** How far the line search looked, in meters. A null line means none within this. */
   searchRadiusM: number;
@@ -105,23 +117,27 @@ export interface NoDataReadout {
 export type Readout = NoDataReadout | PoorFixReadout | PlaceReadout;
 
 function lineReadout(l: PropertyLine): LineReadout {
-  return { distanceM: l.distanceM, bearingDeg: l.bearingDeg, compass: compassPoint(l.bearingDeg), point: l.point };
+  return { distanceM: l.distanceM, bearingDeg: l.bearingDeg, compass: compassPoint(l.bearingDeg), point: l.point, segment: l.segment };
 }
 
 const same = (a: ParcelDetails, b: ParcelDetails) => a.county === b.county && a.pid === b.pid;
 
 function place(q: PositionQuery, m: Measured): PlaceReadout {
   const nl = q.nearestLine;
+  // Records with no parcel ID (right of way strips) are never named: a point
+  // in one alone is in no parcel. Their edges still count as lines.
+  const thisSide = nl?.thisSide.filter(isNamedParcel) ?? [];
+  const otherSide = nl?.otherSide.filter(isNamedParcel) ?? [];
   if (nl && nl.distanceM <= m.uncertaintyM) {
-    return { kind: 'near-line', ...m, line: lineReadout(nl), thisSide: nl.thisSide, otherSide: nl.otherSide };
+    return { kind: 'near-line', ...m, line: lineReadout(nl), thisSide, otherSide };
   }
   const line = nl ? lineReadout(nl) : null;
-  const inside = q.inside;
-  if (inside && inside[0]) {
-    const neighbour = nl?.otherSide.find((p) => !inside.some((i) => same(i, p))) ?? null;
+  const inside = q.inside?.filter(isNamedParcel) ?? [];
+  if (inside[0]) {
+    const neighbour = otherSide.find((p) => !inside.some((i) => same(i, p))) ?? null;
     return { kind: 'inside', ...m, parcel: inside[0], alsoIn: inside.slice(1), line, neighbour };
   }
-  return { kind: 'no-parcel', ...m, line, nearest: nl?.otherSide[0] ?? null };
+  return { kind: 'no-parcel', ...m, line, nearest: otherSide[0] ?? null };
 }
 
 /** What the readout says for a fix, given the parcel query made for (about) that fix. */
@@ -131,7 +147,7 @@ export function positionReadout(fix: PositionFix, query: PositionQuery, options:
   if (!(offset <= STALE_QUERY_M)) return { kind: 'no-data', reason: 'stale' };
   const known = Number.isFinite(fix.accuracyM) && fix.accuracyM >= 0;
   const accuracyM = known ? fix.accuracyM : Infinity;
-  const m: Measured = { accuracyM, uncertaintyM: accuracyM + offset, searchRadiusM: query.searchRadiusM };
+  const m: Measured = { accuracyM, uncertaintyM: accuracyM + offset + LINE_DATA_MARGIN_M, searchRadiusM: query.searchRadiusM };
   const poorFixM = Math.min(options.poorFixM ?? POOR_FIX_M, query.searchRadiusM);
   // A fix whose uncertainty reaches past the search radius could be near a
   // line the search never looked at, so it too is only a guess.

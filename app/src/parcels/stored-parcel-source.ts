@@ -182,7 +182,13 @@ export class StoredParcelSource implements ParcelSource {
     let nearestLine: PositionQuery['nearestLine'] = null;
     if (raw) {
       const [lng, lat] = scene.frame.toLngLat(raw.x, raw.y);
+      const [aLng, aLat] = scene.frame.toLngLat(raw.segment[0], raw.segment[1]);
+      const [bLng, bLat] = scene.frame.toLngLat(raw.segment[2], raw.segment[3]);
       nearestLine = {
+        segment: [
+          { lng: aLng, lat: aLat },
+          { lng: bLng, lat: bLat },
+        ],
         distanceM: raw.distanceM,
         point: { lng, lat },
         bearingDeg: bearingOf(raw.x, raw.y),
