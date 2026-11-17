@@ -12,6 +12,7 @@ The county parcel findings were made by the lead directly and are written in ful
 **Status words used here**
 
 - **Approved**: the license allows a free, open source app to use the data and to redistribute it. The pipeline may use it.
+- **By permission**: there is no open license, but the owner says the data's publisher has allowed the project to use it and keep a stored copy (D25). The pipeline may use it. The output is not put on any public host until the owner says so in plain words.
 - **Live only**: the app may query it for what the user views or taps. It may not be copied in bulk or redistributed.
 - **Blocked**: must not be used until the named condition is met.
 - **Dropped**: not used.
@@ -24,8 +25,8 @@ The county parcel findings were made by the lead directly and are written in ful
 
 | Source | Used for | Status | License | Size, both counties | Newest data |
 |---|---|---|---|---|---|
-| Macon County parcel service | Parcel outlines and owners | Live only | No terms posted | Not copied | Edited 2026-10-28 |
-| Champaign County GIS Consortium | Parcel outlines and owners | **Blocked** | Terms forbid copying, public display and reuse | None | Not checked |
+| Macon County parcel service | Parcel outlines, ID, owner name and acreage | By permission (D25), since 2026-11-17 | No terms posted. The county allows a stored copy, by the owner's word. | Download 33 MB. Archive 15.0 MB (zoom 13 to 16, measured). | Edited 2026-10-28 |
+| Champaign County GIS Consortium | Parcel outlines and owners | **Blocked** until the county hands the data over in a way that needs no login | The county allows a stored copy, by the owner's word, but every parcel service needs a login | None | Not checked |
 | OpenStreetMap, via the Protomaps daily build | Roads, water, woodland, place names | Approved | ODbL 1.0 | 16.7 MB cut by bounding box, 16.2 MB cut by county outline (both measured, zoom 0 to 15) | 2026-11-12 |
 | Natural Earth | Coastlines and borders in the zoomed-out base map tiles. It comes inside the Protomaps build. | Approved | Public domain | Inside the base map archive | Not dated |
 | US Census TIGER/Line 2026 | County boundaries, which are the hunting units | Approved | Public domain | County outlines come from an 83 MB national file. Roads and water for both counties are 7.3 MB and are not needed while OpenStreetMap supplies them. | 2026-10-06 |
@@ -55,7 +56,18 @@ The first estimate for Step 1 through Step 5 was under 3 GB. Step 1 alone read a
 
 This is the main risk in Phase 1. Both counties' terms were read in full.
 
-### Macon County: live only
+### Macon County: by permission, built as stored data (since 2026-11-17)
+
+- **Status.** By permission. The owner said on 2026-11-17 that Macon County allows a stored copy (D25). That is the whole basis: there is no written grant in the project and no license on the service. The metadata of the archive says: "Used with Macon County's permission, as stated by the project owner on 2026-11-17. Not an open license."
+- **Built as** the `parcels` layer, `data/build/il-macon/parcels.pmtiles`, zoom 13 to 16 (D27). The whole service is downloaded once (58 pages of 1,000, 33 MB over the network, measured) and cached in `data/cache/parcels/il-macon/`.
+- **Fields requested**, exactly: `PIN,ParcelNumb,Acreage,PrimaryNam`, with outlines in EPSG:4326. Nothing else is requested. The tiles hold four fields: `pid` from `ParcelNumb`, `owner` from `PrimaryNam`, `acres` from `Acreage` (left out where the county records 0), and `county`. `PIN` is requested only because the brief named it. It is `ParcelNumb` without the township digits, and it is not put in the tiles.
+- **Parcel ID.** `ParcelNumb`, because the county's own viewer shows it, labelled "Parcel", and does not show `PIN`.
+- **Data date.** The service's last edit date, 2026-10-28.
+- **Not hosted publicly.** The archive stays under `data/`, which is never committed. It is not put on GitHub or any other public host until the owner says so in plain words (D25). Until then it reaches a phone only inside a test build that he installs himself.
+- **What the data holds** that the app must handle (measured, `docs/evidence/step2/parcels/data-il-macon.md`): 379 records with a parcel ID of one space, no owner and acreage 0, mostly long thin strips (likely road and rail right of way); 26,379 records with acreage 0, mostly town lots; 774 multipart parcels; 592 records in 84 stacks of identical outlines (up to 101 records on one outline); 23 parcels lying inside a larger one; 22 small partial overlaps.
+- **Coordinates.** The service stores NAD83 Illinois East State Plane feet and converts to EPSG:4326 when asked. Asking for the same parcel with Esri's NAD83 to WGS 84 (ITRF00) transformation moves it 1.9 m (1.0 m east, 1.6 m south). The archive uses the service's default conversion. So the lines may sit 1 to 2 m off GPS positions, on top of the error of the assessment map itself.
+
+The Step 0 findings, which led to the live lookup that D25 replaced:
 
 - **What the county publishes.** The county GIS page links to a public parcel viewer. The viewer reads a public ArcGIS feature service named `Parcels2021`, hosted in the county's ArcGIS Online account. Its access is "public" and its only capability is "Query". It holds 57,096 parcels and its data was last edited on 2026-10-28.
 - **Terms.** None are posted. The license and credit fields of the service, of the map and of the viewer are empty. The county GIS page has no terms of use, no fee schedule and no data request form. Its download table is empty. The viewer shows one statement: maps "are based on assessment information only and do not represent a legal survey of the parcels shown and shall not be used for conveyance or the establishment of property boundaries". The county website footer, on every page, says "© 2010- Macon County, Illinois. All rights reserved."
@@ -65,9 +77,15 @@ This is the main risk in Phase 1. Both counties' terms were read in full.
 - **Requests made in Step 0.** The service description, one count of records, and one test query for three records with no outlines. The test result was read once and deleted. See `docs/research/county-parcel-terms.md`.
 - **Data date shown in the app.** The service's last edit date.
 - **Credit.** "Parcel data: Macon County, Illinois GIS. Based on assessment information. Not a legal survey."
-- **Open.** The owner's permission request is still waiting. A "no" switches this off.
+- **Open (Step 0).** The owner's permission request was waiting. He answered on 2026-11-17 (D25).
 
 ### Champaign County: blocked
+
+- **Status since 2026-11-17.** The owner says the county allows a stored copy (D25). D25 allows the consortium's own service only if it can be read without accepting the terms page and without a login. A search on 2026-11-17 (18 requests, listed in `docs/research/county-parcel-terms.md`) found no such service: every parcel service of the consortium needs a token, or is reached only through its portal's proxy, which signs in with a stored login. Every consortium item also carries the license line "Unauthorized use of this service and/or the data it contains is strictly prohibited and punishable by law." So nothing is built. `bash pipeline/build.sh parcels il-champaign` stops with the reason and makes no request.
+- **What would unblock it.** The county sends the parcel layer (parcel ID, owner name, acreage and outline only) as a file, or gives written leave to read it through the proxy. Either way, the grant should be in writing because of that license line.
+- **No other source.** No official State of Illinois parcel dataset was found. Copies on ArcGIS Online by students and others are third-party copies and are not used.
+
+The Step 0 findings:
 
 - **What the county publishes.** The Champaign County GIS Consortium runs a free public parcel map. Entering it requires accepting a disclaimer and the consortium's terms. The map is down each night from about 10:45 pm to 3:30 am.
 - **Terms** (read at `ccgisc.org/TermsOfUse.aspx`, last updated 2013-06-17). They cover the website, its sub-domains and "any associated web-based and mobile applications". The key sentences:
@@ -101,7 +119,7 @@ These go on the attribution screen. The OpenStreetMap credit also sits on the ma
 | Tree canopy | USDA Forest Service. 2026. USFS NLCD Percent Tree Canopy CONUS v2025-6 |
 | LANDFIRE (if its license is confirmed) | LANDFIRE Existing Vegetation Type, U.S. Department of the Interior, Geological Survey, and U.S. Department of Agriculture |
 | Weather | National Weather Service, NOAA |
-| Macon County parcels | Parcel data: Macon County, Illinois GIS. Based on assessment information. Not a legal survey. |
+| Macon County parcels | Parcel data: Macon County, Illinois GIS. Based on assessment information. Not a legal survey. (Used with the county's permission, as stated by the owner on 2026-11-17.) |
 
 ---
 
