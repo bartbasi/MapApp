@@ -26,8 +26,9 @@ import { PUBLIC_LAND_LAYER, readPublicLandSite, type PublicLandSite } from './pu
 import { publicLandLabelPoints, type LabelSource } from './public-land-labels';
 import { revealOffset } from './reveal';
 import { DOUBLE_TAP_MS, TAP_REACH_STEPS_PX, isSecondTap, type Tap } from './taps';
-import { buildStyle, type StyleOptions } from './style/build-style';
+import { buildStyle, type LIVE_SOURCES, type StyleOptions } from './style/build-style';
 import { styleImage } from './style/images';
+import { PARCEL_RELATION_SOURCE, PARCEL_SELECTED_SOURCE } from './style/parcels';
 import { POSITION_SOURCE } from './style/position';
 import { PUBLIC_LAND_FILL, PUBLIC_LAND_LABEL_MINZOOM } from './style/public-land';
 import { TILE_SCHEME, createTileLoader, newTileStats, type TileStats } from './tile-protocol';
@@ -55,15 +56,26 @@ export function dataBounds(installed: InstalledLayers): Bounds | null {
   return unionBounds([...installed.values()].map((l) => l.bounds));
 }
 
+/** A single tap on the map, known to be a single tap (not the first of a double tap). */
+export interface MapTap {
+  /** The public land site under the finger, or null. */
+  site: PublicLandSite | null;
+  at: LngLat;
+  /** The map's zoom when the finger met it. */
+  zoom: number;
+}
+
 export interface MapViewEvents {
-  /** A tap on the map: the public land site there (or null), and where the tap was. */
-  onPublicLandTap?: (site: PublicLandSite | null, at: LngLat) => void;
+  /** A single tap on the map. Parcels are looked up by the caller, through the parcel source. */
+  onMapTap?: (tap: MapTap) => void;
   onBearingChange?: (bearing: number) => void;
   /** The user started moving the map by hand: a drag, pinch, rotate, wheel or key. */
   onUserMove?: () => void;
 }
 
 export const MAX_ZOOM = 20;
+
+export type LiveSource = (typeof LIVE_SOURCES)[number];
 
 /** How long a recenter on the phone takes. A fix comes about once a second, so the glide nearly meets the next one. */
 const FOLLOW_EASE_MS = 900;
@@ -78,8 +90,8 @@ export class MapView {
   private readonly resizeObserver: ResizeObserver;
   private tapTimer: number | undefined;
   private lastTap: Tap | null = null;
-  private position: FeatureCollection | null = null;
-  private positionKey = '';
+  /** The data of each source updated in place (the marker, the tapped parcel, the relation), and a key to skip repeats. */
+  private readonly live = new Map<LiveSource, { data: FeatureCollection; key: string }>();
   /** The zoom a locate glide is heading for, until the map gets there or the user moves it. */
   private followZoom: number | null = null;
   private readonly onWindowResize = () => this.map.resize();
@@ -88,7 +100,7 @@ export class MapView {
     this.options = options;
     const bounds = dataBounds(options.installed);
     const style = buildStyle(this.withLabels(options));
-    this.lastStyleKey = JSON.stringify(buildStyle({ ...this.withLabels(options), position: null }));
+    this.lastStyleKey = this.styleKey(options);
     this.map = new MapLibreMap({
       container,
       style,
@@ -125,7 +137,7 @@ export class MapView {
     });
     for (const name of ['movestart', 'dragstart', 'zoomstart', 'rotatestart', 'pitchstart'] as const) this.map.on(name, byUser);
     this.map.on('click', (e) => {
-      if (!events.onPublicLandTap) return;
+      if (!events.onMapTap) return;
       const tap: Tap = { time: performance.now(), x: e.point.x, y: e.point.y };
       const second = isSecondTap(this.lastTap, tap);
       this.lastTap = tap;
@@ -135,8 +147,9 @@ export class MapView {
       // Find the site now, while the map is where the finger met it. Then wait
       // a moment to see that this tap is not the first of a double tap.
       const hit = this.publicLandAt(tap.x, tap.y);
+      const zoom = this.map.getZoom();
       this.tapTimer = window.setTimeout(() => {
-        events.onPublicLandTap?.(hit ? readPublicLandSite(hit) : null, e.lngLat);
+        events.onMapTap?.({ site: hit ? readPublicLandSite(hit) : null, at: e.lngLat, zoom });
       }, DOUBLE_TAP_MS);
     });
     this.map.on('dblclick', () => window.clearTimeout(this.tapTimer));
@@ -178,21 +191,35 @@ export class MapView {
   }
 
   private withLabels(options: StyleOptions): StyleOptions {
-    return { ...options, publicLandLabels: this.labels, position: this.position };
+    return {
+      ...options,
+      publicLandLabels: this.labels,
+      position: this.live.get(POSITION_SOURCE)?.data ?? null,
+      parcelSelected: this.live.get(PARCEL_SELECTED_SOURCE)?.data ?? null,
+      parcelRelation: this.live.get(PARCEL_RELATION_SOURCE)?.data ?? null,
+    };
+  }
+
+  /** The style options without the in-place data, for telling whether a rebuild is needed. */
+  private styleKey(options: StyleOptions): string {
+    return JSON.stringify(buildStyle({ ...this.withLabels(options), position: null, parcelSelected: null, parcelRelation: null }));
   }
 
   /**
-   * Shows the phone's position marker (position/marker.ts), or none. The data
-   * goes straight into the map's source, with no style rebuild, and is kept
-   * so a later style change carries it over.
+   * Puts data straight into one of the in-place sources, with no style
+   * rebuild. It is kept so a later style change carries it over.
    */
-  setPosition(data: FeatureCollection): void {
+  setLiveData(id: LiveSource, data: FeatureCollection): void {
     const key = JSON.stringify(data);
-    if (key === this.positionKey) return;
-    this.positionKey = key;
-    this.position = data;
-    const source = this.map.getSource<GeoJSONSource>(POSITION_SOURCE);
+    if (this.live.get(id)?.key === key) return;
+    this.live.set(id, { data, key });
+    const source = this.map.getSource<GeoJSONSource>(id);
     if (source) source.setData(data);
+  }
+
+  /** Shows the phone's position marker (position/marker.ts), or none. */
+  setPosition(data: FeatureCollection): void {
+    this.setLiveData(POSITION_SOURCE, data);
   }
 
   /**
@@ -252,9 +279,9 @@ export class MapView {
   /** Applies a new base view, overlay set or selection. The camera is kept. */
   update(options: StyleOptions): void {
     this.options = options;
-    // The key leaves out the position, which changes every second and is
-    // updated in place by setPosition().
-    const key = JSON.stringify(buildStyle({ ...this.withLabels(options), position: null }));
+    // The key leaves out the in-place sources (the position changes every
+    // second), which setLiveData() updates without a rebuild.
+    const key = this.styleKey(options);
     if (key === this.lastStyleKey) return;
     this.lastStyleKey = key;
     this.map.setStyle(buildStyle(this.withLabels(options)), { diff: true });
