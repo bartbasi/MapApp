@@ -1,0 +1,91 @@
+Dex check of build/location-masked-debug.apk (built 2026-11-17 from the working tree, debug).
+SHA-256 of the APK: dd06e72df1b55ddd5c39f6e5065f09941cad9d7db6fb231c5827ded70e849428
+
+Method: unzip classes*.dex from the APK, list every class with
+  build-tools/36.1.0/dexdump.exe classes<N>.dex | grep 'Class descriptor'
+and search the list.
+
+Dex files: classes.dex classes2.dex classes3.dex classes4.dex classes5.dex classes6.dex classes7.dex classes8.dex 
+Classes in all dex files: 5309
+
+Classes under com/google/android/gms/ : 0
+Classes under io/ionic/ (iongeolocation): 0
+Classes under com/capacitorjs/plugins/geolocation/ (the old plugin): 0
+Classes under com/google/ of any kind:
+  Lcom/google/common/util/concurrent/ListenableFuture;
+  (This is Guava's ListenableFuture interface, which androidx.concurrent uses. Guava is Apache 2.0. It is not Play services.)
+
+The new plugin's classes:
+  Lio/github/bartbasi/mapapp/location/DeviceLocationPlugin$$ExternalSyntheticLambda0;
+  Lio/github/bartbasi/mapapp/location/DeviceLocationPlugin$$ExternalSyntheticLambda1;
+  Lio/github/bartbasi/mapapp/location/DeviceLocationPlugin$1;
+  Lio/github/bartbasi/mapapp/location/DeviceLocationPlugin$ProviderListener;
+  Lio/github/bartbasi/mapapp/location/DeviceLocationPlugin;
+  Lio/github/bartbasi/mapapp/location/FixArbiter$Provider;
+  Lio/github/bartbasi/mapapp/location/FixArbiter;
+
+Classes by top package (first two path parts):
+       21 Landroid/support/
+      168 Landroidx/activity/
+       82 Landroidx/annotation/
+      462 Landroidx/appcompat/
+       17 Landroidx/arch/
+      144 Landroidx/collection/
+       20 Landroidx/concurrent/
+       19 Landroidx/coordinatorlayout/
+     1181 Landroidx/core/
+       10 Landroidx/cursoradapter/
+       26 Landroidx/customview/
+       22 Landroidx/drawerlayout/
+      182 Landroidx/fragment/
+        5 Landroidx/interpolator/
+      144 Landroidx/lifecycle/
+       34 Landroidx/loader/
+       34 Landroidx/profileinstaller/
+        3 Landroidx/resourceinspection/
+       16 Landroidx/savedstate/
+        7 Landroidx/startup/
+        4 Landroidx/tracing/
+       47 Landroidx/vectordrawable/
+       16 Landroidx/versionedparcelable/
+       35 Landroidx/viewpager/
+      201 Landroidx/webkit/
+        1 Lcapacitor/cordova/
+      132 Lcom/getcapacitor/
+        1 Lcom/google/
+       29 Lio/github/
+        6 Lkotlin/annotation/
+      168 Lkotlin/collections/
+       23 Lkotlin/comparisons/
+        6 Lkotlin/concurrent/
+       11 Lkotlin/contracts/
+       53 Lkotlin/coroutines/
+        6 Lkotlin/enums/
+        5 Lkotlin/experimental/
+       24 Lkotlin/internal/
+       81 Lkotlin/io/
+        5 Lkotlin/js/
+      152 Lkotlin/jvm/
+        5 Lkotlin/math/
+        8 Lkotlin/properties/
+       16 Lkotlin/random/
+       42 Lkotlin/ranges/
+       57 Lkotlin/reflect/
+       85 Lkotlin/sequences/
+        6 Lkotlin/streams/
+        2 Lkotlin/system/
+       82 Lkotlin/text/
+       33 Lkotlin/time/
+        8 Lkotlin/uuid/
+      878 Lkotlinx/coroutines/
+      102 Lorg/apache/
+       58 Lorg/chromium/
+       27 Lorg/intellij/
+       30 Lorg/jetbrains/
+        4 Lorg/jspecify/
+
+For contrast, the same check on build/step2-masked-debug.apk (Step 2, with @capacitor/geolocation 8.2.5):
+  Classes in all dex files: 6787
+  Classes under com/google/android/gms/ : 1076
+  Classes under io/ionic/ : 46
+  Classes under com/capacitorjs/plugins/geolocation/ : 16
