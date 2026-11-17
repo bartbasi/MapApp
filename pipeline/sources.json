@@ -3,7 +3,7 @@
     "MapApp. Copyright 2026 Play, Inc.",
     "Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE."
   ],
-  "_about": "One entry per data source the pipeline uses. Name, license and credit text follow docs/DATA_SOURCES.md. Each layer's .meta.json copies the entries it used and adds the data date. Only sources marked Approved in docs/DATA_SOURCES.md may be listed here.",
+  "_about": "One entry per data source the pipeline uses. Name, license and credit text follow docs/DATA_SOURCES.md. Each layer's .meta.json copies the entries it used and adds the data date. Only sources marked Approved or By permission in docs/DATA_SOURCES.md may be listed here.",
 
   "openstreetmap": {
     "name": "OpenStreetMap",
@@ -35,6 +35,12 @@
     "license": "Public domain",
     "credit": "Imagery: USDA NAIP {year}. USDA Farm Production and Conservation Business Center.",
     "url": "https://catalog.data.gov/dataset/national-agriculture-imagery-program-naip-imagery"
+  },
+  "macon-parcels": {
+    "name": "Macon County, Illinois GIS, tax parcels",
+    "license": "Used with Macon County's permission, as stated by the project owner on 2026-11-17. Not an open license. Not to be published on a public host until the owner says so.",
+    "credit": "Parcel data: Macon County, Illinois GIS. Based on assessment information. Not a legal survey.",
+    "url": "https://services1.arcgis.com/a3k0qIja5SolIRYR/arcgis/rest/services/Parcels2021/FeatureServer/1"
   },
   "census-tiger": {
     "name": "US Census Bureau TIGER/Line county boundaries",

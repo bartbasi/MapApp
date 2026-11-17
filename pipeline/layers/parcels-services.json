@@ -1,0 +1,31 @@
+{
+  "_license": [
+    "MapApp. Copyright 2026 Play, Inc.",
+    "Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE."
+  ],
+  "_about": [
+    "One entry per county id of pipeline/counties.json: where the 'parcels' layer reads that county's parcels.",
+    "status 'approved': the owner says the county allows a stored copy (docs/DECISIONS.md D25). The build may run.",
+    "status 'blocked': the build stops with 'reason'. Nothing is requested.",
+    "outFields is the exact list sent to the service. pid, owner and acres name the fields that become the four tile properties (D27).",
+    "acres may be null when the county has no acreage field.",
+    "Never add a mailing address, site address, phone, tax or legal description field: lib/parcelsvc.py refuses such names."
+  ],
+
+  "il-macon": {
+    "status": "approved",
+    "source": "macon-parcels",
+    "service": "https://services1.arcgis.com/a3k0qIja5SolIRYR/arcgis/rest/services/Parcels2021/FeatureServer/1",
+    "outFields": ["PIN", "ParcelNumb", "Acreage", "PrimaryNam"],
+    "pid": "ParcelNumb",
+    "owner": "PrimaryNam",
+    "acres": "Acreage",
+    "pageSize": 1000,
+    "pidReason": "The county's own parcel viewer (web map item 9bdfc0d29b1d4fc1b392b1f23c913dd1) shows ParcelNumb, labelled 'Parcel', in its pop-up and does not show PIN."
+  },
+
+  "il-champaign": {
+    "status": "blocked",
+    "reason": "No openly readable parcel service was found. Every parcel service of the Champaign County GIS Consortium needs a token, or is reached only through the consortium portal's proxy, which signs in with the consortium's stored login. D25 allows only a service that can be read without accepting the terms page and without a login. See docs/research/county-parcel-terms.md, 'Step 2 search for a readable service'."
+  }
+}

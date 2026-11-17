@@ -1,6 +1,6 @@
 # Data pipeline
 
-Scripts that turn public data into tile archives, one layer for one county per run. The decisions behind this are in `docs/DECISIONS.md` (D4, D6, D7, D14, D16) and the approved sources are in `docs/DATA_SOURCES.md`.
+Scripts that turn public data into tile archives, one layer for one county per run. The decisions behind this are in `docs/DECISIONS.md` (D4, D6, D7, D14, D16, and D25 to D27 for parcels) and the approved sources are in `docs/DATA_SOURCES.md`.
 
 ## Running it
 
@@ -31,6 +31,13 @@ Files:
 | `layers/publicland.sh`, `layers/publicland.py` | The `publicland` layer. |
 | `layers/publicland-mapping.json` | Every PAD-US mapping table: manager names, categories, access, filter thresholds, corrections. |
 | `layers/aerial.sh`, `layers/aerial.py` | The `aerial` layer: NAIP images found by a catalog search of the county, read at the 1.2 m level, cached per image in `data/cache/naip/`, tiled to WebP. `AERIAL_MAX_GB` (default 15) stops a county whose projected download is larger. |
+| `layers/parcels.sh`, `layers/parcels.py` | The `parcels` layer: every parcel of the county from the county's own service, cached in `data/cache/parcels/<county-id>/`. |
+| `layers/parcels-services.json` | Where each county's parcels come from: service address, the exact field list, which fields become `pid`, `owner` and `acres`, and whether the county is approved or blocked. |
+| `lib/parcelsvc.py` | Parcel service access shared by the layer and the checks: the field list, refusal of address, phone, tax and legal fields, one request at a time with a pause, and the request log. |
+| `lib/vtiles.py` | A small pure-Python reader for PMTiles archives and vector tiles, used by the checks. |
+| `checks/parcels_fields.py` | Walks every tile of a parcel archive: property keys, counts against the service, largest tile per zoom, and whether any parcel is missing at zooms 13 to 15. Prints keys and counts, never owner names. |
+| `checks/parcels_sample.py` | Twenty random parcels compared with the county's records, fetched fresh: owner, acres and outline (pass under 0.5 m). Prints "match" or "differs" for owners. |
+| `checks/parcels_data.py` | Notes on a county's parcel data that the position readout must handle: multipart parcels, overlaps, empty owners, parcels outside the county and so on. Reads the cache only. |
 | `lib/busy.ps1` | Run on Windows before each heavy step: lists a running Android emulator or a busy Gradle build, and the pipeline waits while it lists anything. |
 
 ## Counties
@@ -102,6 +109,7 @@ data/build/<county-id>/<layer>.meta.json
 | `basemap` | vector | 0 to 15 | OpenStreetMap, cut from the Protomaps planet build | The Protomaps basemap tile layout, version 4. Layers such as `earth`, `water`, `landuse`, `landcover`, `roads`, `boundaries`, `places`, `pois`. |
 | `aerial` | raster | 7 to 16 | USDA NAIP 2025, with the newest earlier NAIP year where 2025 has gaps | Natural color, leaf-on summer imagery, built from the 1.2 m level. |
 | `publicland` | vector | 10 to 14 | USGS PAD-US 4.1, corrected with the regional planning commission's open spaces | One vector layer named `publicland`. Fields below. |
+| `parcels` | vector | 13 to 16 | The county's own parcel service, used with the county's permission (D25) | One vector layer named `parcels`. Four fields, below. Not built for Champaign County (see below). |
 
 ### Fields of the `publicland` layer
 
@@ -131,3 +139,34 @@ Champaign County Forest Preserve District land comes from the regional planning 
 The layer starts at zoom 10 because features are fetched for every zoom 10 tile that touches the county, which keeps every tile whole (rule 1) at a small download, and the sites here are too small to see below zoom 10 anyway.
 
 Whether hunting is allowed is not in the tiles. PAD-US has no hunting field. The app keeps its own short notes per managing body, each with a link to the rule (D16).
+
+### Fields of the `parcels` layer
+
+The decision is D27. Any other field in a parcel tile is a defect, and `checks/parcels_fields.py` fails on it.
+
+| Field | Meaning |
+|---|---|
+| `pid` | The parcel ID as the county writes it, as text. In Macon County this is the service's `ParcelNumb`, the number the county's own viewer shows as "Parcel". |
+| `owner` | The owner name as the county writes it, as text. It may be empty. |
+| `acres` | The county's recorded acreage, a number. Absent when the county has none for that parcel. It is the assessment figure, not the drawn area. |
+| `county` | The county id, for example `il-macon`. |
+
+Each feature also carries a numeric feature id: the record's number in that build, so the pieces of one record cut by tile edges can be joined. It is not stable from one build to the next. Use `pid` to name a parcel.
+
+How it is built:
+
+- **Zoom 16** holds every parcel with no simplification, no dropping and no tiny polygon reduction, at the full 4096 tile units (about 0.11 m on the ground).
+- **Zooms 13 to 15** are simplified, with shared borders simplified the same way on both sides so no gaps open between neighbours. No parcel is dropped.
+- **Rule 1 does not apply as written.** A parcel tile holds only that county's parcels (D27). Where two counties meet, both counties' parcel archives must be drawn. Parcel tiles are not cut to the county outline: the archive holds every tile that has one of the county's parcels in it. Its header bounds are widened to cover the county outline's box.
+- **Permission, not a license.** The metadata `license` says the data is used with the county's permission as stated by the owner. **Parcel archives are not put on GitHub or any other public host until the owner says so in plain words (D25).**
+- The download asks only for the fields listed in `layers/parcels-services.json`. `lib/parcelsvc.py` refuses any field name that looks like an address, phone, tax or legal description, and refuses a response that carries any field not asked for. Every request goes into `data/logs/parcels/requests-<county-id>.log`.
+- The raw pages are cached in `data/cache/parcels/<county-id>/`. A rebuild reuses them and makes no request. `REFRESH=1` downloads again.
+- A county whose entry in `layers/parcels-services.json` is `blocked` stops with the reason and makes no request. Champaign County is blocked: its parcel services need a login (see `docs/research/county-parcel-terms.md`).
+
+Checks, run in WSL after a build:
+
+```
+python3 -I pipeline/checks/parcels_fields.py <county-id>
+python3 -I pipeline/checks/parcels_sample.py <county-id>
+python3 -I pipeline/checks/parcels_data.py <county-id>
+```

@@ -40,6 +40,7 @@ LAYERS = {
     "basemap": {"kind": "vector", "title": "Base map", "minzoom": 0, "maxzoom": 15},
     "aerial": {"kind": "raster", "title": "Aerial imagery", "minzoom": 7, "maxzoom": 16},
     "publicland": {"kind": "vector", "title": "Public land", "minzoom": 10, "maxzoom": 14},
+    "parcels": {"kind": "vector", "title": "Parcels", "minzoom": 13, "maxzoom": 16},
 }
 
 # Census TIGERweb, current vintage, "Counties" layer. A single-county query is
