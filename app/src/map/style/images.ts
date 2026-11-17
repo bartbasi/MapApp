@@ -6,15 +6,16 @@
 // there is no sprite file to fetch and nothing to keep in step with it. The
 // map adds an image the first time the style asks for it (map-view.ts).
 
-import { publicLandStyle as pl, shieldPalette as sh } from './palette';
+import { positionPalette as pos, publicLandStyle as pl, shieldPalette as sh } from './palette';
 
 export const IMAGE_HATCH_CLOSED = 'pl-hatch-closed';
 export const IMAGE_HATCH_RESTRICTED = 'pl-hatch-restricted';
 export const IMAGE_SHIELD_MAJOR = 'shield-major';
 export const IMAGE_SHIELD_COUNTY = 'shield-county';
+export const IMAGE_POSITION_HEADING = 'position-heading';
 
 /** Every image the style may ask for. */
-export const STYLE_IMAGE_IDS = [IMAGE_HATCH_CLOSED, IMAGE_HATCH_RESTRICTED, IMAGE_SHIELD_MAJOR, IMAGE_SHIELD_COUNTY] as const;
+export const STYLE_IMAGE_IDS = [IMAGE_HATCH_CLOSED, IMAGE_HATCH_RESTRICTED, IMAGE_SHIELD_MAJOR, IMAGE_SHIELD_COUNTY, IMAGE_POSITION_HEADING] as const;
 
 export interface StyleImage {
   data: { width: number; height: number; data: Uint8ClampedArray };
@@ -106,6 +107,36 @@ function shield(fill: string, border: string, ratio: number): StyleImage {
   };
 }
 
+/**
+ * The heading wedge: a fan pointing straight up from the image's center,
+ * strongest near the dot and fading outward, with a pale rim so it shows on
+ * dark imagery. The map turns it to the heading.
+ */
+function headingWedge(ratio: number): StyleImage {
+  const size = 96 * ratio;
+  const c = size / 2;
+  const outer = 44 * ratio;
+  const halfAngle = (32 * Math.PI) / 180;
+  const fill = rgb(pos.wedge);
+  const rim = rgb(pos.wedgeRim);
+  const rimW = 1.4 * ratio;
+  const data = image(size, size, (x, y) => {
+    const dx = x - c;
+    const dy = c - y;
+    const r = Math.hypot(dx, dy);
+    // Distance in pixels outside the fan's straight sides and its round end.
+    const angle = Math.abs(Math.atan2(dx, dy));
+    const side = angle <= halfAngle ? -r * Math.sin(halfAngle - angle) : r * Math.sin(Math.min(angle - halfAngle, Math.PI / 2));
+    const d = Math.max(side, r - outer);
+    const inside = clamp01(0.5 - d);
+    if (inside === 0) return [0, 0, 0, 0];
+    const fade = 0.92 - 0.6 * clamp01(r / outer);
+    const onRim = clamp01(0.5 - Math.abs(d + rimW / 2) + rimW / 2) * clamp01(r / (12 * ratio));
+    return over([...rim.slice(0, 3), 0.75 * onRim * inside] as Rgba, [...fill.slice(0, 3), fade * inside] as Rgba);
+  });
+  return { data, options: { pixelRatio: ratio } };
+}
+
 /** The image the style asks for, drawn for the screen's pixel ratio, or null if the name is unknown. */
 export function styleImage(id: string, pixelRatio = 2): StyleImage | null {
   const ratio = Math.max(1, Math.min(4, Math.round(pixelRatio)));
@@ -118,6 +149,8 @@ export function styleImage(id: string, pixelRatio = 2): StyleImage | null {
       return shield(sh.major, sh.majorBorder, ratio);
     case IMAGE_SHIELD_COUNTY:
       return shield(sh.county, sh.countyBorder, ratio);
+    case IMAGE_POSITION_HEADING:
+      return headingWedge(ratio);
     default:
       return null;
   }

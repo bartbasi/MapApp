@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import type { ArchiveEntry, ArchiveMeta } from '../../platform/archive-meta';
 import { firstSentence, summarizeInstalled } from '../installed';
 import { availableBaseViews, buildStyle, effectiveBaseView, type StyleOptions } from './build-style';
+import { POSITION_LAYER_IDS, POSITION_SOURCE } from './position';
 
 const CHAMPAIGN: [number, number, number, number] = [-88.47, 39.87, -87.92, 40.41];
 const MACON: [number, number, number, number] = [-89.22, 39.65, -88.74, 40.06];
@@ -46,7 +47,12 @@ function opts(o: Partial<StyleOptions>): StyleOptions {
 }
 
 type Style = ReturnType<typeof buildStyle>;
-const ids = (s: Style) => s.layers.map((l) => l.id);
+/** Every layer, the position marker's included. */
+const allIds = (s: Style) => s.layers.map((l) => l.id);
+/** The map's own layers: the position marker is always there and is tested on its own below. */
+const ids = (s: Style) => allIds(s).filter((id) => !id.startsWith('position-'));
+/** The map data sources, leaving out the position marker's. */
+const dataSources = (s: Style) => Object.keys(s.sources).filter((k) => k !== POSITION_SOURCE);
 const sourceOf = (s: Style, id: string) => {
   const l = s.layers.find((x) => x.id === id);
   return l && 'source' in l ? l.source : undefined;
@@ -56,7 +62,7 @@ const rasterLayers = (s: Style) => s.layers.filter((l) => l.type === 'raster');
 describe('buildStyle: base views', () => {
   it('map view: vector base map, no imagery', () => {
     const s = buildStyle(opts({ base: 'map', overlays: { publicland: false } }));
-    expect(Object.keys(s.sources).sort()).toEqual(['basemap']);
+    expect(dataSources(s).sort()).toEqual(['basemap']);
     expect(ids(s)).toContain('base-road-major');
     expect(ids(s)).toContain('label-place');
     expect(rasterLayers(s)).toEqual([]);
@@ -64,7 +70,7 @@ describe('buildStyle: base views', () => {
 
   it('aerial view: imagery over a plain base map, no labels', () => {
     const s = buildStyle(opts({ base: 'aerial', overlays: { publicland: false } }));
-    expect(Object.keys(s.sources).sort()).toEqual(['aerial:il-champaign', 'aerial:il-macon', 'basemap']);
+    expect(dataSources(s).sort()).toEqual(['aerial:il-champaign', 'aerial:il-macon', 'basemap']);
     expect(ids(s).some((id) => id.startsWith('label-'))).toBe(false);
     expect(ids(s).some((id) => id.startsWith('base-'))).toBe(false);
   });
@@ -212,7 +218,7 @@ describe('buildStyle: missing layers', () => {
     expect(availableBaseViews(baseOnly)).toEqual(['map']);
     expect(effectiveBaseView('hybrid', baseOnly)).toBe('map');
     const s = buildStyle(opts({ base: 'aerial', installed: baseOnly }));
-    expect(Object.keys(s.sources)).toEqual(['basemap']);
+    expect(dataSources(s)).toEqual(['basemap']);
     expect(rasterLayers(s)).toEqual([]);
     expect(ids(s)).toContain('base-road-major');
   });
@@ -227,7 +233,7 @@ describe('buildStyle: missing layers', () => {
     const none = summarizeInstalled([]);
     expect(availableBaseViews(none)).toEqual(['map']);
     const s = buildStyle(opts({ installed: none }));
-    expect(s.sources).toEqual({});
+    expect(dataSources(s)).toEqual([]);
     expect(ids(s)).toEqual(['background']);
   });
 
@@ -250,7 +256,7 @@ describe('buildStyle: validity', () => {
           for (const l of s.layers) {
             if ('source' in l && typeof l.source === 'string') expect(s.sources[l.source], `${base}/${l.id}`).toBeDefined();
           }
-          expect(new Set(ids(s)).size).toBe(s.layers.length);
+          expect(new Set(allIds(s)).size).toBe(s.layers.length);
         }
       }
     }
@@ -265,5 +271,35 @@ describe('buildStyle: validity', () => {
         }
       }
     }
+  });
+});
+
+describe('buildStyle: the position marker', () => {
+  const marker: FeatureCollection = {
+    type: 'FeatureCollection',
+    features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [-88.2, 40.1] }, properties: { part: 'dot', stale: false } }],
+  };
+
+  it('is drawn last, above every other layer and label, in every base view', () => {
+    for (const base of ['map', 'aerial', 'hybrid'] as const) {
+      for (const publicland of [true, false]) {
+        const order = allIds(buildStyle(opts({ base, overlays: { publicland } })));
+        expect(order.slice(-POSITION_LAYER_IDS.length), `${base}`).toEqual([...POSITION_LAYER_IDS]);
+      }
+    }
+  });
+
+  it('is in the style even with position off, so a base view change never drops it', () => {
+    const s = buildStyle(opts({}));
+    expect(s.sources[POSITION_SOURCE]).toEqual({ type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    expect(buildStyle(opts({ base: 'aerial', position: marker })).sources[POSITION_SOURCE]).toEqual({ type: 'geojson', data: marker });
+  });
+
+  it('is drawn with nothing installed', () => {
+    expect(allIds(buildStyle(opts({ installed: summarizeInstalled([]) }))).slice(1)).toEqual([...POSITION_LAYER_IDS]);
+  });
+
+  it('passes the style spec validator with a marker in it', () => {
+    expect(validateStyleMin(buildStyle(opts({ base: 'hybrid', position: marker })))).toEqual([]);
   });
 });

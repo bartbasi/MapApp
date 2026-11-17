@@ -204,6 +204,37 @@ export const parcelPalette = {
   labelHalo: '#ffffff',
 } as const;
 
+/**
+ * The phone's position marker, drawn above everything (DECISIONS D26).
+ * A strong blue no other layer uses, inside a white ring with a dark edge,
+ * so it reads on the pale map and on dark woods in the imagery. The
+ * accuracy circle is a light wash with a firm edge. A stale fix turns gray.
+ */
+export const positionPalette = {
+  dot: '#1559d6',
+  ring: '#ffffff',
+  /** The soft dark edge outside the white ring, for pale ground. */
+  edge: '#0a1630',
+  edgeOpacity: 0.45,
+  stale: '#80858c',
+  accuracyFill: '#1559d6',
+  accuracyFillOpacity: 0.13,
+  accuracyEdge: '#1559d6',
+  accuracyFillOnImagery: '#cfe0ff',
+  accuracyFillOpacityOnImagery: 0.2,
+  accuracyEdgeOnImagery: '#ffffff',
+  accuracyEdgeOpacity: 0.85,
+  staleAccuracy: '#80858c',
+  /** The heading wedge: the dot's blue, fading outward, with a pale rim. */
+  wedge: '#1559d6',
+  wedgeRim: '#ffffff',
+  /** Sizes in screen pixels. */
+  dotRadius: 7.5,
+  ringWidth: 3,
+  edgeWidth: 1.6,
+  accuracyEdgeWidth: 1.5,
+} as const;
+
 /** Route number shields: a dark shield for interstate, US and state routes, a light one for county roads. */
 export const shieldPalette = {
   major: '#2e3b4e',

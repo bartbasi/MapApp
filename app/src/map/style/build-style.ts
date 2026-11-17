@@ -30,6 +30,7 @@ import { aerialLayer } from './aerial';
 import { baseMapGroundLayers, baseMapLabelLayers, labelsOnImagery, labelsOnMap, plainBaseMapLayers } from './base-map';
 import { hybridLineLayers } from './hybrid';
 import { basePalette, imageryPalette, plainPalette } from './palette';
+import { POSITION_SOURCE, positionLayers } from './position';
 import { PUBLIC_LAND_LABELS_SOURCE, publicLandAreaLayers, publicLandLabelLayers, type PublicLandSelection } from './public-land';
 
 export const BASE_VIEWS = ['map', 'aerial', 'hybrid'] as const;
@@ -52,9 +53,16 @@ export interface StyleOptions {
   selection?: PublicLandSelection | null;
   /** One label point per public land site, made by public-land-labels.ts from the loaded tiles. */
   publicLandLabels?: FeatureCollection<Point> | null;
+  /**
+   * The phone's position marker, made by position/marker.ts. The source and
+   * its layers are always in the style, empty when position is off, so a new
+   * base view never drops the marker. The map updates the data in place.
+   */
+  position?: FeatureCollection | null;
 }
 
 const EMPTY_LABELS: FeatureCollection<Point> = { type: 'FeatureCollection', features: [] };
+const EMPTY_FEATURES: FeatureCollection = { type: 'FeatureCollection', features: [] };
 
 /** The base views that the installed layers can draw. */
 export function availableBaseViews(installed: InstalledLayers): BaseView[] {
@@ -151,6 +159,9 @@ export function buildStyle(opts: StyleOptions): StyleSpecification {
     overlayLabels.push(...publicLandLabelLayers(PUBLIC_LAND_LABELS_SOURCE, onImagery ? labelsOnImagery : labelsOnMap, onImagery));
   }
 
+  // The position marker goes last, above every other layer (D26).
+  sources[POSITION_SOURCE] = { type: 'geojson', data: opts.position ?? EMPTY_FEATURES };
+
   return {
     version: 8,
     name: `MapApp ${base}`,
@@ -167,6 +178,7 @@ export function buildStyle(opts: StyleOptions): StyleSpecification {
       ...overlayAreas,
       ...labels,
       ...overlayLabels,
+      ...positionLayers(POSITION_SOURCE, onImagery),
     ],
   };
 }

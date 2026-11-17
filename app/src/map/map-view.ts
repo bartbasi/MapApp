@@ -6,7 +6,16 @@
 // this can be reused by any screen or platform.
 
 import type { FeatureCollection, Point } from 'geojson';
-import { AttributionControl, Map as MapLibreMap, ScaleControl, addProtocol, setWorkerUrl, type LngLat, type LngLatBoundsLike } from 'maplibre-gl';
+import {
+  AttributionControl,
+  Map as MapLibreMap,
+  ScaleControl,
+  addProtocol,
+  setWorkerUrl,
+  type GeoJSONSource,
+  type LngLat,
+  type LngLatBoundsLike,
+} from 'maplibre-gl';
 // MapLibre GL JS 6 loads its worker from a file next to its own module. The
 // bundler moves that module, so the worker is bundled as its own file and its
 // address is passed in (see docs/research/engine-and-hosting-checks.md).
@@ -19,6 +28,7 @@ import { revealOffset } from './reveal';
 import { DOUBLE_TAP_MS, TAP_REACH_STEPS_PX, isSecondTap, type Tap } from './taps';
 import { buildStyle, type StyleOptions } from './style/build-style';
 import { styleImage } from './style/images';
+import { POSITION_SOURCE } from './style/position';
 import { PUBLIC_LAND_FILL, PUBLIC_LAND_LABEL_MINZOOM } from './style/public-land';
 import { TILE_SCHEME, createTileLoader, newTileStats, type TileStats } from './tile-protocol';
 import { unionBounds, type Bounds } from './tile-math';
@@ -49,7 +59,15 @@ export interface MapViewEvents {
   /** A tap on the map: the public land site there (or null), and where the tap was. */
   onPublicLandTap?: (site: PublicLandSite | null, at: LngLat) => void;
   onBearingChange?: (bearing: number) => void;
+  /** The user started moving the map by hand: a drag, pinch, rotate, wheel or key. */
+  onUserMove?: () => void;
 }
+
+export const MAX_ZOOM = 20;
+
+/** How long a recenter on the phone takes. A fix comes about once a second, so the glide nearly meets the next one. */
+const FOLLOW_EASE_MS = 900;
+const LOCATE_EASE_MS = 1200;
 
 export class MapView {
   readonly map: MapLibreMap;
@@ -60,18 +78,24 @@ export class MapView {
   private readonly resizeObserver: ResizeObserver;
   private tapTimer: number | undefined;
   private lastTap: Tap | null = null;
+  private position: FeatureCollection | null = null;
+  private positionKey = '';
+  /** The zoom a locate glide is heading for, until the map gets there or the user moves it. */
+  private followZoom: number | null = null;
   private readonly onWindowResize = () => this.map.resize();
 
   constructor(container: HTMLElement, options: StyleOptions, events: MapViewEvents = {}) {
     this.options = options;
     const bounds = dataBounds(options.installed);
     const style = buildStyle(this.withLabels(options));
-    this.lastStyleKey = JSON.stringify(style);
+    this.lastStyleKey = JSON.stringify(buildStyle({ ...this.withLabels(options), position: null }));
     this.map = new MapLibreMap({
       container,
       style,
       ...(bounds ? { bounds: bounds as LngLatBoundsLike, fitBoundsOptions: { padding: 24 } } : { center: [-89.2, 40], zoom: 6 }),
-      maxZoom: 18,
+      // A few meters fill the screen at zoom 20 (D27). Layers whose data stops
+      // sooner are drawn larger from their last zoom (overzoom).
+      maxZoom: MAX_ZOOM,
       attributionControl: false,
       // Labels are drawn upright and readable whatever the rotation.
       pitchWithRotate: false,
@@ -86,6 +110,20 @@ export class MapView {
     window.visualViewport?.addEventListener('resize', this.onWindowResize);
 
     this.map.on('rotate', () => events.onBearingChange?.(this.map.getBearing()));
+    // A move the user makes carries the input event that caused it; a move
+    // the app makes (follow, reveal, reset north) does not.
+    // A drag that interrupts a glide may not start a new move, so the
+    // gesture events are watched as well.
+    const byUser = (e: { originalEvent?: Event }) => {
+      if (!e.originalEvent) return;
+      this.followZoom = null;
+      events.onUserMove?.();
+    };
+    // Once a glide reaches the target zoom, later glides leave the zoom alone.
+    this.map.on('moveend', () => {
+      if (this.followZoom !== null && Math.abs(this.map.getZoom() - this.followZoom) < 0.01) this.followZoom = null;
+    });
+    for (const name of ['movestart', 'dragstart', 'zoomstart', 'rotatestart', 'pitchstart'] as const) this.map.on(name, byUser);
     this.map.on('click', (e) => {
       if (!events.onPublicLandTap) return;
       const tap: Tap = { time: performance.now(), x: e.point.x, y: e.point.y };
@@ -140,7 +178,40 @@ export class MapView {
   }
 
   private withLabels(options: StyleOptions): StyleOptions {
-    return { ...options, publicLandLabels: this.labels };
+    return { ...options, publicLandLabels: this.labels, position: this.position };
+  }
+
+  /**
+   * Shows the phone's position marker (position/marker.ts), or none. The data
+   * goes straight into the map's source, with no style rebuild, and is kept
+   * so a later style change carries it over.
+   */
+  setPosition(data: FeatureCollection): void {
+    const key = JSON.stringify(data);
+    if (key === this.positionKey) return;
+    this.positionKey = key;
+    this.position = data;
+    const source = this.map.getSource<GeoJSONSource>(POSITION_SOURCE);
+    if (source) source.setData(data);
+  }
+
+  /**
+   * Glides the map to a point, keeping the zoom unless minZoom asks for
+   * closer. With a sheet over the bottom of the map, the point goes to the
+   * middle of the part still showing.
+   */
+  centerOn(lng: number, lat: number, minZoom: number | null = null, coveredBottom = 0): void {
+    if (minZoom !== null) this.followZoom = Math.max(this.map.getZoom(), minZoom);
+    // The next fix comes before a zoom glide ends and starts a new glide. It
+    // carries the same target zoom, so the zoom is not left halfway.
+    const zoom = this.followZoom ?? undefined;
+    this.map.easeTo({
+      center: [lng, lat],
+      offset: [0, -coveredBottom / 2],
+      ...(zoom !== undefined ? { zoom } : {}),
+      duration: minZoom !== null ? LOCATE_EASE_MS : FOLLOW_EASE_MS,
+      easing: (t) => t * (2 - t),
+    });
   }
 
   /** Recomputes the public land label points from the loaded tiles. */
@@ -181,11 +252,12 @@ export class MapView {
   /** Applies a new base view, overlay set or selection. The camera is kept. */
   update(options: StyleOptions): void {
     this.options = options;
-    const style = buildStyle(this.withLabels(options));
-    const key = JSON.stringify(style);
+    // The key leaves out the position, which changes every second and is
+    // updated in place by setPosition().
+    const key = JSON.stringify(buildStyle({ ...this.withLabels(options), position: null }));
     if (key === this.lastStyleKey) return;
     this.lastStyleKey = key;
-    this.map.setStyle(style, { diff: true });
+    this.map.setStyle(buildStyle(this.withLabels(options)), { diff: true });
   }
 
   get styleOptions(): StyleOptions {
