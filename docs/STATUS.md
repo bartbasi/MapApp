@@ -4,7 +4,9 @@ Last updated: 2026-11-17, end of Step 2, waiting for the owner.
 
 ## Where the project stands
 
-**Step 2 (position and property lines) is built and tested on the emulator.** The report is `docs/reports/step-2.md`. One check is open: the owner checks the marker outdoors on his phone.
+**Step 2 (position and property lines) is built, reviewed and tested on the emulator.** The report is `docs/reports/step-2.md`. One check is open: the owner checks the marker outdoors on his phone.
+
+**Step 2 is not pushed.** `main` is ahead of `origin/main`. The push waits for the owner's answer on the screenshots that show county parcel lines (question 3 of the report). Nothing under `data/` is ever pushed.
 
 **Step 2 is not the Step 2 of the brief.** The owner said the app's first job is to show the phone's position against the property lines (D26). Offline downloads moved to Step 3. See `docs/STEP_PLAN.md`.
 
@@ -15,9 +17,9 @@ Last updated: 2026-11-17, end of Step 2, waiting for the owner.
 ## What exists
 
 - `pipeline/`: scripts that build one layer for one county per run, in WSL. Layers: `basemap`, `aerial`, `publicland`, `parcels`. The archive contract is in `pipeline/README.md`. Parcel checks are in `pipeline/checks/parcels_*.py`.
-- `data/build/<county-id>/`: the built archives. Not in git. `il-macon` has a parcel archive (57,096 records, data date 2026-10-28). `il-champaign` has none. Rebuild with `wsl -d Ubuntu -- bash pipeline/build.sh <layer> <county-id>`.
+- `data/build/<county-id>/`: the built archives. Not in git. `il-macon` has a parcel archive (57,096 records, data date 2026-10-28). Its `parcels.meta.json` carries the county outline as `coverage` (D32); `python3 -I pipeline/layers/parcels.py --update-meta <county>` adds it without asking the county again. `il-champaign` has none. Rebuild with `wsl -d Ubuntu -- bash pipeline/build.sh <layer> <county-id>`.
 - `app/src/position/`: the GPS sources, the position store, heading and follow. `app/src/parcels/`: the parcel source, the nearest line, the readout rule and its words. `app/src/map/style/parcels.ts` and `position.ts`: the layers. `app/src/ui/PositionReadout.svelte` and `ParcelDetails.svelte`: the screens.
-- `npm run check` passes and `npm test` passes with 280 tests.
+- `npm run check` passes and `npm test` passes with 327 tests. One of them reads the real Macon County archive and skips when it is absent.
 - `build/step2-debug.apk`: the Step 2 test build with real owner names, for the owner's phone. `build/step2-masked-debug.apk`: the same with every owner shown as "OWNER NAME", for screenshots. Step 1's build is still on the owner's phone until he connects it.
 - Evidence: `docs/evidence/step2/`.
 
@@ -35,9 +37,11 @@ Last updated: 2026-11-17, end of Step 2, waiting for the owner.
 1. **The outdoor check of the marker on his phone.** Install `build/step2-debug.apk` when the phone is connected. The steps are in the Step 2 report.
 2. **How Champaign County will hand over its parcel data:** a file with outline, parcel ID, acreage and owner, or a login the county issues to him. And the grant in writing.
 3. **Whether the Macon County parcel archive may be published on GitHub** for the app to download. Needed in Step 3. "Everything is approved" (2026-11-17) was not taken to cover this. He must say it by name.
-4. Any condition a county put on its grant: a required credit, a limit on passing the data on, or a set way to receive the data.
-5. Whether to ask the Illinois State Geological Survey for the leaf-off imagery, and the Illinois Department of Natural Resources for its hunting table.
-6. Whether 3 m is the right allowance for error in the county's lines (D28).
+4. **Whether the Step 2 screenshots may be pushed.** About 140 show Macon County parcel lines, parcel IDs and acreages, owners masked. If no, push the code without `docs/evidence/step2/` images (the history must then be rewritten before the push, because the images are already committed locally).
+5. **Whether to replace the location plugin** with one of our own that links no Google library (D31).
+6. Any condition a county put on its grant: a required credit, a limit on passing the data on, or a set way to receive the data.
+7. Whether to ask the Illinois State Geological Survey for the leaf-off imagery, and the Illinois Department of Natural Resources for its hunting table.
+8. Whether 3 m is the right allowance for error in the county's lines (D28).
 
 ## Lesson from Step 1
 
@@ -50,12 +54,16 @@ Read a service's terms before the first request to it, not only the license of t
 - **The Macon County lines sit about 0.5 m east of the GPS frame** (D29). Not corrected.
 - **On the folded screen an open parcel panel covers the readout card.** The marker and the striped line still show.
 - **After "My position" is switched off and on, the marker takes 3 to 4 s to return.**
-- **The "GPS too weak" state was not seen on Android**, only in the browser and in unit tests. A stack of 101 parcels on one outline was not seen on screen; 14 was.
+- **A stack of 101 parcels on one outline was not seen on screen**; 14 was. "Acreage not listed" is shown on Android only in the tap panel screenshot `t8_noacre_tap.png`.
+- **Within 25 m inside the county outline, a place in no parcel reads "No property lines for this place yet"** (D32). Cautious, and wrong for a Macon County road on the line.
+- **A position's age is counted from when it arrived, not from its own time stamp.** If a phone re-delivers an old position as new, the stale and 5 minute limits do not see it. The emulator re-sends its last fix every second, which is a GPS that is still reporting. Watch for this on the real phone.
+- **With accuracy unknown the poor-fix title still says "GPS is too weak to place you."**
+- **`real-archive.test.ts` logs one side mismatch** between zoom 15 and zoom 16 at a point where two lines are within 0.05 m of the same distance. Not asserted.
 - **The tapped parcel and a tapped public land site share one yellow outline.**
 - **There are two distance formatters**, `position/messages.ts` (rounded, for the accuracy) and `parcels/format.ts` (exact, for the line). They give different text for the same distance.
 - **Two harmless log lines on Android:** "Error injecting safe area CSS" at start, and the location plugin's "Location services are not enabled" when location is off.
 - **The location plugin uses Google's fused location service when there is a network**, and the GPS provider directly when there is none. The app sends nothing.
-- **Two agents ended their commits with a wrong co-author line** (an older model name). Left as is.
+- **Some agents' commits carry "Claude Opus 5.5" as co-author**, the model that wrote them. Left as is.
 - **Aerial imagery is two years joined.** About a quarter of Champaign County and half of Macon County is 2023 imagery. The owner has seen it and chose to leave it.
 - **Aerial imagery is at half detail** (1.2 m). Full detail needs about 50 GB of reading or the MrSID decoder.
 - **Closed sites.** PAD-US lists state nature preserves as closed even where people may walk in. The app shows "do not enter or hunt" for every closed record, ahead of the manager's own note. Seven such records are in or at the two counties.
