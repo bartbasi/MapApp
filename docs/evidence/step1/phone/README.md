@@ -13,9 +13,18 @@ The frame test is the one built into the app: Layers, Sources and licenses, Diag
 
 The cover screen refreshes 120 times a second, so the app is drawing every frame the screen can show.
 
-## Unfolded (main screen)
+## Unfolded (main screen, 690 by 829 at pixel ratio 2.625)
 
-Not run yet. The phone has to be unfolded by hand.
+| View | Average | Worst 1 percent | Frames over 33 ms | Tiles finished after stop | Screenshot |
+|---|---|---|---|---|---|
+| Map | 119.7 frames per second | 119 | 0 of 1802 | 363 ms | `unfolded-map-result.png` |
+| Hybrid | 119.7 frames per second | 117.6 | 0 of 1801 | 309 ms | `unfolded-hybrid-result.png` |
+
+Tile reads over the session: 2,115 requested, 0 failed.
+
+## Result
+
+The check "panning and zooming stay smooth on the Z Fold 5" passes on both screens. The map engine decision (DECISIONS D2) stands.
 
 ## Seen during the runs
 

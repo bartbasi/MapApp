@@ -15,7 +15,7 @@ The full brief is `MapApp-kickoff-prompt.md`. Read it before any step-level work
 
 ## Rules that are never broken
 
-1. **County parcel data.** Never bulk-download, scrape, cache in bulk or commit county parcel data. Macon County parcels are fetched live by the app, only for what the user is viewing or taps. Champaign County has no parcel source until the owner decides (see DECISIONS D8). Never show or store mailing addresses or phone numbers. Do not write owner names into docs, commits, logs or reports. Refer to a parcel by its ID.
+1. **County parcel data.** The owner says both counties allow a stored copy (DECISIONS D25). Parcel archives are built by the pipeline on this machine and live under `data/`. Never commit them, and never put them on GitHub or any public host until the owner says so in plain words. Keep only the outline, parcel ID, acreage and owner name. Never request, show or store mailing addresses, site addresses or phone numbers. Do not write owner names into docs, commits, logs or reports. Refer to a parcel by its ID.
 2. **No data files in git.** Downloads and build outputs live under `data/`, which is ignored. Never push any county data file.
 3. **Privacy.** No accounts, ads, analytics or crash reporting. User data stays on the device.
 4. **Originality.** Code, map styles, icons and text are written here. Do not copy another mapping product's name, branding, layer names, styling or data, and do not call another product's servers.

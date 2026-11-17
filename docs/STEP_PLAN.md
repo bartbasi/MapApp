@@ -33,36 +33,46 @@ Checks:
 
 In Step 1 the map data is loaded onto the device from the development machine. Downloads inside the app come in Step 2.
 
-## Step 2. Offline downloads and GPS position
+## Step 2. Position and property lines (the core function)
 
-Goal: the user downloads an area or a whole county, and sees their position with no network.
+The owner set this order on 2026-11-17 (DECISIONS D26). Both counties now allow a stored copy of their parcel data (D25), so parcels are built as offline data.
 
-1. Owner approval needed first: the first push to the public repository, because the archives are hosted as GitHub release files (DECISIONS D15).
-2. app-developer: the native download plugin (pause, resume, survive an app kill), the area and detail picker with the size shown before starting, the one-tap county downloads, the download list with delete.
-3. app-developer: the position marker from device GPS, and the true network state from the shell (DECISIONS D12).
-4. qa-tester: run the checks.
+Goal: with no network, the hunter sees where the phone is against the property lines, and who owns the land on each side.
+
+1. Lead: the first push to the public repository (approved, D25).
+2. data-engineer: the parcel archive for each county. It holds the outline, parcel ID, acreage and owner name and nothing else. It is built on this laptop and is never committed or hosted.
+3. app-developer: the position marker from the phone's GPS. A dot, an accuracy circle, a heading, a button that centers the map on the phone, and a follow mode.
+4. app-developer: the parcel layer. Outlines readable in all three base views, the tap panel (owner, acreage, parcel ID, county, data date) and the "not a legal survey" statement. All parcel access goes through the `ParcelSource` interface (D8).
+5. app-developer: the position readout. It names the parcel the phone is in and gives the distance and direction to the nearest property line, with the GPS accuracy beside it.
+6. Lead: a test build with every archive inside it, parcels included.
+7. qa-tester: run the checks.
+
+Checks:
+
+- Twenty parcels picked at random in each county match that county's own records for owner name and outline. (From the brief.)
+- The position marker follows a replayed GPS route. (From the brief.)
+- In airplane mode, the parcel outlines draw and a parcel tap returns the owner. (From the brief, for a county with stored data.)
+- The parcel archives hold no mailing address, site address or phone number, and the pipeline requests none. This is checked from the archive's contents and from the pipeline's request log. (The brief's check on mailing address fields, applied to stored data.)
+- On a replayed route that crosses a property line, the readout names the right parcel on each side, and its distance to the line agrees with a measurement made from the county's own outline to within 2 m. (New, for D26.)
+- The owner checks the marker outdoors on his phone against a place he knows.
+
+The brief's "needs a connection" message and saved results belong to a live lookup county. Neither county is one now, so those two parts are not built in this step.
+
+## Step 3. Offline downloads
+
+Goal: the user downloads an area or a whole county, and the app no longer needs its map data built in.
+
+1. Lead: publish the base map, imagery and public land archives as GitHub release files (D15), and check range reads and the redirect.
+2. Owner decision needed: whether the parcel archives may be published the same way. Until he says yes they are not hosted, and a parcel archive reaches a phone only inside a build.
+3. app-developer: the native download plugin (pause, resume, survive an app kill), the area and detail picker with the size shown before starting, the one-tap county downloads, the download list with delete.
+4. app-developer: the true network state from the shell (D12).
+5. qa-tester: run the checks.
 
 Checks:
 
 - In airplane mode, a downloaded area draws every bundled layer.
-- The position marker follows a replayed GPS route.
 - Killing the app in the middle of a download and reopening it resumes the download without corrupting the area.
 - A downloaded area includes every layer the user had turned on.
-
-## Step 3. Parcels and owners
-
-Goal: parcel outlines and owner details for every county with an allowed source.
-
-1. Lead: the `ParcelSource` interface and the Macon County live lookup (DECISIONS D8), with the field allowlist enforced in one place and tested.
-2. app-developer: outlines at high zoom, the tap panel (owner, acreage, parcel ID, county, data date), the "not a legal survey" statement, saved results, and the "needs a connection" state.
-3. Champaign County: built as bundled data if permission has arrived, as live lookup if the owner so decides, or left as "not available yet".
-4. qa-tester: run the checks.
-
-Checks:
-
-- Twenty parcels picked at random in each county with a parcel source match that county's own records for owner name and outline.
-- In airplane mode, a live lookup county shows its "needs a connection" message and its saved results. A bundled county returns the owner.
-- No request made by the app contains a mailing address field. This is checked from a network log.
 
 ## Step 4. Scouting and tracking
 

@@ -35,7 +35,7 @@ If the phone averages well under 30 frames per second in the Map view, I will re
 |---|---|
 | Public land colors match the source data along at least three boundaries | Pass. Seven sites checked at 20,382 points. No point was wrong. |
 | Every layer present names its source and license | Pass. All six data files do. |
-| Smooth panning and zooming on the Z Fold 5, with the measured frame rate | Open. Needs your phone. Emulator numbers are below. |
+| Smooth panning and zooming on the Z Fold 5, with the measured frame rate | Pass, measured 2026-11-17 after this report was sent. About 120 frames per second in the Map and Hybrid views, folded and unfolded, with no slow frames. See the addendum at the end. |
 | Screenshots of all three base views, folded and unfolded | Pass. They are in `docs/evidence/step1/final/`, taken from the build you are getting. |
 
 ### Boundaries
@@ -175,3 +175,20 @@ Also still open, with no hurry: whether to ask the state geological survey for i
 
 - Two empty folders appeared in the project root during a tool run: `BASI\PADX` and one named `C:SERSBART`. A safety check stopped me from deleting them. They are safe to delete by hand.
 - The work is in 13 local commits. Nothing is on GitHub.
+
+## Addendum, 2026-11-17: the phone test and the owner's answers
+
+This part was added after the report above was sent. The report above is unchanged apart from the frame rate row in the checks table.
+
+**Frame rate on the Galaxy Z Fold 5.** The test build was installed over USB and the built-in frame test was run on the phone.
+
+| Screen | View | Average | Worst 1 percent | Frames over 33 ms | Tiles finished after stop |
+|---|---|---|---|---|---|
+| Folded | Map | 119.9 frames per second | 119 | 0 of 1806 | 350 ms |
+| Folded | Hybrid | 119.7 frames per second | 119 | 0 of 1802 | 594 ms |
+| Unfolded | Map | 119.7 frames per second | 119 | 0 of 1802 | 363 ms |
+| Unfolded | Hybrid | 119.7 frames per second | 117.6 | 0 of 1801 | 309 ms |
+
+Both screens refresh 120 times a second, so the app draws every frame the phone can show. The screenshots are in `docs/evidence/step1/phone/`.
+
+**The owner's answers.** They are recorded in `docs/DECISIONS.md`, D25 and D26. In short: the first push is approved with the brief, `CLAUDE.md` and the reports included. He accepts Microsoft's terms for the imagery. Both counties allow a stored copy of their parcel data. The imagery patchwork stays. The hunting notes are right. The app's first job is to show the phone's position against the property lines.

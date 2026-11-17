@@ -256,3 +256,38 @@ The public land layer shows land a member of the public could reasonably think o
 - Access is shown as access on foot. It is never shown as permission to hunt (D16).
 
 Known faults left in the data, to be listed in the Step 1 report: one PAD-US record named "City Park" bundles many small parks far apart, and seven Champaign County parks have no recorded manager.
+
+## D25. The owner's answers to the Step 1 report (2026-11-17)
+
+His words are quoted, then how they are applied.
+
+| Question | His answer | Applied as |
+|---|---|---|
+| Frame rate on the Z Fold 5 | Measured on his phone over USB: about 120 frames per second in the Map and Hybrid views, folded and unfolded, no frame over 33 ms. He added "Works great". | The check passes. D2 (the map engine) stands. Evidence: `docs/evidence/step1/phone/`. |
+| First push to GitHub | "yes, include the brief CLAUDE.md and the reports" | The repository is pushed to `github.com/bartbasi/MapApp` as a public repository, with every tracked file. |
+| Microsoft's terms for the imagery service | "yes i accept them" | The aerial archives stay as built and may be hosted with the other layers. |
+| What each county granted for parcels | "can store a copy" | Both counties become bundled offline parcel data. See below. |
+| The imagery patchwork | "I agree with your recommendation on leaving it, it looks good." | Left as built: newest imagery where it exists. |
+| The hunting notes | "Hunting notes are right" | Kept as written. |
+
+**Parcels: both counties are now stored data.** This replaces the live lookup in D8 and the limits at the end of D22.
+
+- Each county's parcels are built into a parcel archive, like any other layer, and work with no network. The brief says this is what happens when a county grants permission.
+- The archive holds four things per parcel and nothing else: the outline, the parcel ID, the acreage and the owner name. The pipeline never requests a mailing address, a site address or a phone number. That rule is unchanged.
+- The grant rests on the owner's word. No written grant is in the project. He should keep each county's reply, and tell the project any condition it carries: a required credit, a limit on passing the data on, or a set way to receive the data.
+- Parcel archives are built on this laptop and stay under `data/`, which is never committed.
+- **Parcel archives are not put on GitHub or any other public host until the owner says so in plain words.** The brief requires his say before any county data file is pushed. Until then they reach a phone only inside a test build that he installs himself.
+- The Champaign County data comes from the county's own map service only if that service can be reached without clicking through the consortium's 2013 terms page. Those terms forbid copying, and accepting them in order to copy would be wrong. If the service cannot be reached that way, Champaign County waits for the owner to say how the county wants to hand the data over.
+- The `ParcelSource` interface from D8 stays, with a stored-data implementation. A live lookup implementation is not built now, because no county needs it. A later county without permission would get one.
+- D21 changes with this: no parcel request leaves the phone. The parcel row of that table no longer applies to these two counties.
+
+## D26. The core function: the phone's position against the property lines (2026-11-17)
+
+The owner wrote: "this app should first and foremost be focused on showing the exact GPS location of the phone itself in relationship to property lines. That's the core functionality above and beyond anything else."
+
+Applied as:
+
+- **The order of the steps changes.** The position marker and the parcel lines are built next, together, as the new Step 2. Offline downloads move to Step 3. Nothing in the brief is dropped. `docs/STEP_PLAN.md` has the new order.
+- **The app tells the user where they stand, in words as well as on the map.** A position readout names the parcel the phone is in and gives the distance and direction to the nearest property line.
+- **The app is honest about how exact it can be.** A phone's GPS is usually good to 3 to 10 m in the open and worse under trees. County parcel lines are drawn for tax assessment and can sit several meters off the true line. So the readout shows the GPS accuracy beside the distance, and when the accuracy is larger than the distance to the line it says the phone may be on either side. The "not a legal survey" statement is shown with it.
+- **When a choice has to be made between features, this one wins**: the marker and the parcel lines are drawn above every other layer, are readable in all three base views, and are tested hardest.
