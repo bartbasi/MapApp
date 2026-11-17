@@ -9,7 +9,9 @@
 // replaces every owner name the screens show with OWNER_MASK_TEXT, so
 // evidence screenshots can be kept. A production build cannot turn it on:
 // OwnerMask ignores every request unless it was created as allowed, and the
-// app creates it allowed only when import.meta.env.DEV is true.
+// app creates it allowed only when import.meta.env.DEV is true, or when the
+// build was made with VITE_MAPAPP_MASK_OWNERS=1 (a test build for emulator
+// screenshots, which starts masked and is never given to a user).
 
 /** What a masked owner name reads as. */
 export const OWNER_MASK_TEXT = 'OWNER NAME';

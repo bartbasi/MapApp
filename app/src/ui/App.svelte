@@ -82,9 +82,15 @@
   let tapped = $state.raw<{ lookup: ParcelLookup; at: ParcelPoint } | null>(null);
   let tapSeq = 0;
 
-  // Development only: owner names can be masked for evidence screenshots.
-  // A production build creates the mask as not allowed, so it never masks.
-  const ownerMask = new OwnerMask(import.meta.env.DEV, import.meta.env.DEV && maskRequested(location.search));
+  // Owner names can be masked for evidence screenshots, in two cases only:
+  // a development build, or a test build made with VITE_MAPAPP_MASK_OWNERS=1
+  // (for screenshots on the emulator, where there is no query string to set).
+  // Any other build creates the mask as not allowed, so it never masks.
+  const maskBuild = import.meta.env.VITE_MAPAPP_MASK_OWNERS === '1';
+  const ownerMask = new OwnerMask(
+    import.meta.env.DEV || maskBuild,
+    maskBuild || (import.meta.env.DEV && maskRequested(location.search)),
+  );
   let masked = $state(ownerMask.on);
   ownerMask.subscribe((on) => (masked = on));
 
