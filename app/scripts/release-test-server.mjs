@@ -96,9 +96,11 @@ function serveFile(req, res, name, note) {
   fileResponses += 1;
   const cutAt = dropEvery > 0 && fileResponses % dropEvery === 0 ? dropAfter : Infinity;
   let sent = 0;
+  let logged = false;
   const stream = createReadStream(path, { start, end, highWaterMark: 64 * 1024 });
   stream.on('data', (chunk) => {
     if (sent + chunk.length > cutAt) {
+      logged = true;
       stream.destroy();
       res.destroy();
       return log(req, status, `${note} CUT`, sent);
@@ -115,10 +117,18 @@ function serveFile(req, res, name, note) {
   });
   stream.on('end', () => {
     res.end();
+    logged = true;
     log(req, status, note, sent);
   });
   stream.on('error', () => res.destroy());
-  res.on('close', () => stream.destroy());
+  res.on('close', () => {
+    stream.destroy();
+    // A response the client or the server cut short is printed too.
+    if (!logged && !res.writableFinished) {
+      logged = true;
+      log(req, status, `${note} CLOSED EARLY`, sent);
+    }
+  });
 }
 
 function finish(req, res, status, note) {
