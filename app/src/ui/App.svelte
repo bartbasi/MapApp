@@ -11,7 +11,9 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import { detectPlatform } from '../platform';
-  import type { LngLat } from 'maplibre-gl';
+  import type { LngLat, Map as MapLibreMap } from 'maplibre-gl';
+  import type { DownloadService } from '../downloads/contract';
+  import type { Bounds } from '../map/tile-math';
   import type { ArchiveSource } from '../platform/archive-meta';
   import type { Platform } from '../platform/platform';
   import { loadDataSession, presentPublicLandCategories, type CategoryList, type DataSession } from '../map/data-session';
@@ -44,8 +46,14 @@
   import PositionReadout from './PositionReadout.svelte';
   import PublicLandDetails from './PublicLandDetails.svelte';
   import SourcesScreen from './SourcesScreen.svelte';
+  import AreaOverlay from './downloads/AreaOverlay.svelte';
+  import DownloadInvite from './downloads/DownloadInvite.svelte';
+  import DownloadsButton from './downloads/DownloadsButton.svelte';
+  import DownloadsScreen from './downloads/DownloadsScreen.svelte';
+  import { connectDownloads } from './downloads/connect';
+  import { DownloadsUi } from './downloads/downloads-ui.svelte';
 
-  type PanelName = 'layers' | 'details' | 'sources' | 'diagnostics';
+  type PanelName = 'layers' | 'details' | 'sources' | 'diagnostics' | 'downloads';
 
   // The platform is known at once; the position store needs it before the map exists.
   const platformImpl = detectPlatform();
@@ -58,6 +66,12 @@
   let chromeBottom = $state(28);
   let mapView: MapView | null = null;
   let mapContainer: HTMLDivElement;
+  /** The MapLibre map, once made, for the download screens' frame and outlines. */
+  let mapRef = $state.raw<MapLibreMap | null>(null);
+
+  // Offline downloads (Step 3). Null where the platform cannot download; then nothing about downloads shows.
+  let downloads = $state.raw<DownloadService | null>(null);
+  const downloadsUi = new DownloadsUi();
 
   let session = $state.raw<DataSession | null>(null);
   let loadError = $state('');
@@ -104,6 +118,8 @@
   const parcelInfo = $derived(tapped ? parcelPanel(tapped.lookup, masked, countiesWithLines) : null);
   /** The parcel part of the details panel: shown alone, or under a public land site when it names a parcel. */
   const showParcelInfo = $derived(!!parcelInfo && (!site || parcelInfo.kind === 'parcels'));
+  /** What a new download includes besides the map: the overlays that are on, and imagery when the base view shows it. */
+  const layersOn = $derived(['basemap', ...(publicLandOn ? ['publicland'] : []), ...(parcelsOn ? ['parcels'] : []), ...(shownView !== 'map' ? ['aerial'] : [])]);
 
   function styleOptions(): StyleOptions {
     return {
@@ -121,6 +137,9 @@
     (async () => {
       try {
         platform = platformImpl;
+        void connectDownloads(platformImpl).then((d) => {
+          if (!cancelled) downloads = d;
+        });
         const s = await loadDataSession(platform);
         if (cancelled) return;
         session = s;
@@ -131,6 +150,7 @@
           onUserMove: () => position.userMovedMap(),
         });
         const view = mapView;
+        mapRef = view.map;
         const parcelArchives = parcelArchivesFrom(s.archives);
         if (parcelArchives.length > 0) {
           parcelSource = new StoredParcelSource(parcelArchives);
@@ -262,7 +282,8 @@
    * the property lines are on and the map is close enough to show them.
    */
   async function onMapTap(t: MapTap) {
-    if (frameRunning) return;
+    // While an area is being framed, a tap belongs to moving the map.
+    if (frameRunning || (panel === 'downloads' && downloadsUi.mode === 'pick')) return;
     const seq = ++tapSeq;
     const at: ParcelPoint = { lng: t.at.lng, lat: t.at.lat };
     let lookup: ParcelLookup | null = null;
@@ -328,6 +349,7 @@
   }
 
   function close() {
+    if (panel === 'downloads') downloadsUi.mode = 'list';
     panel = null;
     site = null;
     tapped = null;
@@ -366,7 +388,16 @@
     details: 'Public land',
     sources: 'Sources and licenses',
     diagnostics: 'Diagnostics',
+    downloads: 'Offline maps',
   };
+
+  /** Moves the map so a download's rectangle shows, clear of the top controls and of a bottom sheet. */
+  async function showArea(b: Bounds) {
+    await tick();
+    if (!mapView) return;
+    mapView.map.resize();
+    mapView.map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: { top: 90, left: 24, right: 84, bottom: Math.max(sheetHeight(), 24) + 24 }, maxZoom: 16, duration: 600 });
+  }
 </script>
 
 <div class="app">
@@ -389,6 +420,10 @@
       <button class="round" onclick={() => (panel === 'layers' ? close() : open('layers'))} aria-label="Layers" aria-pressed={panel === 'layers'}>
         <Icon name="layers" size={26} />
       </button>
+      <!-- Hidden while an area is framed, so the frame can use the top of the map; the panel's own close button ends it. -->
+      {#if downloads && !(panel === 'downloads' && downloadsUi.mode === 'pick')}
+        <DownloadsButton service={downloads} pressed={panel === 'downloads'} onTap={() => (panel === 'downloads' ? close() : open('downloads'))} />
+      {/if}
       {#if Math.abs(bearing) > 0.5}
         <button class="round" onclick={() => mapView?.resetNorth()} aria-label="Point north up">
           <!-- A compass needle: the dark half with the N points north. -->
@@ -399,6 +434,11 @@
         </button>
       {/if}
     </div>
+
+    {#if downloads && mapRef}
+      <AreaOverlay map={mapRef} ui={downloadsUi} service={downloads} active={panel === 'downloads'} />
+      <DownloadInvite map={mapRef} {installed} service={downloads} hidden={panel === 'downloads' || frameRunning} onOpen={() => open('downloads')} />
+    {/if}
 
     {#if loadError}
       <div class="notice" role="alert">The map data could not be loaded: {loadError}</div>
@@ -414,9 +454,9 @@
     <!-- A new panel starts scrolled to the top. A fold does not change the key, so it keeps its place. -->
     {#key panel}
     <Panel
-      title={panel === 'details' ? (site ? site.name || panelTitles.details : parcelInfo?.kind === 'parcels' ? 'Parcel' : 'Property lines') : panelTitles[panel]}
+      title={panel === 'details' ? (site ? site.name || panelTitles.details : parcelInfo?.kind === 'parcels' ? 'Parcel' : 'Property lines') : panel === 'downloads' && downloadsUi.mode === 'pick' ? 'Pick an area' : panelTitles[panel]}
       onClose={close}
-      onBack={panel === 'sources' ? () => open('layers') : panel === 'diagnostics' ? () => open('sources') : undefined}
+      onBack={panel === 'sources' ? () => open('layers') : panel === 'diagnostics' ? () => open('sources') : panel === 'downloads' && downloadsUi.mode === 'pick' ? () => (downloadsUi.mode = 'list') : undefined}
     >
       {#if panel === 'layers'}
         <LayersPanel
@@ -438,8 +478,16 @@
           {#if site}<hr class="split" />{/if}
           <ParcelDetails panel={parcelInfo} />
         {/if}
+      {:else if panel === 'downloads' && downloads}
+        <DownloadsScreen
+          service={downloads}
+          ui={downloadsUi}
+          {layersOn}
+          onShowArea={(b) => void showArea(b)}
+          onZoom={(d) => (d > 0 ? mapView?.map.zoomIn() : mapView?.map.zoomOut())}
+        />
       {:else if panel === 'sources'}
-        <SourcesScreen entries={session?.entries ?? []} onOpenDiagnostics={() => open('diagnostics')} />
+        <SourcesScreen entries={session?.entries ?? []} areaNames={new Map((downloads?.areas() ?? []).map((a) => [a.record.id, a.record.name]))} onOpenDiagnostics={() => open('diagnostics')} />
       {:else if panel === 'diagnostics'}
         <DiagnosticsScreen
           platform={platform?.kind ?? 'unknown'}

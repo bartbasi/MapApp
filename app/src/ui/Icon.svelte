@@ -26,7 +26,20 @@
     | 'caution'
     | 'gap'
     | 'weak-gps'
-    | 'no-lines';
+    | 'no-lines'
+    | 'download'
+    | 'pause'
+    | 'resume'
+    | 'trash'
+    | 'check'
+    | 'clock'
+    | 'offline'
+    | 'mobile-data'
+    | 'retry'
+    | 'frame'
+    | 'show-area'
+    | 'bigger'
+    | 'smaller';
 </script>
 
 <script lang="ts">
@@ -123,6 +136,55 @@
     <!-- A plot drawn in dashes: no property lines here. -->
     <path d="M4 5h16v14H4z" stroke-dasharray="3 2.6" stroke-width="2" />
     <path d="M9 12h6" stroke-width="2.2" />
+  {:else if name === 'download'}
+    <!-- An arrow dropping into an open tray: keep this on the phone. -->
+    <path d="M12 3v11.5M7 9.8l5 5 5-5" stroke-width="2.5" />
+    <path d="M3.5 15v3.5a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2V15" stroke-width="2.3" />
+  {:else if name === 'pause'}
+    <rect x="5.5" y="4.5" width="4.5" height="15" rx="1.2" fill="currentColor" stroke="none" />
+    <rect x="14" y="4.5" width="4.5" height="15" rx="1.2" fill="currentColor" stroke="none" />
+  {:else if name === 'resume'}
+    <path d="M7 4.5v15l12.5-7.5z" fill="currentColor" stroke-width="1.8" />
+  {:else if name === 'trash'}
+    <!-- A bin with its lid lifted a little. -->
+    <path d="M3.5 6.5h17M9.5 6.5V3.8h5v2.7" stroke-width="2.2" />
+    <path d="M6 6.5 7.2 20.2h9.6L18 6.5" stroke-width="2.2" />
+    <path d="M10 10.5v6M14 10.5v6" stroke-width="1.8" />
+  {:else if name === 'check'}
+    <!-- A tick in a ring: done. -->
+    <circle cx="12" cy="12" r="9.2" stroke-width="2.3" />
+    <path d="m7.4 12.4 3.1 3.1 6.1-6.6" stroke-width="2.7" />
+  {:else if name === 'clock'}
+    <!-- A clock face: waiting its turn. -->
+    <circle cx="12" cy="12" r="9.2" stroke-width="2.3" />
+    <path d="M12 6.8v5.6l3.8 2.3" stroke-width="2.4" />
+  {:else if name === 'offline'}
+    <!-- Three arcs of a signal, crossed out: no connection. -->
+    <path d="M2.8 9.2a13.5 13.5 0 0 1 18.4 0M6.2 12.8a8.6 8.6 0 0 1 11.6 0M9.4 16.3a3.9 3.9 0 0 1 5.2 0" stroke-width="2.1" />
+    <circle cx="12" cy="19.6" r="1.4" fill="currentColor" stroke="none" />
+    <path d="M4 3.2 20 20.8" stroke-width="2.6" />
+  {:else if name === 'mobile-data'}
+    <!-- One arrow up and one down, side by side: data going to and from the phone. -->
+    <path d="M8 19.5V5M4.3 8.7 8 5l3.7 3.7" stroke-width="2.4" />
+    <path d="M16 4.5V19M12.3 15.3 16 19l3.7-3.7" stroke-width="2.4" />
+  {:else if name === 'retry'}
+    <!-- An arrow going round: try again. -->
+    <path d="M19.6 12.5A7.6 7.6 0 1 1 17.2 6.6" stroke-width="2.4" />
+    <path d="M19.8 3.6v4.8H15" stroke-width="2.4" />
+  {:else if name === 'frame'}
+    <!-- Four corners of a frame around a spot: pick an area. -->
+    <path d="M3.5 8.5v-5h5M15.5 3.5h5v5M20.5 15.5v5h-5M8.5 20.5h-5v-5" stroke-width="2.5" />
+    <path d="M12 8.5v7M8.5 12h7" stroke-width="2.2" />
+  {:else if name === 'show-area'}
+    <!-- A dashed outline with a dot in it: where this download is. -->
+    <rect x="3.5" y="4.5" width="17" height="15" rx="1.5" stroke-dasharray="3.4 2.4" stroke-width="2.1" />
+    <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
+  {:else if name === 'bigger'}
+    <!-- Arrows out to two corners: take in more ground. -->
+    <path d="M13.5 10.5 20 4M14.5 4H20v5.5M10.5 13.5 4 20M9.5 20H4v-5.5" stroke-width="2.4" />
+  {:else if name === 'smaller'}
+    <!-- Arrows in from two corners: take in less ground. -->
+    <path d="M20 4l-6.5 6.5M13.5 5v5.5H19M4 20l6.5-6.5M10.5 19v-5.5H5" stroke-width="2.4" />
   {/if}
 </svg>
 

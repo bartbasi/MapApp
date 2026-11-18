@@ -3,32 +3,42 @@
   Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE.
 -->
 <!--
-  Every installed archive and every source in it, straight from the archives'
-  metadata files. Nothing here is written per source.
+  Every installed layer and every source in it, straight from the archives'
+  metadata files. Nothing here is written per source. A layer that is on the
+  phone several times (the overview map, downloaded counties and areas) is
+  listed once, with each place it covers (sources-groups.ts).
 -->
 <script lang="ts">
-  import { layerTitle } from '../map/installed';
   import type { ArchiveEntry } from '../platform/archive-meta';
   import { formatBytes, formatDate } from './format';
   import Icon from './Icon.svelte';
+  import { groupSources } from './sources-groups';
 
   interface Props {
     entries: ArchiveEntry[];
+    /** The name of each downloaded area, by its ID, to say which download a copy belongs to. */
+    areaNames?: ReadonlyMap<string, string>;
     onOpenDiagnostics: () => void;
   }
 
-  let { entries, onOpenDiagnostics }: Props = $props();
+  let { entries, areaNames = new Map(), onOpenDiagnostics }: Props = $props();
+
+  const groups = $derived(groupSources(entries, areaNames));
 </script>
 
 {#if entries.length === 0}
   <p>No map data is installed.</p>
 {/if}
 
-{#each entries as entry (`${entry.county}/${entry.layer}`)}
+{#each groups as group (group.layer)}
   <article>
-    <h3>{layerTitle(entry)}</h3>
-    <p class="muted">{entry.meta.countyName}. Built {formatDate(entry.meta.buildDate)}, {formatBytes(entry.meta.bytes)}.</p>
-    {#each entry.meta.sources as source, i (i)}
+    <h3>{group.title}</h3>
+    <ul class="places">
+      {#each group.places as place (place.key)}
+        <li class="muted">{place.where}. Built {formatDate(place.buildDate)}, {formatBytes(place.bytes)}.</li>
+      {/each}
+    </ul>
+    {#each group.sources as source, i (i)}
       <dl>
         <dt>Source</dt>
         <dd>
@@ -46,9 +56,9 @@
         <dd>{formatDate(source.dataDate)}</dd>
       </dl>
     {/each}
-    {#if entry.meta.notes}
-      <p class="notes">{entry.meta.notes}</p>
-    {/if}
+    {#each group.notes as note (note)}
+      <p class="notes">{note}</p>
+    {/each}
   </article>
 {/each}
 
@@ -98,6 +108,16 @@
     display: inline-flex;
     align-items: center;
     min-height: var(--touch);
+  }
+
+  .places {
+    list-style: none;
+    margin: 2px 0 0;
+    padding: 0;
+  }
+
+  .places li + li {
+    margin-top: 2px;
   }
 
   .muted {
