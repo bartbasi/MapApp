@@ -65,8 +65,14 @@ final class AreaJob {
     /** Order of starting: the queue runs areas in this order. */
     final long seq;
     final List<FileSpec> files;
+    /**
+     * May this area fetch over a connection charged by use (contract.ts
+     * AreaJob.allowMetered)? A job stored before the field existed has none,
+     * which counts as false.
+     */
+    final boolean allowMetered;
 
-    AreaJob(String id, String record, long seq, List<FileSpec> files) {
+    AreaJob(String id, String record, long seq, List<FileSpec> files, boolean allowMetered) {
         if (!ArchiveIds.isId(id)) throw new IllegalArgumentException("bad area ID: " + id);
         if (record == null) throw new IllegalArgumentException("no record");
         if (files.isEmpty()) throw new IllegalArgumentException("an area needs at least one file");
@@ -78,6 +84,17 @@ final class AreaJob {
         this.record = record;
         this.seq = seq;
         this.files = Collections.unmodifiableList(new ArrayList<>(files));
+        this.allowMetered = allowMetered;
+    }
+
+    /** The same job with another seq. */
+    AreaJob withSeq(long newSeq) {
+        return new AreaJob(id, record, newSeq, files, allowMetered);
+    }
+
+    /** The same job with another choice about metered connections. */
+    AreaJob withAllowMetered(boolean allow) {
+        return new AreaJob(id, record, seq, files, allow);
     }
 
     long totalBytes() {
@@ -94,8 +111,9 @@ final class AreaJob {
 
     /**
      * Reads a job as the web app sends it or as job.json holds it:
-     * { id, record, seq?, files: [{ county, layer, url, etag?, headBytes,
-     * ranges: [offset, length, ...], bytes, sha256?, meta }] }.
+     * { id, record, seq?, allowMetered?, files: [{ county, layer, url, etag?,
+     * headBytes, ranges: [offset, length, ...], bytes, sha256?, meta }] }.
+     * allowMetered is true only when given as the JSON value true.
      */
     static AreaJob fromJson(JSONObject o, long seqIfAbsent) throws JSONException {
         JSONArray fa = o.getJSONArray("files");
@@ -117,7 +135,8 @@ final class AreaJob {
                 f.getString("meta")
             ));
         }
-        return new AreaJob(o.getString("id"), o.getString("record"), o.optLong("seq", seqIfAbsent), files);
+        boolean allowMetered = Boolean.TRUE.equals(o.opt("allowMetered"));
+        return new AreaJob(o.getString("id"), o.getString("record"), o.optLong("seq", seqIfAbsent), files, allowMetered);
     }
 
     /** A whole number from the array; a fraction or a number past 2^53 is refused. */
@@ -137,6 +156,7 @@ final class AreaJob {
         o.put("id", id);
         o.put("record", record);
         o.put("seq", seq);
+        o.put("allowMetered", allowMetered);
         JSONArray fa = new JSONArray();
         for (FileSpec f : files) {
             JSONObject j = new JSONObject();

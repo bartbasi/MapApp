@@ -71,6 +71,12 @@ public class RangeResponseTest {
     }
 
     @Test
+    public void anyClientErrorButRangeFromASignedAddressIsTriedFromTheOriginal() {
+        for (int s : new int[] { 400, 401, 403, 404, 410, 408, 429, 499 }) assertTrue(String.valueOf(s), RangeResponse.renewFromOriginal(s));
+        for (int s : new int[] { 416, 200, 206, 302, 500, 503 }) assertFalse(String.valueOf(s), RangeResponse.renewFromOriginal(s));
+    }
+
+    @Test
     public void contentRangeParsing() {
         RangeResponse.ContentRange r = RangeResponse.parseContentRange("bytes 0-0/1");
         assertEquals(0, r.first);

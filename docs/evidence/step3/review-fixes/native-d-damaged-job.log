@@ -1,0 +1,36 @@
+# Review fix 6: an area whose job.json is damaged, on the emulator
+# 2026-11-17 (UTC 2026-11-18), emulator-5554.
+
+Before: four areas. a0mwlhh04v-m6nntenn complete (Macon County area 1: base map, aerial, public land; 4,032,172 bytes). d-half paused at 851,968 of 140,565,035 bytes.
+damaged a0mwlhh04v-m6nntenn/job.json (truncated to 5 bytes): '{"v":'
+total 20
+-rw------- 1 u0_a220 u0_a220    0 2026-11-17 20:11 complete
+drwx------ 2 u0_a220 u0_a220 4096 2026-11-17 20:11 il-macon
+-rw------- 1 u0_a220 u0_a220    5 2026-11-17 20:47 job.json
+damaged d-half/job.json (truncated to 5 bytes): '{"v":'
+total 860
+-rw------- 1 u0_a220 u0_a220      6 2026-11-17 20:45 0.ckpt
+-rw------- 1 u0_a220 u0_a220 851968 2026-11-17 20:45 0.part
+-rw------- 1 u0_a220 u0_a220      5 2026-11-17 20:47 job.json
+-rw------- 1 u0_a220 u0_a220     19 2026-11-17 20:45 state.json
+--- after reopening (am force-stop, am start)
+11-17 20:47:58.645  5091  5091 W MapAppDownloads: area a0mwlhh04v-m6nntenn is complete but its job cannot be read; kept, with an empty record
+11-17 20:47:58.650  5091  5091 W MapAppDownloads: area d-half was incomplete and its job cannot be read; deleted
+11-17 20:47:58.665  5091  5091 I MapAppArchives: installed archives: [_area/a0mwlh6qtr-194epcy0/il-champaign/aerial, _area/a0mwlhh04v-m6nntenn/il-macon/aerial, _area/a0mwlhh04v-m6nntenn/il-macon/basemap, _area/a0mwlhh04v-m6nntenn/il-macon/publicland, _area/a0mwlificq-s6i7jd1j/il-champaign/basemap, _area/a0mwlificq-s6i7jd1j/il-champaign/publicland, il-macon/parcels, overview/basemap]
+11-17 20:47:58.674  5091  5091 I MapAppArchives: installed archives: [_area/a0mwlh6qtr-194epcy0/il-champaign/aerial, _area/a0mwlhh04v-m6nntenn/il-macon/aerial, _area/a0mwlhh04v-m6nntenn/il-macon/basemap, _area/a0mwlhh04v-m6nntenn/il-macon/publicland, _area/a0mwlificq-s6i7jd1j/il-champaign/basemap, _area/a0mwlificq-s6i7jd1j/il-champaign/publicland, il-macon/parcels, overview/basemap]
+11-17 20:47:58.675  5091  5091 I MapAppDownloads: loaded 3 areas from /data/user/0/io.github.bartbasi.mapapp/no_backup/areas
+DownloadJobs.list(): [{"id":"a0mwlhh04v-m6nntenn","status":"complete","allowMetered":false,"done":4032172,"total":4032172},{"id":"a0mwlh6qtr-194epcy0","status":"complete","allowMetered":false,"done":225572890,"total":225572890},{"id":"a0mwlificq-s6i7jd1j","status":"complete","allowMetered":true,"done":12168646,"total":12168646}]
+the damaged complete area: "{\"id\":\"a0mwlhh04v-m6nntenn\",\"record\":\"\",\"status\":\"complete\",\"allowMetered\":false,\"bytesDone\":4032172,\"bytesTotal\":4032172}"
+Archives.list(): "a0mwlh6qtr-194epcy0:il-champaign/aerial, a0mwlhh04v-m6nntenn:il-macon/aerial, a0mwlhh04v-m6nntenn:il-macon/basemap, a0mwlhh04v-m6nntenn:il-macon/publicland, a0mwlificq-s6i7jd1j:il-champaign/basemap, a0mwlificq-s6i7jd1j:il-champaign/publicland, bundled:il-macon/parcels, bundled:overview/basemap"
+read through the shell: "200 PMTiles"
+folder:
+total 40
+drwx------ 5 u0_a220 u0_a220 4096 2026-11-17 20:47 .
+drwxrwx--x 3 u0_a220 u0_a220 4096 2026-11-17 19:43 ..
+drwx------ 3 u0_a220 u0_a220 4096 2026-11-17 20:03 a0mwlh6qtr-194epcy0
+drwx------ 3 u0_a220 u0_a220 4096 2026-11-17 20:11 a0mwlhh04v-m6nntenn
+drwx------ 3 u0_a220 u0_a220 4096 2026-11-17 20:37 a0mwlificq-s6i7jd1j
+
+Result: the complete area stays listed (status complete, empty record, 4,032,172 bytes from its archives) and its three archives stay in the
+archive list and read through the shell. The incomplete area was deleted at load; it had never been in the archive list, so the list agrees.
+Screen: native-04 shows it as 'Unreadable download', 'Cannot be used', with Delete (the screens' words; its archives still draw on the map).

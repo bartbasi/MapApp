@@ -1,0 +1,99 @@
+# Review fix 5: remove wins over the worker, on the emulator
+# 2026-11-17 (UTC 2026-11-18), emulator-5554, server at full speed.
+# Each round: start a whole-file area (il-macon publicland, 99,815 bytes, sha256 checked), wait the delay, remove it, wait 300 ms,
+# then ask the downloader's list and the archive plugin's list for it. completeBeforeRemove: the 'complete' event had arrived before
+# remove was called. completeEventAtAll: it arrived at any time, including while remove ran (the race the review found).
+
+race-0 delay=0ms removeReturnedAt=91ms completeBeforeRemove=false completeEventAtAll=false listed=false archiveListed=false
+race-1 delay=50ms removeReturnedAt=108ms completeBeforeRemove=false completeEventAtAll=false listed=false archiveListed=false
+race-2 delay=100ms removeReturnedAt=136ms completeBeforeRemove=false completeEventAtAll=false listed=false archiveListed=false
+race-3 delay=150ms removeReturnedAt=178ms completeBeforeRemove=false completeEventAtAll=false listed=false archiveListed=false
+race-4 delay=200ms removeReturnedAt=238ms completeBeforeRemove=false completeEventAtAll=false listed=false archiveListed=false
+race-5 delay=250ms removeReturnedAt=280ms completeBeforeRemove=false completeEventAtAll=false listed=false archiveListed=false
+race-6 delay=300ms removeReturnedAt=335ms completeBeforeRemove=false completeEventAtAll=false listed=false archiveListed=false
+race-7 delay=350ms removeReturnedAt=374ms completeBeforeRemove=false completeEventAtAll=false listed=false archiveListed=false
+race-8 delay=400ms removeReturnedAt=469ms completeBeforeRemove=false completeEventAtAll=false listed=false archiveListed=false
+race-9 delay=450ms removeReturnedAt=482ms completeBeforeRemove=false completeEventAtAll=false listed=false archiveListed=false
+race-10 delay=500ms removeReturnedAt=614ms completeBeforeRemove=false completeEventAtAll=false listed=false archiveListed=false
+race-11 delay=600ms removeReturnedAt=669ms completeBeforeRemove=false completeEventAtAll=false listed=false archiveListed=false
+race-12 delay=700ms removeReturnedAt=936ms completeBeforeRemove=true completeEventAtAll=true listed=false archiveListed=false
+race-13 delay=800ms removeReturnedAt=813ms completeBeforeRemove=true completeEventAtAll=true listed=false archiveListed=false
+race-14 delay=1000ms removeReturnedAt=1024ms completeBeforeRemove=true completeEventAtAll=true listed=false archiveListed=false
+race-15 delay=1500ms removeReturnedAt=1508ms completeBeforeRemove=true completeEventAtAll=true listed=false archiveListed=false
+tight-0 delay=560ms removeReturnedAt=623ms completeBeforeRemove=false completeEventAtAll=false listed=false archiveListed=false
+tight-1 delay=568ms removeReturnedAt=662ms completeBeforeRemove=false completeEventAtAll=true listed=false archiveListed=false
+tight-2 delay=576ms removeReturnedAt=613ms completeBeforeRemove=false completeEventAtAll=false listed=false archiveListed=false
+tight-3 delay=584ms removeReturnedAt=625ms completeBeforeRemove=false completeEventAtAll=false listed=false archiveListed=false
+tight-4 delay=592ms removeReturnedAt=629ms completeBeforeRemove=false completeEventAtAll=false listed=false archiveListed=false
+tight-5 delay=600ms removeReturnedAt=640ms completeBeforeRemove=false completeEventAtAll=true listed=false archiveListed=false
+tight-6 delay=608ms removeReturnedAt=637ms completeBeforeRemove=false completeEventAtAll=true listed=false archiveListed=false
+tight-7 delay=616ms removeReturnedAt=637ms completeBeforeRemove=false completeEventAtAll=true listed=false archiveListed=false
+tight-8 delay=624ms removeReturnedAt=649ms completeBeforeRemove=false completeEventAtAll=true listed=false archiveListed=false
+tight-9 delay=632ms removeReturnedAt=687ms completeBeforeRemove=true completeEventAtAll=true listed=false archiveListed=false
+tight-10 delay=640ms removeReturnedAt=661ms completeBeforeRemove=true completeEventAtAll=true listed=false archiveListed=false
+tight-11 delay=648ms removeReturnedAt=666ms completeBeforeRemove=true completeEventAtAll=true listed=false archiveListed=false
+tight-12 delay=656ms removeReturnedAt=686ms completeBeforeRemove=true completeEventAtAll=true listed=false archiveListed=false
+tight-13 delay=664ms removeReturnedAt=682ms completeBeforeRemove=true completeEventAtAll=true listed=false archiveListed=false
+tight-14 delay=672ms removeReturnedAt=703ms completeBeforeRemove=false completeEventAtAll=true listed=false archiveListed=false
+tight-15 delay=680ms removeReturnedAt=710ms completeBeforeRemove=true completeEventAtAll=true listed=false archiveListed=false
+tight-16 delay=688ms removeReturnedAt=699ms completeBeforeRemove=true completeEventAtAll=true listed=false archiveListed=false
+tight-17 delay=696ms removeReturnedAt=718ms completeBeforeRemove=true completeEventAtAll=true listed=false archiveListed=false
+tight-18 delay=704ms removeReturnedAt=724ms completeBeforeRemove=true completeEventAtAll=true listed=false archiveListed=false
+tight-19 delay=712ms removeReturnedAt=752ms completeBeforeRemove=true completeEventAtAll=true listed=false archiveListed=false
+tight-20 delay=720ms removeReturnedAt=762ms completeBeforeRemove=true completeEventAtAll=true listed=false archiveListed=false
+tight-21 delay=728ms removeReturnedAt=748ms completeBeforeRemove=true completeEventAtAll=true listed=false archiveListed=false
+tight-22 delay=736ms removeReturnedAt=780ms completeBeforeRemove=true completeEventAtAll=true listed=false archiveListed=false
+tight-23 delay=744ms removeReturnedAt=761ms completeBeforeRemove=true completeEventAtAll=true listed=false archiveListed=false
+tight-24 delay=752ms removeReturnedAt=802ms completeBeforeRemove=true completeEventAtAll=true listed=false archiveListed=false
+
+41 rounds. Removed before completing: 16. Completed before remove was called: 19 (removed as complete areas).
+Completed while remove was running (the race): 6 (tight-1, tight-5 to tight-8, tight-14). In every round the area was gone from both lists.
+
+## The folder right after the rounds, and 10 s later (no race-*, tight-* or .trash-* folder; .staging is the empty staging folder)
+total 56
+drwx------ 7 u0_a220 u0_a220 4096 2026-11-17 20:44 .
+drwxrwx--x 3 u0_a220 u0_a220 4096 2026-11-17 19:43 ..
+drwx------ 2 u0_a220 u0_a220 4096 2026-11-17 20:44 .staging
+drwx------ 3 u0_a220 u0_a220 4096 2026-11-17 20:03 a0mwlh6qtr-194epcy0
+drwx------ 3 u0_a220 u0_a220 4096 2026-11-17 20:11 a0mwlhh04v-m6nntenn
+drwx------ 3 u0_a220 u0_a220 4096 2026-11-17 20:42 a0mwli8vcr-z8r2yxn9
+drwx------ 3 u0_a220 u0_a220 4096 2026-11-17 20:37 a0mwlificq-s6i7jd1j
+--- 10 s later
+total 56
+drwx------ 7 u0_a220 u0_a220 4096 2026-11-17 20:44 .
+drwxrwx--x 3 u0_a220 u0_a220 4096 2026-11-17 19:43 ..
+drwx------ 2 u0_a220 u0_a220 4096 2026-11-17 20:44 .staging
+drwx------ 3 u0_a220 u0_a220 4096 2026-11-17 20:03 a0mwlh6qtr-194epcy0
+drwx------ 3 u0_a220 u0_a220 4096 2026-11-17 20:11 a0mwlhh04v-m6nntenn
+drwx------ 3 u0_a220 u0_a220 4096 2026-11-17 20:42 a0mwli8vcr-z8r2yxn9
+drwx------ 3 u0_a220 u0_a220 4096 2026-11-17 20:37 a0mwlificq-s6i7jd1j
+
+## Remove in the middle of a large download (Macon County, 145 MB, at 92.8 MB)
+"resumed"
+02:45:17.734 UTC before: [('downloading', 92770959)]
+no_backup/areas/a0mwli8vcr-z8r2yxn9:
+total 87728
+-rw------- 1 u0_a220 u0_a220        8 2026-11-17 20:45 1.ckpt
+-rw------- 1 u0_a220 u0_a220 89793670 2026-11-17 20:45 1.part
+drwx------ 2 u0_a220 u0_a220     4096 2026-11-17 20:31 il-macon
+-rw------- 1 u0_a220 u0_a220     4534 2026-11-17 20:34 job.json
+
+no_backup/areas/a0mwli8vcr-z8r2yxn9/il-macon:
+total 4184
+-rw------- 1 u0_a220 u0_a220    1115 2026-11-17 20:31 basemap.meta.json
+-rw------- 1 u0_a220 u0_a220 4271625 2026-11-17 20:31 basemap.pmtiles
+"removed"
+remove returned after 529 ms (including the driver)
+ls: no_backup/areas/a0mwli8vcr-z8r2yxn9: No such file or directory
+10 s later:
+total 48
+drwx------ 6 u0_a220 u0_a220 4096 2026-11-17 20:45 .
+drwxrwx--x 3 u0_a220 u0_a220 4096 2026-11-17 19:43 ..
+drwx------ 2 u0_a220 u0_a220 4096 2026-11-17 20:44 .staging
+drwx------ 3 u0_a220 u0_a220 4096 2026-11-17 20:03 a0mwlh6qtr-194epcy0
+drwx------ 3 u0_a220 u0_a220 4096 2026-11-17 20:11 a0mwlhh04v-m6nntenn
+drwx------ 3 u0_a220 u0_a220 4096 2026-11-17 20:37 a0mwlificq-s6i7jd1j
+11-17 20:45:11.136  4315  4727 I MapAppDownloads: wake lock taken for 120 s
+11-17 20:45:18.531  4315  4727 I MapAppDownloads: wake lock let go
+11-17 20:45:18.588  4315  4379 I MapAppDownloads: area a0mwli8vcr-z8r2yxn9 removed
+No server request after the removal (173 lines before and 5 s after).

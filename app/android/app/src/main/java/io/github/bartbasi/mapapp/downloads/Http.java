@@ -3,10 +3,12 @@
 
 package io.github.bartbasi.mapapp.downloads;
 
+import android.security.NetworkSecurityPolicy;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.UnknownServiceException;
 import java.util.Locale;
 
 /**
@@ -28,6 +30,24 @@ final class Http {
     private static final int MAX_REDIRECTS = 5;
 
     private Http() {}
+
+    /** Whether plain http to a host is allowed in this build. */
+    interface Cleartext {
+        boolean permitted(String host);
+    }
+
+    /**
+     * The build's network security config: plain http only to the test server
+     * in a debug build, never in a release build. Where the platform class gives
+     * nothing (laptop tests), http is allowed.
+     */
+    static final Cleartext BUILD_POLICY = host -> {
+        NetworkSecurityPolicy p = NetworkSecurityPolicy.getInstance();
+        return p == null || p.isCleartextTrafficPermitted(host);
+    };
+
+    /** The policy in use. Tests replace it. */
+    static volatile Cleartext cleartext = BUILD_POLICY;
 
     /** An answered request: the open connection, its status, and the address that answered. */
     static final class Answer {
@@ -63,7 +83,10 @@ final class Http {
         }
     }
 
-    /** Thrown for an address that is not http(s), or a redirect to one. */
+    /**
+     * Thrown for an address that is not http(s), a redirect to one, or plain
+     * http where the build does not allow it. The area fails as "server".
+     */
     static final class BadAddress extends IOException {
         BadAddress(String message) {
             super(message);
@@ -92,6 +115,10 @@ final class Http {
             int status;
             try {
                 status = c.getResponseCode();
+            } catch (UnknownServiceException e) {
+                // The platform refused the address itself (cleartext not permitted).
+                c.disconnect();
+                throw new BadAddress("refused by this build: " + e.getMessage());
             } catch (IOException e) {
                 c.disconnect();
                 throw e;
@@ -122,6 +149,8 @@ final class Http {
         }
         String p = u.getProtocol().toLowerCase(Locale.ROOT);
         if (!p.equals("http") && !p.equals("https")) throw new BadAddress("only http and https: " + url);
+        // A scheme this build does not allow fails at once, never as a connection problem to retry.
+        if (p.equals("http") && !cleartext.permitted(u.getHost())) throw new BadAddress("plain http is not allowed in this build: " + url);
         return u;
     }
 

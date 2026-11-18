@@ -1,0 +1,50 @@
+# Review fix S4: the wake lock, on the emulator
+# 2026-11-17 (UTC 2026-11-18), emulator-5554, server --kbps 200, Wi-Fi.
+# The lease is taken for 120 s and renewed every 30 s while bytes arrive (WakeLease.LEASE_MS, RENEW_AFTER_MS).
+# Held for longer than 120 s without a break therefore proves renewal; the old code's 30 minute figure was not run.
+# dumpsys power counts ACQ from the first taking; Android does not reset it when the lock is renewed.
+
+02:38:15 UTC paused: [('paused', 14560777)]; lock: 
+"resumed"
+02:38:17 UTC resumed on Wi-Fi
+02:38:47 UTC [('downloading', 20524553)]; lock: PARTIAL_WAKE_LOCK                 'MapApp:download' ACQ=-31s329ms (uid=10220 pid=4315)
+02:39:19 UTC [('downloading', 26619401)]; lock: PARTIAL_WAKE_LOCK                 'MapApp:download' ACQ=-1m2s597ms LONG (uid=10220 pid=4315)
+02:39:50 UTC [('downloading', 32714249)]; lock: PARTIAL_WAKE_LOCK                 'MapApp:download' ACQ=-1m33s854ms LONG (uid=10220 pid=4315)
+02:40:21 UTC [('downloading', 38809097)]; lock: PARTIAL_WAKE_LOCK                 'MapApp:download' ACQ=-2m4s999ms LONG (uid=10220 pid=4315)
+02:40:52 UTC [('downloading', 44903945)]; lock: PARTIAL_WAKE_LOCK                 'MapApp:download' ACQ=-2m36s326ms LONG (uid=10220 pid=4315)
+02:41:24 UTC [('downloading', 51064329)]; lock: PARTIAL_WAKE_LOCK                 'MapApp:download' ACQ=-3m7s793ms LONG (uid=10220 pid=4315)
+02:41:55 UTC [('downloading', 57224713)]; lock: PARTIAL_WAKE_LOCK                 'MapApp:download' ACQ=-3m39s637ms LONG (uid=10220 pid=4315)
+02:42:27 UTC [('downloading', 63385097)]; lock: PARTIAL_WAKE_LOCK                 'MapApp:download' ACQ=-4m10s806ms LONG (uid=10220 pid=4315)
+02:42:58 UTC [('downloading', 69348873)]; lock: PARTIAL_WAKE_LOCK                 'MapApp:download' ACQ=-4m41s793ms LONG (uid=10220 pid=4315)
+"paused"
+02:43:02 UTC paused: [('paused', 69545481)]; lock: 
+--- logcat
+11-17 20:38:17.141  4315  4582 I MapAppDownloads: wake lock taken for 120 s
+11-17 20:38:17.142  4315  4582 I MapAppDownloads: file 1 (il-macon/aerial): going on from byte 10289152 of 140565035
+11-17 20:38:38.662  4315  4582 I MapAppDownloads: signed address answered 403; asking the original address again
+11-17 20:38:47.191  4315  4582 I MapAppDownloads: wake lock taken for 120 s
+11-17 20:39:00.202  4315  4582 I MapAppDownloads: signed address answered 403; asking the original address again
+11-17 20:39:17.364  4315  4582 I MapAppDownloads: wake lock taken for 120 s
+11-17 20:39:21.791  4315  4582 I MapAppDownloads: signed address answered 403; asking the original address again
+11-17 20:39:43.220  4315  4582 I MapAppDownloads: signed address answered 403; asking the original address again
+11-17 20:39:47.432  4315  4582 I MapAppDownloads: wake lock taken for 120 s
+11-17 20:40:04.682  4315  4582 I MapAppDownloads: signed address answered 403; asking the original address again
+11-17 20:40:17.473  4315  4582 I MapAppDownloads: wake lock taken for 120 s
+11-17 20:40:26.196  4315  4582 I MapAppDownloads: signed address answered 403; asking the original address again
+11-17 20:40:47.637  4315  4582 I MapAppDownloads: wake lock taken for 120 s
+11-17 20:40:47.688  4315  4582 I MapAppDownloads: signed address answered 403; asking the original address again
+11-17 20:41:09.113  4315  4582 I MapAppDownloads: signed address answered 403; asking the original address again
+11-17 20:41:17.671  4315  4582 I MapAppDownloads: wake lock taken for 120 s
+11-17 20:41:30.659  4315  4582 I MapAppDownloads: signed address answered 403; asking the original address again
+11-17 20:41:47.940  4315  4582 I MapAppDownloads: wake lock taken for 120 s
+11-17 20:41:52.296  4315  4582 I MapAppDownloads: signed address answered 403; asking the original address again
+11-17 20:42:13.871  4315  4582 I MapAppDownloads: signed address answered 403; asking the original address again
+11-17 20:42:18.068  4315  4582 I MapAppDownloads: wake lock taken for 120 s
+11-17 20:42:35.374  4315  4582 I MapAppDownloads: signed address answered 403; asking the original address again
+11-17 20:42:48.141  4315  4582 I MapAppDownloads: wake lock taken for 120 s
+11-17 20:42:56.803  4315  4582 I MapAppDownloads: signed address answered 403; asking the original address again
+11-17 20:42:59.505  4315  4582 I MapAppDownloads: wake lock let go
+
+Waiting: not held while the area waited for Wi-Fi (native-a-mobile-data.log part 3, 'wake locks named MapApp:download in dumpsys power: 0').
+Done: let go 7 ms after the Champaign County area completed, and 'not held' in dumpsys power 5 s later (native-a-mobile-data.log part 6).
+Paused: let go at 02:42:59.5, and not in dumpsys power at 02:43:02 (above).

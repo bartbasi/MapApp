@@ -60,6 +60,10 @@ public class FileDownloaderTest {
     private final AtomicInteger cuts = new AtomicInteger();
     /** A signed address works for this many requests. */
     private volatile int signedUses = Integer.MAX_VALUE;
+    /** What a signed address answers once it has run out. */
+    private volatile int expiredStatus = 403;
+    /** What the original address answers instead of redirecting, when not 0. */
+    private volatile int originalStatus = 0;
     private final AtomicInteger tokens = new AtomicInteger();
     private final java.util.Map<Integer, AtomicInteger> tokenUses = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -79,6 +83,10 @@ public class FileDownloaderTest {
         String range = req.header("Range");
         TinyHttpServer.Response r = new TinyHttpServer.Response();
         if (path.equals("/dl/hosted.pmtiles")) {
+            if (originalStatus != 0) {
+                log.add(originalStatus + " original " + range);
+                return r.status(originalStatus);
+            }
             int t = tokens.incrementAndGet();
             tokenUses.put(t, new AtomicInteger());
             log.add("302 " + range);
@@ -88,8 +96,8 @@ public class FileDownloaderTest {
         if (signed.matches()) {
             AtomicInteger uses = tokenUses.get(Integer.parseInt(signed.group(1)));
             if (uses == null || uses.incrementAndGet() > signedUses) {
-                log.add("403 " + range);
-                return r.status(403);
+                log.add(expiredStatus + " " + range);
+                return r.status(expiredStatus);
             }
         } else if (!path.equals("/hosted.pmtiles")) {
             return r.status(404);
@@ -245,6 +253,85 @@ public class FileDownloaderTest {
         assertTrue("renewed " + tokens.get() + " times", tokens.get() > 3);
         long expired = log.stream().filter(l -> l.startsWith("403 ")).count();
         assertEquals("every renewal followed a 403", tokens.get() - 1, expired);
+    }
+
+    @Test
+    public void aSignedAddressAnswering404Or400WhenItRunsOutIsRenewed() throws Exception {
+        for (int status : new int[] { 404, 400, 410 }) {
+            File dir = tmp.newFolder("expired-" + status);
+            try (java.io.FileOutputStream out = new java.io.FileOutputStream(AreaLayout.head(dir, 0))) {
+                out.write(HEAD);
+            }
+            log.clear();
+            tokens.set(0);
+            signedUses = 2;
+            expiredStatus = status;
+            downloader(dir, spec(base + "/dl/hosted.pmtiles", "\"v1\"", null), Long.MAX_VALUE).run();
+            assertFinished(dir);
+            long expired = log.stream().filter(l -> l.startsWith(status + " ")).count();
+            assertTrue(status + ": renewed " + expired + " times", expired > 2);
+            assertEquals(status + ": every expiry was followed by a fresh redirect", tokens.get() - 1, expired);
+        }
+    }
+
+    @Test
+    public void theOriginalAddressDecides() throws Exception {
+        File dir = areaWithHead();
+        signedUses = 1;
+        expiredStatus = 404;
+        AreaJob.FileSpec s = spec(base + "/dl/hosted.pmtiles", "\"v1\"", null);
+        FileDownloader d = downloader(dir, s, Long.MAX_VALUE);
+        // The first request works through a fresh signed address; the next finds it run out,
+        // goes back to the original, which now answers 404 itself: a server error, not a loop.
+        originalStatusAfterFirst(d);
+    }
+
+    private void originalStatusAfterFirst(FileDownloader d) {
+        Thread flip = new Thread(() -> {
+            while (tokens.get() < 1) Thread.yield();
+            originalStatus = 404;
+        });
+        flip.start();
+        try {
+            d.run();
+            fail("the original address's 404 must fail the file");
+        } catch (DownloadProblem p) {
+            assertEquals(DownloadProblem.Kind.FAILED, p.kind);
+            assertEquals("server", p.error);
+        }
+        assertTrue(log.toString(), log.stream().anyMatch(l -> l.startsWith("404 original")));
+        assertEquals(log.toString(), 1, log.stream().filter(l -> l.startsWith("404 original")).count());
+    }
+
+    @Test
+    public void plainHttpRefusedByTheBuildFailsAtOnceWithoutARequest() throws Exception {
+        File dir = areaWithHead();
+        Http.cleartext = host -> false;
+        try {
+            downloader(dir, spec(base + "/hosted.pmtiles", null, null), Long.MAX_VALUE).run();
+            fail("must fail");
+        } catch (DownloadProblem p) {
+            assertEquals(DownloadProblem.Kind.FAILED, p.kind);
+            assertEquals("server", p.error);
+        } finally {
+            Http.cleartext = Http.BUILD_POLICY;
+        }
+        assertEquals("no request was made", 0, log.size());
+    }
+
+    @Test
+    public void httpsIsNeverRefusedByTheCleartextRule() {
+        Http.cleartext = host -> false;
+        try {
+            Http.get("https://127.0.0.1:1/x", 0, 10, null);
+            fail("https to a closed port should not succeed");
+        } catch (Http.BadAddress e) {
+            fail("https was refused as a bad address: " + e.getMessage());
+        } catch (java.io.IOException expected) {
+            // a connection error, as it should be
+        } finally {
+            Http.cleartext = Http.BUILD_POLICY;
+        }
     }
 
     @Test

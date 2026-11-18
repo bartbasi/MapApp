@@ -151,8 +151,9 @@ final class FileDownloader {
                 request.length,
                 spec.etag
             );
-            if (verdict == RangeResponse.Verdict.EXPIRED && usedSigned) {
-                // The signed address ran out: ask the original address for a fresh one.
+            if (usedSigned && RangeResponse.renewFromOriginal(answer.status)) {
+                // The signed address may have run out, whatever 4xx it gives:
+                // ask the original address once for a fresh one. Its answer decides.
                 Log.i(TAG, "signed address answered " + answer.status + "; asking the original address again");
                 answer.close();
                 signedUrl = null;

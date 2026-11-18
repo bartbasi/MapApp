@@ -1,0 +1,119 @@
+# Review fix S1, mobile data, on the emulator (native side)
+# 2026-11-17 (UTC 2026-11-18), emulator-5554, masked debug build with the native review fixes (commit in README.md). Server: release-test-server.mjs --kbps 200 (100 for the old-build job).
+# Times are UTC. The test server prints a line when an answer ENDS; a request starts with its /dl 302 line.
+
+## 1. A job stored by the old build counts as not allowed
+The app installed before (the tester's build, old native code) stored job old-build-job (il-macon aerial, whole) with no allowMetered field.
+Wi-Fi off, then the new build installed over it (which kills the old process), then opened on mobile data:
+02:28:36 UTC Wi-Fi off; wifi_on=0
+Success
+02:28:38 UTC new build installed (the old process is gone): no process
+server log lines now: 4
+02:29:14 UTC network: "{\"online\":true,\"metered\":true}"
+02:29:14 UTC old-build-job: "[{\"status\":\"waiting\",\"waitingFor\":\"unmetered\",\"allowMetered\":false,\"bytesDone\":3022848}]"
+02:29:35 UTC 20 s later, server log lines: 5
+part file: 3145728 bytes
+11-17 20:28:40.544  3585  3585 I MapAppDownloads: loaded 4 areas from /data/user/0/io.github.bartbasi.mapapp/no_backup/areas
+Server log of that part:
+serving C:\bart\MapApp\data\publish\data-2026-11-17-test on port 8765; signed addresses last 20 s, then answer 403
+2026-11-18T02:28:05.256Z 302 GET /dl/il-macon.aerial.pmtiles bytes=0-4194303 sent=0
+2026-11-18T02:28:31.395Z 302 GET /dl/il-macon.aerial.pmtiles bytes=2490368-6684671 sent=0
+2026-11-18T02:28:37.587Z 206 GET /signed/836f15af007cf6adeb89892d/il-macon.aerial.pmtiles bytes=2490368-6684671 sent=655360 signed CLOSED EARLY
+2026-11-18T02:28:47.450Z 206 GET /signed/8815220f51963b0c1ef95a0c/il-macon.aerial.pmtiles bytes=0-4194303 sent=4194304 signed
+2026-11-18T02:30:01.031Z 200 GET /catalog.json - sent=10682
+Reading: 02:28:05 the old build's first request (on Wi-Fi). 02:28:31 after Wi-Fi went off the OLD build went on over mobile data (the fault S1),
+until the install killed it at 02:28:37 (CLOSED EARLY). 02:28:47 is the end of the first request, which the server kept writing into the dead Wi-Fi
+connection. The new build started at 02:28:40 and made no request: it shows the job waiting for unmetered, allowMetered false.
+
+## 2. A county download started on Wi-Fi (through the screens), then Wi-Fi off
+Macon County with aerial imagery, 144,936,475 bytes, started with the screen's Download button at 02:31:21 on Wi-Fi: allowMetered false.
+02:31:48.519 UTC before: [{'id': 'a0mwli8vcr-z8r2yxn9', 'status': 'downloading', 'allowMetered': False, 'done': 5123593, 'total': 144936475}] part files: 
+02:31:49.832 UTC Wi-Fi off (svc wifi disable returned)
+02:31:50.986 UTC +1s: [('waiting', 'unmetered', 5320201)] part files:  server lines: 7
+02:31:53.095 UTC +2s: [('waiting', 'unmetered', 5320201)] part files:  server lines: 7
+02:31:55.322 UTC +3s: [('waiting', 'unmetered', 5320201)] part files:  server lines: 7
+02:31:58.568 UTC +5s: [('waiting', 'unmetered', 5320201)] part files:  server lines: 7
+02:32:04.850 UTC +10s: [('waiting', 'unmetered', 5320201)] part files:  server lines: 8
+02:32:16.119 UTC +20s: [('waiting', 'unmetered', 5320201)] part files:  server lines: 8
+Reading: the open request was cut at 02:31:49.8 (logcat 'wake lock let go' 56 ms after the network was lost). No request started after it: the
+02:32:05 line is the end of the request that started at 02:31:44.7. Bytes stayed at 5,320,201. Screen: native-01 (Waiting for Wi-Fi, Use mobile data).
+Notification: native-02 ('Waiting for Wi-Fi. 5.3 MB of 145 MB').
+
+## 3. Wi-Fi back on: goes on by itself
+02:32:45 UTC waiting for Wi-Fi: [('waiting', 'unmetered', 5320201)]; wake locks named MapApp:download in dumpsys power: 0
+02:32:47.711 UTC Wi-Fi on
+02:32:50.799 UTC: [('waiting', 'unmetered', 5320201)] net="{\"online\":true,\"metered\":true}" wakelock lines=0
+02:32:55.369 UTC: [('downloading', None, 5975561)] net="{\"online\":true,\"metered\":false}" wakelock lines=2
+02:33:00.200 UTC: [('downloading', None, 6893065)] net="{\"online\":true,\"metered\":false}" wakelock lines=2
+02:33:04.592 UTC: [('downloading', None, 7745033)] net="{\"online\":true,\"metered\":false}" wakelock lines=2
+
+## 4. On mobile data again; the app killed while it waits, and reopened
+02:33:15.736 UTC Wi-Fi off
+02:33:20 UTC [('waiting', 'unmetered', False, 9711113)]
+02:33:22 UTC am force-stop
+02:33:25 UTC reopened
+02:34:00 UTC after reopening: [('waiting', 'unmetered', False, 9711113)]; network "{\"online\":true,\"metered\":true}"
+02:34:16 UTC 15 s later: [('waiting', 'unmetered', False, 9711113)]
+server log lines since the kill: 1
+2026-11-18T02:33:35.762Z 206 GET /signed/1fb91ca37c83b71be3bf0219/il-macon.aerial.pmtiles bytes=5242880-9437183 sent=4194304 signed
+--- logcat after reopening
+11-17 20:33:26.795  4149  4149 I MapAppDownloads: loaded 4 areas from /data/user/0/io.github.bartbasi.mapapp/no_backup/areas
+Reading: the one server line after the kill is the end of a request that started at 02:33:14 on Wi-Fi (its 302 line). Nothing was requested after reopening.
+
+## 5. 'Use mobile data' pressed
+02:34:27.827 UTC press Use mobile data: "clicked of 1"
+02:34:31.703 UTC: [('downloading', None, True, 10497545)]
+02:34:35.708 UTC: [('downloading', None, True, 11218441)]
+02:34:39.771 UTC: [('downloading', None, True, 12070409)]
+shot data/spike/step3-dl/rf-mobile-going.png
+2026-11-18T02:33:35.762Z 206 GET /signed/1fb91ca37c83b71be3bf0219/il-macon.aerial.pmtiles bytes=5242880-9437183 sent=4194304 signed
+2026-11-18T02:34:25.045Z 200 GET /catalog.json - sent=10682
+2026-11-18T02:34:28.632Z 302 GET /dl/il-macon.aerial.pmtiles bytes=5439488-9633791 sent=0
+11-17 20:33:26.795  4149  4149 I MapAppDownloads: loaded 4 areas from /data/user/0/io.github.bartbasi.mapapp/no_backup/areas
+11-17 20:34:28.157  4149  4220 I MapAppDownloads: area a0mwli8vcr-z8r2yxn9: mobile data allowed
+11-17 20:34:28.166  4149  4208 I MapAppDownloads: wake lock taken for 120 s
+11-17 20:34:28.168  4149  4208 I MapAppDownloads: file 1 (il-macon/aerial): going on from byte 5439488 of 140565035
+(The 02:34:25 catalog read is the screens reading the 10 KB catalog when the panel opened, over mobile data.)
+
+## 6. A new download started on mobile data
+Champaign County map and public land (12,168,646 bytes). Download pressed at 02:35:49: the question appears (native-03), no area is made, no request.
+'Not now' at 02:36:12: still no area and no request (server lines since: 0), the question is gone.
+02:36:28 UTC press Download again: "clicked of 1"
+02:36:31 UTC Download now: "clicked of 1"
+02:36:41 UTC network "{\"online\":true,\"metered\":true}"
+[{"id":"a0mwlh6qtr-194epcy0","status":"complete","allowMetered":false,"done":225572890,"total":225572890},{"id":"a0mwlhh04v-m6nntenn","status":"complete","allowMetered":false,"done":4032172,"total":4032172},{"id":"a0mwli8vcr-z8r2yxn9","status":"paused","allowMetered":true,"done":14560777,"total":144936475},{"id":"a0mwlificq-s6i7jd1j","status":"downloading","allowMetered":true,"done":2162688,"total":12168646}]
+server lines since: 1
+2026-11-18T02:36:31.849Z 302 GET /dl/il-champaign.basemap.pmtiles bytes=0-4194303 sent=0
+It completed at 02:37:32 over mobile data; the wake lock was renewed at 02:37:01 and 02:37:31 and let go 7 ms after completion.
+
+## Server log of parts 2 to 6
+serving C:\bart\MapApp\data\publish\data-2026-11-17-test on port 8765; signed addresses last 20 s, then answer 403
+2026-11-18T02:31:22.073Z 302 GET /dl/il-macon.basemap.pmtiles bytes=0-4194303 sent=0
+2026-11-18T02:31:43.508Z 206 GET /signed/6f585cde773118124fda81fd/il-macon.basemap.pmtiles bytes=0-4194303 sent=4194304 signed
+2026-11-18T02:31:43.558Z 403 GET /signed/6f585cde773118124fda81fd/il-macon.basemap.pmtiles bytes=4194304-4271624 sent=0 expired
+2026-11-18T02:31:43.570Z 302 GET /dl/il-macon.basemap.pmtiles bytes=4194304-4271624 sent=0
+2026-11-18T02:31:44.437Z 206 GET /signed/a1dc114a53a1500e2463097f/il-macon.basemap.pmtiles bytes=4194304-4271624 sent=77321 signed
+2026-11-18T02:31:44.700Z 302 GET /dl/il-macon.aerial.pmtiles bytes=0-4194303 sent=0
+2026-11-18T02:32:05.595Z 206 GET /signed/87264343c24c4448222a6973/il-macon.aerial.pmtiles bytes=0-4194303 sent=4194304 signed
+2026-11-18T02:32:52.815Z 302 GET /dl/il-macon.aerial.pmtiles bytes=1048576-5242879 sent=0
+2026-11-18T02:33:13.793Z 206 GET /signed/8550a440f731da190a865a53/il-macon.aerial.pmtiles bytes=1048576-5242879 sent=4194304 signed
+2026-11-18T02:33:13.832Z 403 GET /signed/8550a440f731da190a865a53/il-macon.aerial.pmtiles bytes=5242880-9437183 sent=0 expired
+2026-11-18T02:33:14.356Z 302 GET /dl/il-macon.aerial.pmtiles bytes=5242880-9437183 sent=0
+2026-11-18T02:33:35.762Z 206 GET /signed/1fb91ca37c83b71be3bf0219/il-macon.aerial.pmtiles bytes=5242880-9437183 sent=4194304 signed
+2026-11-18T02:34:25.045Z 200 GET /catalog.json - sent=10682
+2026-11-18T02:34:28.632Z 302 GET /dl/il-macon.aerial.pmtiles bytes=5439488-9633791 sent=0
+2026-11-18T02:34:49.547Z 206 GET /signed/25156a79fa43239801188385/il-macon.aerial.pmtiles bytes=5439488-9633791 sent=4194304 signed
+2026-11-18T02:34:49.600Z 403 GET /signed/25156a79fa43239801188385/il-macon.aerial.pmtiles bytes=9633792-13828095 sent=0 expired
+2026-11-18T02:34:49.610Z 302 GET /dl/il-macon.aerial.pmtiles bytes=9633792-13828095 sent=0
+2026-11-18T02:34:52.745Z 206 GET /signed/1af2e6067f97a40bea2cc6f0/il-macon.aerial.pmtiles bytes=9633792-13828095 sent=655360 signed CLOSED EARLY
+2026-11-18T02:35:40.077Z 200 GET /catalog.json - sent=10682
+2026-11-18T02:36:31.849Z 302 GET /dl/il-champaign.basemap.pmtiles bytes=0-4194303 sent=0
+2026-11-18T02:36:52.774Z 206 GET /signed/51bfe86ffc31b4829a2def3c/il-champaign.basemap.pmtiles bytes=0-4194303 sent=4194304 signed
+2026-11-18T02:36:52.799Z 403 GET /signed/51bfe86ffc31b4829a2def3c/il-champaign.basemap.pmtiles bytes=4194304-8388607 sent=0 expired
+2026-11-18T02:36:52.816Z 302 GET /dl/il-champaign.basemap.pmtiles bytes=4194304-8388607 sent=0
+2026-11-18T02:37:13.736Z 206 GET /signed/168f5e5a4018c25992820a97/il-champaign.basemap.pmtiles bytes=4194304-8388607 sent=4194304 signed
+2026-11-18T02:37:13.765Z 403 GET /signed/168f5e5a4018c25992820a97/il-champaign.basemap.pmtiles bytes=8388608-12035804 sent=0 expired
+2026-11-18T02:37:13.779Z 302 GET /dl/il-champaign.basemap.pmtiles bytes=8388608-12035804 sent=0
+2026-11-18T02:37:32.100Z 206 GET /signed/0da44f87326e75dd3d401b9e/il-champaign.basemap.pmtiles bytes=8388608-12035804 sent=3647197 signed
+2026-11-18T02:37:32.303Z 302 GET /dl/il-champaign.publicland.pmtiles bytes=0-132840 sent=0
+2026-11-18T02:37:32.981Z 206 GET /signed/32a4a14c97264ebe683cde99/il-champaign.publicland.pmtiles bytes=0-132840 sent=132841 signed

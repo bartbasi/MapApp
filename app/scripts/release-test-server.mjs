@@ -5,7 +5,7 @@
 // for testing the downloader with nothing published.
 //
 //   node scripts/release-test-server.mjs <folder> [--port 8765] [--expire 20]
-//        [--kbps 0] [--drop-every 0] [--drop-after 300000]
+//        [--expire-status 403] [--kbps 0] [--drop-every 0] [--drop-after 300000]
 //
 // The folder is one made by `pipeline/publish.py stage <tag> --base
 // http://10.0.2.2:8765/dl/` (the emulator reaches this laptop at 10.0.2.2).
@@ -15,7 +15,9 @@
 //                           redirects a release download to a signed address.
 //   /signed/<token>/<file>  serves the file with byte ranges. The token stops
 //                           working after --expire seconds and then answers
-//                           403, as a signed address does when it runs out.
+//                           403, as a signed address does when it runs out
+//                           (--expire-status gives another status, such as 400
+//                           or 404, which some hosts answer instead).
 //   /<file>                 serves the file directly, with byte ranges.
 //
 // What it adds, to test a download that is interrupted:
@@ -38,6 +40,7 @@ const opt = (name, fallback) => {
 };
 const port = opt('port', 8765);
 const expireSeconds = opt('expire', 20);
+const expireStatus = opt('expire-status', 403);
 const kbps = opt('kbps', 0);
 const dropEvery = opt('drop-every', 0);
 const dropAfter = opt('drop-after', 300_000);
@@ -156,12 +159,12 @@ createServer((req, res) => {
   const signed = /^\/signed\/([0-9a-f]+)\/([^/]+)$/.exec(path);
   if (signed) {
     const until = tokens.get(signed[1]);
-    if (until === undefined || Date.now() > until) return finish(req, res, 403, 'expired');
+    if (until === undefined || Date.now() > until) return finish(req, res, expireStatus, 'expired');
     return serveFile(req, res, signed[2], 'signed');
   }
   const plain = /^\/([^/]+)$/.exec(path);
   if (plain) return serveFile(req, res, plain[1], '');
   return finish(req, res, 404, '');
 }).listen(port, '0.0.0.0', () => {
-  console.log(`serving ${folder} on port ${port}; signed addresses last ${expireSeconds} s`);
+  console.log(`serving ${folder} on port ${port}; signed addresses last ${expireSeconds} s, then answer ${expireStatus}`);
 });

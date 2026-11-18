@@ -57,6 +57,25 @@ public class AreaJobTest {
     }
 
     @Test
+    public void mobileDataIsAllowedOnlyWhenSaidSo() throws JSONException {
+        AreaJob none = AreaJob.fromJson(job(file("il-macon", "aerial")), 1);
+        assertEquals(false, none.allowMetered);
+        JSONObject yes = job(file("il-macon", "aerial"));
+        yes.put("allowMetered", true);
+        AreaJob y = AreaJob.fromJson(yes, 1);
+        assertEquals(true, y.allowMetered);
+        assertEquals(true, AreaJob.fromJson(y.toJson(), 0).allowMetered);
+        assertEquals(false, AreaJob.fromJson(y.withAllowMetered(false).toJson(), 0).allowMetered);
+        // Anything but the JSON value true is no.
+        JSONObject text = job(file("il-macon", "aerial"));
+        text.put("allowMetered", "true");
+        assertEquals(false, AreaJob.fromJson(text, 1).allowMetered);
+        // A new seq keeps the choice.
+        assertEquals(true, y.withSeq(9).allowMetered);
+        assertEquals(9, y.withSeq(9).seq);
+    }
+
+    @Test
     public void bigNumbersSurvive() throws JSONException {
         JSONObject f = file("il-macon", "aerial");
         f.put("headBytes", 0);

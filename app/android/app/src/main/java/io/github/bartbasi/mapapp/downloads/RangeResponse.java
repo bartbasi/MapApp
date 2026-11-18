@@ -80,6 +80,18 @@ final class RangeResponse {
     }
 
     /**
+     * True when an answer from a signed address (one the original address
+     * redirected to) should be tried once more from the original address: any
+     * 4xx except 416. A signed address that runs out may answer 401, 403, 400,
+     * 404 or another 4xx depending on the host. 416 means the file is shorter
+     * than planned, which a fresh address does not change. The original
+     * address's own answer then decides.
+     */
+    static boolean renewFromOriginal(int status) {
+        return status >= 400 && status < 500 && status != 416;
+    }
+
+    /**
      * Judges an answer to a request for {@code length} bytes at {@code offset}.
      *
      * @param contentLength the Content-Length header, or -1 when absent

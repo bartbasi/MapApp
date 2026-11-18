@@ -114,8 +114,9 @@ public class DownloadsPlugin extends Plugin {
     }
 
     /**
-     * { id, record, files: [{ county, layer, url, etag?, headBytes, ranges: [offset, length, ...],
-     * bytes, sha256?, meta }] }. On Android 13 and later asks once for
+     * { id, record, allowMetered, files: [{ county, layer, url, etag?, headBytes,
+     * ranges: [offset, length, ...], bytes, sha256?, meta }] }. allowMetered is
+     * stored with the job; anything but true counts as false. On Android 13 and later asks once for
      * permission to show the progress notification; the download runs either way.
      */
     @PluginMethod
@@ -158,6 +159,17 @@ public class DownloadsPlugin extends Plugin {
     @PluginMethod
     public void remove(PluginCall call) {
         withId(call, id -> engine.remove(id));
+    }
+
+    /** { id, allow }: whether the area may use a connection charged by use (contract.ts setAllowMetered). */
+    @PluginMethod
+    public void setAllowMetered(PluginCall call) {
+        Object allow = call.getData().opt("allow");
+        if (!(allow instanceof Boolean)) {
+            call.reject("allow must be true or false", "bad-request");
+            return;
+        }
+        withId(call, id -> engine.setAllowMetered(id, (Boolean) allow));
     }
 
     @PluginMethod
@@ -224,6 +236,8 @@ public class DownloadsPlugin extends Plugin {
         o.put("record", s.record);
         o.put("status", s.status);
         if (s.error != null) o.put("error", s.error);
+        if (s.waitingFor != null) o.put("waitingFor", s.waitingFor);
+        o.put("allowMetered", s.allowMetered);
         o.put("bytesDone", s.bytesDone);
         o.put("bytesTotal", s.bytesTotal);
         return o;

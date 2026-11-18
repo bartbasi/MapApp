@@ -99,11 +99,6 @@ public final class DownloadService extends Service implements DownloadEngine.Ser
     // ------------------------------------------------------------ DownloadEngine.ServiceHook
 
     @Override
-    public void busy() {
-        // Starting is done through start(); nothing more here.
-    }
-
-    @Override
     public void idle() {
         if (engine.hasWork()) return;
         stopNow();
@@ -153,7 +148,7 @@ public final class DownloadService extends Service implements DownloadEngine.Ser
         String sizes = mb(area.bytesDone) + " of " + mb(area.bytesTotal);
         switch (area.status) {
             case "waiting":
-                b.setContentTitle(title).setContentText("Waiting for a connection. " + sizes).setProgress(0, 0, false);
+                b.setContentTitle(title).setContentText(waitingText(area.waitingFor) + ". " + sizes).setProgress(0, 0, false);
                 break;
             case "queued":
                 b.setContentTitle(title).setContentText("Waiting to start").setProgress(0, 0, true);
@@ -169,6 +164,11 @@ public final class DownloadService extends Service implements DownloadEngine.Ser
                 b.setContentTitle("Downloading " + title).setContentText(sizes).setProgress(100, percent, false);
         }
         return b.build();
+    }
+
+    /** What a waiting area waits for, in the screens' words (app/src/ui/downloads/text.ts). */
+    static String waitingText(String waitingFor) {
+        return Schedule.UNMETERED.equals(waitingFor) ? "Waiting for Wi-Fi" : "Waiting for a connection";
     }
 
     /** A size as the screens write it (formatSize in app/src/ui/format.ts): 1 MB is 1,000,000 bytes. */
