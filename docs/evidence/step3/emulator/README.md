@@ -1,0 +1,90 @@
+# Step 3 checks on the Android emulator
+
+Build tested: commit f23847c (HEAD of main when the build was cut), masked build (`VITE_MAPAPP_MASK_OWNERS=1`), catalog `http://10.0.2.2:8765/catalog.json`, kept as `build/step3-masked-debug.apk` (26 MB, no download folders in it). Emulator `mapapp_fold` (Android 16). Unfolded is display 4619827259835644672 (2208 x 1840), folded is display 4619827551948147201 (1080 x 2092). Data came from `release-test-server.mjs` at full speed, then at `--kbps 80`. No real phone was touched. Owner names read OWNER NAME in every screenshot. Parcels are named by ID.
+
+Text quoted below was read from the WebView through the DevTools port (`cdp.mjs`) unless a screenshot is named. Sizes the app calls "MB" are mebibytes (bytes / 1,048,576). Files on the phone were counted with `run-as ... ls -l`. Server logs: `server-log-session1-full-speed.txt`, `server-log-session3-80kBps.txt` (the first session's log lagged behind the app by a minute or more; see check 5).
+
+## Results
+
+| # | Check | Result |
+|---|---|---|
+| 1 | First run, nothing downloaded | pass |
+| 2 | Whole county in one tap | pass, with two faults (F4, F6) |
+| 3 | Pick an area, sizes by detail | pass |
+| 4 | Area holds every layer that was on | pass for the files, fault F5 for the wording |
+| 5 | Airplane mode, area draws everything | pass |
+| 6 | Kill mid-download, resume | pass for all three kills; fault F7 (verify) |
+| 7 | Pause, resume, delete | pass |
+| 8 | Connection states | pass |
+| 9 | Screens folded and unfolded | fail (F1, F2, F3) |
+| 10 | Step 2 still passes | pass |
+| 11 | Anything else | see faults |
+
+## 1. First run: pass
+- Overview map shows, Offline maps button under Layers (`01-unfolded-first-run.png`).
+- Zoomed in at Decatur (-88.9548, 39.8403): the card "Only a rough map here" with "Download maps" sits top left, clear of the readout card at bottom right. Property lines for Macon County draw; the readout names parcel 04-12-15-431-006 (`01-unfolded-first-run-zoomed-invite.png`).
+- Server log: no request until Offline maps was opened; then one `GET /catalog.json` (10,682 bytes).
+- Start-up took about 8 s from launch to a drawn map on the emulator.
+
+## 2. Whole county: pass
+- Macon, map and public land: card said Map 4.1 MB, Public land 0.1 MB, total 4.2 MB (`03-unfolded-macon-card.png`). Phone afterwards: basemap 4,271,625 + public land 99,815 = 4,371,440 bytes = 4.17 MiB. Match.
+- Progress was shown in the list ("Downloading, 49%", "2.0 of 4.2 MB"), then "Ready to use offline" (text only). The notification permission dialog appeared at the first Download tap (`04-unfolded-county-after-download-tap.png`).
+- The map showed street detail and names at once, without a restart (`06-unfolded-macon-detail-after-download.png`).
+- With imagery ticked: card total 138 MB. Phone afterwards: 4,271,625 + 140,565,035 + 99,815 = 144,936,475 bytes = 138.2 MiB. Match. The Android notification "Downloading Macon County" with a progress bar was seen in the shade (`10-unfolded-notification-shade-progress.png`). Hybrid view then drew imagery (`12-unfolded-macon-hybrid-after-imagery-download.png`). The Map, Aerial, Hybrid switcher appeared only once imagery was on the phone.
+- List with two Macon County entries: `11-unfolded-list-two-macon-entries-done.png`.
+
+## 3. Pick an area: pass
+Frame about 5 km, first in Map view with nothing installed, then in Hybrid view (imagery preselected at High, `19-unfolded-pick-area-hybrid-preselected.png`). Sizes shown, Hybrid area 5.9 x 4.2 km: None 0.7 MB, Low 1.2 MB, Medium 1.6 MB, High 2.6 MB. Map view area 5.1 x 4.5 km: None 0.7, Low 1.2, Medium 1.5, High 2.4 MB. Download at High, Hybrid area: shown 2.6 MB; on the phone 762,376 + 1,982,168 + 11,859 = 2,756,403 bytes = 2.63 MiB, and each layer matched its line (map 0.7, aerial 1.9). Map-view area: shown 2.4 MB; on the phone 759,204 + 1,719,173 + 11,859 = 2,490,236 bytes = 2.37 MiB. Match. Area 3 (shown 4.0 MB): 4,181,020 bytes = 3.99 MiB. Match. Area 1 of the 80 kB/s runs (shown 7.2 MB): 7,585,948 bytes = 7.24 MiB. Match. `18-unfolded-pick-area-high-map-view.png`.
+Note: with nothing downloaded there is no Hybrid view and no public land switch, so "Hybrid and public land on" cannot be set first. The picker still offers imagery. I installed Macon imagery first, then picked, then deleted the county so the area stood alone.
+
+## 4. Area includes every layer that was on: pass (files), fault F5 (wording)
+Folder listing of the Hybrid area, pulled with `run-as`: `area-folder-listing-hybrid-area-2.txt` (basemap, aerial, publicland `.pmtiles`, a `.meta.json` each, `job.json`, `complete`). The picker says "Map 0.7 MB, public land less than 0.1 MB, aerial imagery 1.9 MB". Property lines: no screen says they are on the phone already and are not part of a download (F5).
+
+## 5. Airplane mode: pass
+Area deleted down to the one Hybrid area, app force-stopped, airplane mode on (`airplane_mode_on` 1, status bar icon, "Active default network: none", ping "Network is unreachable"). At -89.06, 39.93: Map (`20-unfolded-airplane-hybrid-warrensburg.png`, shows Map view with property lines), Aerial (`21-unfolded-airplane-aerial.png`) and Hybrid (`22-unfolded-airplane-parcel-tap.png`) all drew with property lines. Parcel tap returned OWNER NAME, Parcel ID 08-06-14-132-009, 1.5 acres (text), and for 08-06-14-132-005 "Acreage not listed in the county record" (screenshot above). Public land is listed in Layers and its polygons drew (pink outlines in `34-unfolded-list-airplane-waiting.png`, taken online). I did not find a public land polygon inside the area in airplane mode itself. Outside the area (Decatur): overview map, the "Only a rough map here" card, and in Hybrid view a plain grey ground with no imagery and no note about it (`24-unfolded-airplane-outside-area-decatur.png`).
+Caveat on the server log: it showed 244 new lines after airplane mode went on, but the app made no download plugin call in that window (logcat), the lines were catalog and planning requests from earlier picks, and opening Offline maps in airplane mode added no line. I believe the log was written late; I could not prove it.
+
+## 6. Kill and resume: pass (3 kills), fault F7
+At 80 kB/s, area 7.2 MB.
+- Force-stop: killed with 1,582,510 bytes in the part file (checkpoint 1,451,438). On `am start` the notification came back, the first request was `bytes=19935791-20328430` (the range that was cut), no earlier range was fetched again, finished at 6,615,096 bytes of aerial. Files pulled; `pmtiles verify` exit 0 for aerial and basemap.
+- `kill -9` of the process (area 4.0 MB): part file 927,009, checkpoint 869,665. The service came back by itself within 5 s (new PID, no screen), the first request was `bytes=20086443-20313884`, inside the cut range, so it went on and did not start over. Finished; verify 0 for aerial and basemap.
+- Kill 2 s after the tap (area 1.5 MB): checkpoint 1,481 (the header). After reopening it requested from the start of the first range and finished. Verify 0 for aerial and basemap.
+- Public land of the finished area fails `pmtiles verify` in all three kills and also in an area that was never interrupted: "header MaxZoom=14 does not match max tile z 13" (F7). So it is not caused by the kill.
+After a kill the screen does not come back by itself (normal Android); the download goes on in the background.
+
+## 7. Pause, resume, delete: pass
+List with one downloading and one waiting: "Starts when the download before it is done." Pause on the waiting one gave "Paused" (`30-unfolded-list-queued-one-paused.png`). Pause on the downloading one: no request in the next 9 s, status "Paused, 5.0 of 138 MB". Resume went on (request `bytes=1004887-` after the cut `21847-4216150`). Delete asks first: complete "This place will no longer have a map when you are offline.", downloading and paused "What has downloaded so far is thrown away." Keep it kept. Deleted a downloading one, a paused one and a complete one: each folder gone from `no_backup/areas` at once, requests stopped. After deleting both Macon county downloads the map fell back to the overview at once and the invitation card returned (`16-unfolded-map-after-delete-last-county.png`; ask screen `14-unfolded-delete-asks-first-complete.png`).
+
+## 8. Connection states: pass
+- Wi-Fi off (5G): panel says "You are on mobile data. Downloads use your data plan. You are asked before each one starts." The picker shows the amber note, and Download shows "Use 365 MB of mobile data? This comes out of your data plan. On Wi-Fi it costs nothing." with Download now and Not now (`33-unfolded-pick-mobile-data-question.png`). No request was made.
+- Airplane mode: the list says "You are offline. Maps already on this phone still work, and so does your position. Sizes and new downloads need a connection." An area at 5% showed "Waiting for a connection ... Goes on by itself when the phone is online." (`34-unfolded-list-airplane-waiting.png`). Airplane off: "Downloading, 8%" within 6 s, no tap.
+- First open with no connection after `pm clear`: "You are offline" and "The list of counties needs a connection the first time. It is kept on the phone after that." (`49-unfolded-offline-first-open-no-catalog.png`).
+
+## 9. Screens on the device: fail
+Folded list with a download (`40-folded-list-downloading.png`): nothing under the system bars, the sheet clears the navigation bar, the readout card sits behind the sheet (as in Step 2). Folded pick (`41-folded-pick-area.png`): the Name field is half hidden under the size footer until the panel is scrolled (F2). With the keyboard up (`42-folded-pick-name-keyboard.png`) the Name field is not visible at all (F2). Unfolded: panel beside the map, nothing cut. Fold and unfold in the middle of picking: the area survived (1.3 by 0.6 km folded, 1.0 by 0.8 km unfolded, same centre; `44-unfolded-pick-after-unfold.png`). Sources screen folded, with the overview map, Macon County and six areas present: it lists every area on its own line under each layer, six lines for aerial and six for base map before the license text (F8). Android Back (F1): on the Pick an area screen, on the Offline maps list and on Layers, Back leaves the app to the launcher. The activity is recreated on return: map back at the overview, panel closed, picked frame lost. The first Back with the keyboard up only hides the keyboard.
+
+## 10. Step 2 still passes: pass
+Route replay of 42 fixes (-89.06050 to -89.06296, 1 per second, 39.9155): the marker stayed centred and the readout changed parcel (`47-unfolded-route-end.png`: parcel 08-06-23-100-007, 111 m to the east line). The screen must stay awake: after the screen timed out the app (correctly) reported "Last position ... ago" until woken; I set stay-on for the test and switched it off at the end. Readout at the three fixes, online and in airplane mode with an area covering the spot (area 2 bounds -89.09472..-89.02528, 39.90657..39.94475):
+| Longitude | Online | Airplane mode |
+|---|---|---|
+| -89.0609 | Parcel 08-06-23-100-005, 213 ft (65 m) W | same |
+| -89.0615 | Parcel 08-06-23-100-005, 45 ft (14 m) W | same |
+| -89.0625 | Parcel 08-06-23-100-007, 236 ft (72 m) E | same |
+Screenshot kept: `46-unfolded-readout-lon-89.0625.png` (online). The airplane-mode screenshot was removed unseen; the text is from the debug port.
+
+## 11. Other things
+- No crash: 0 `FATAL EXCEPTION`, 0 `ANR` lines (`crash-log-grep.txt`).
+- The app made no request before Offline maps was opened.
+- Whole-county and area downloads both write 2 to 6 small `.meta.json` files next to the archives (about 1 KB each). They are not counted in the size shown. Harmless.
+- Faults F4 and F6 below.
+
+## Faults
+- **F1 Android Back is not handled anywhere.** From the Pick an area screen, the Offline maps list and Layers, Back leaves the app and the screen state is lost.
+- **F2 Name field in the picker.** Folded, the Name field is half under the size footer at rest, and with the keyboard up it is not visible (`42-folded-pick-name-keyboard.png`), so the user cannot see what is typed.
+- **F3 Hybrid or Aerial outside any area** shows plain grey ground; the invitation card does not say there is no imagery there (`24-unfolded-airplane-outside-area-decatur.png`).
+- **F4 County card after a map-only download** says "On this phone." although imagery (134 MB) is not on the phone. Ticking imagery brings the Download button back, but the new download repeats the 4.2 MB of map and public land and adds a second "Macon County" entry (two entries, 4.2 MB stored twice).
+- **F5 Property lines are never explained as part of the app.** The only text is the footer "Public land and property lines come from public records. They are not a legal survey." No screen says they come with the app and are not downloaded.
+- **F6 Notification permission** is asked by Android at the first Download tap with no sentence from the app before it. Sizes are labelled MB but are MiB (4,371,440 bytes shows as 4.2 MB; phones show 4.4 MB).
+- **F7 Extracted public land** has a header max zoom higher than its highest tile, so `pmtiles verify` rejects it ("header MaxZoom=14 does not match max tile z 13" or "11"). Map and aerial extracts verify. The app draws it.
+- **F8 Sources and licenses** lists one line per downloaded area under each layer (six lines each with six areas).
+- **F9 Naming and step sizes.** An area covering both counties (253 by 185 km, 365 MB) was named "Macon County area 8". "Bigger area" grows by different factors depending on the zoom (3 taps gave 0.8 km at one zoom, 6.6 km at another, and 4 taps gave 71 km).

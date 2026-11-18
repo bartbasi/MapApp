@@ -1,0 +1,16 @@
+0 no_backup/areas/a0mwledjn9-oefn99lh/complete
+5329 no_backup/areas/a0mwledjn9-oefn99lh/job.json
+759204 no_backup/areas/a0mwledjn9-oefn99lh/il-macon/basemap.pmtiles
+1119 no_backup/areas/a0mwledjn9-oefn99lh/il-macon/basemap.meta.json
+1719173 no_backup/areas/a0mwledjn9-oefn99lh/il-macon/aerial.pmtiles
+1165 no_backup/areas/a0mwledjn9-oefn99lh/il-macon/aerial.meta.json
+11859 no_backup/areas/a0mwledjn9-oefn99lh/il-macon/publicland.pmtiles
+879 no_backup/areas/a0mwledjn9-oefn99lh/il-macon/publicland.meta.json
+0 no_backup/areas/a0mwleffpc-5r90y2qr/complete
+5270 no_backup/areas/a0mwleffpc-5r90y2qr/job.json
+762376 no_backup/areas/a0mwleffpc-5r90y2qr/il-macon/basemap.pmtiles
+1119 no_backup/areas/a0mwleffpc-5r90y2qr/il-macon/basemap.meta.json
+1982168 no_backup/areas/a0mwleffpc-5r90y2qr/il-macon/aerial.pmtiles
+1165 no_backup/areas/a0mwleffpc-5r90y2qr/il-macon/aerial.meta.json
+11859 no_backup/areas/a0mwleffpc-5r90y2qr/il-macon/publicland.pmtiles
+879 no_backup/areas/a0mwleffpc-5r90y2qr/il-macon/publicland.meta.json
