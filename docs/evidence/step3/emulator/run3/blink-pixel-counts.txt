@@ -1,0 +1,1 @@
+40 frames, 0.7 to 1.1 s apart (blink-frame-times.txt), download finished at about 03:25:18 UTC (frames 7 to 9). Count of lime property-line pixels in the map pane: 2260 in every one of the 40 frames. Count of blue marker pixels: 570 then 563, steady.
