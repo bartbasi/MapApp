@@ -1,14 +1,14 @@
 # Status
 
-Last updated: 2026-11-17, end of Step 3, waiting for the owner.
+Last updated: 2026-11-18. Step 3 is pushed and the first data release is published. The owner is trying the downloads on his phone.
 
 ## Where the project stands
 
 **Step 3 (offline downloads) is built, tested on the emulator three times, and reviewed twice.** The report is `docs/reports/step-3.md`. The design is D33. Its three checks pass on the emulator. Nothing in its downloads has run on a real phone.
 
-**Step 3 is not pushed.** `main` is ahead of `origin/main` (5c706d9, the end of Step 2). The push waits for the owner's word on the new screenshots, which show Macon County parcel lines and IDs with owners masked (report question 1). His yes on 2026-11-17 named the Step 2 screenshots.
+**Step 3 is pushed** (the owner said yes on 2026-11-18, screenshots included).
 
-**Nothing is published as a release file.** `pipeline/publish.py upload` has never been run. It needs the owner's yes and `--yes-publish` (report question 2). The catalog the app reads by default, `catalog/catalog.json` on GitHub, does not exist yet, so a default build can download nothing.
+**The first data release is published** (the owner said yes on 2026-11-18): GitHub release `data-2026-11-18`, six archives (base map, imagery, public land for each county), 382,678,011 bytes, no parcel data. `catalog/catalog.json` on `main` points the app at it. It was read back and tested from this laptop against GitHub's servers before the catalog was pushed (`docs/evidence/step3/hosted/README.md`). The Android downloader itself has not yet been seen downloading from GitHub. To publish new data: build, `publish.py stage <new tag>` in WSL, `publish.py upload <new tag> --yes-publish`, run `MAPAPP_CHECK_HOSTED=1 npx vitest run src/downloads/hosted-release.test.ts`, then commit and push the catalog. A tag is never reused. Publishing anything new needs the owner's word again.
 
 **The steps are not the brief's order.** Step 2 was position and property lines (D26). Step 3 was offline downloads. See `docs/STEP_PLAN.md`.
 
@@ -25,7 +25,7 @@ Last updated: 2026-11-17, end of Step 3, waiting for the owner.
 - `data/publish/data-2026-11-17-test/`: the six archives staged for the test server, catalog base `http://10.0.2.2:8765/dl/` (the emulator). `data/publish/phone-test/`: the same with base `http://localhost:8765/dl/` (a phone on the cable).
 - `app/src/downloads/`: the extract planner, the download manager, the contract (`contract.ts`). `app/src/ui/downloads/`: the screens. `app/android/.../downloads/`: the native downloader and its foreground service. `app/android/.../location/`: the location plugin.
 - `npm run check` passes. Vitest passes with 602 tests. JUnit passes with 73.
-- `build/step3-debug.apk`: real owner names, for the owner's phone, catalog at `http://localhost:8765/catalog.json`. `build/step3-masked-debug.apk`: masked, with the download test hook, catalog at `http://10.0.2.2:8765/catalog.json`. Both carry only the overview map and the Macon County parcel archive.
+- `build/step3-debug.apk`: real owner names, for the owner's phone, catalog on GitHub (the default). It is on his phone since 2026-11-18. `build/step3-cable-debug.apk`: the same with the catalog at `http://localhost:8765/catalog.json`, for downloads through the cable. `build/step3-masked-debug.apk`: masked, with the download test hook, catalog at `http://10.0.2.2:8765/catalog.json`. Both carry only the overview map and the Macon County parcel archive.
 - Evidence: `docs/evidence/step3/` (`location`, `downloader`, `screens`, `emulator`, `review-fixes`).
 
 ## How to build and run
@@ -40,12 +40,10 @@ Last updated: 2026-11-17, end of Step 3, waiting for the owner.
 
 ## Waiting on the owner
 
-1. **Install and try Step 3 on his phone** through the cable (above). The build is ready; the phone was not attached when it was finished.
-2. **May Step 3 be pushed,** screenshots included (report question 1).
-3. **May the six map archives be published** as release files (report question 2). He has been shown the sentence from Microsoft's general terms about personal and non-commercial use, which bears on the two imagery files only. After a yes: stage under a real tag, upload, verify, treat the first release as a test of GitHub's real behaviour, and only then commit `catalog/catalog.json`.
-4. **How property lines reach a phone that is not his** (report question 3; Step 2's question 2).
-5. **Champaign County's parcel data:** a file or a county-issued login, and the grant in writing.
-6. From Step 2: any condition a county put on its grant, the leaf-off imagery and hunting table requests, and whether 3 m is the right allowance (D28).
+1. **What he sees when he downloads on his phone.** This is the first run of the downloads on a real phone, and the Android downloader's first run against GitHub.
+2. **Whether parcel data may be made public.** On 2026-11-18 he wrote that property lines are the point of the app and every user should see them. He has not yet said, by name, that the Macon County parcel file may be published. He was asked again in plain terms, with his own distinction put to him: the Macon file is the county's own file, fetched from the county's service. Until he answers, parcel data stays inside test builds only, and the app refuses it from a catalog.
+3. **Champaign County.** He asked for other sources of the same public information. A research task is writing `docs/research/champaign-parcel-alternatives.md`. A draft email to the consortium is written (in the Step 3 conversation); his Gmail connection needed signing in again before it could be saved as a draft.
+4. From Step 2: any condition a county put on its grant, the leaf-off imagery and hunting table requests, and whether 3 m is the right allowance (D28).
 
 ## Lesson from Step 1
 
