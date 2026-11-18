@@ -1,0 +1,157 @@
+serving C:\bart\MapApp\data\publish\data-2026-11-17-test on port 8765; signed addresses last 20 s
+2026-11-18T01:55:48.356Z 200 GET /catalog.json - sent=10682
+2026-11-18T01:56:47.220Z 302 GET /dl/il-macon.publicland.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:56:47.227Z 302 GET /dl/il-macon.basemap.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:56:47.243Z 206 GET /signed/f957e71c763da8764588d223/il-macon.publicland.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:56:47.253Z 206 GET /signed/8db0c4b0559391a400d0d62b/il-macon.basemap.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:56:56.428Z 302 GET /dl/il-champaign.publicland.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:56:56.432Z 302 GET /dl/il-champaign.basemap.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:56:56.452Z 302 GET /dl/il-macon.basemap.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:56:56.473Z 206 GET /signed/86659438284fbf01137f38b2/il-champaign.publicland.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:56:56.475Z 206 GET /signed/c0ead760f6073db9bb7406ea/il-champaign.basemap.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:56:56.516Z 206 GET /signed/b5338fd58afe868ccb47a259/il-macon.basemap.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:56:56.519Z 302 GET /dl/il-macon.publicland.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:56:56.539Z 206 GET /signed/c16a647dc08fa9992ca96806/il-macon.publicland.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:56:58.855Z 302 GET /dl/il-champaign.basemap.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:56:58.856Z 302 GET /dl/il-macon.basemap.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:56:58.887Z 302 GET /dl/il-champaign.publicland.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:56:58.900Z 206 GET /signed/f83c337214208cafef619070/il-champaign.basemap.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:56:58.923Z 206 GET /signed/52704f244b67e1ad5d10b7de/il-champaign.publicland.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:56:58.943Z 206 GET /signed/b67bdd2681e6643fd75b66e2/il-macon.basemap.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:56:58.951Z 302 GET /dl/il-macon.publicland.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:56:59.475Z 206 GET /signed/ea821ec6651b22ed884db8bb/il-macon.publicland.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:57:00.480Z 302 GET /dl/il-champaign.basemap.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:57:00.489Z 302 GET /dl/il-champaign.publicland.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:57:00.501Z 302 GET /dl/il-macon.basemap.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:57:00.517Z 206 GET /signed/980bce38cf8d3cfd2803c465/il-champaign.basemap.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:57:00.522Z 206 GET /signed/18e610bf685ffc6c227ee9bc/il-champaign.publicland.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:57:00.539Z 206 GET /signed/0cce670f870909711262951f/il-macon.basemap.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:57:00.558Z 302 GET /dl/il-macon.publicland.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:57:00.580Z 206 GET /signed/5f4d75a03d7f96c1800f77dd/il-macon.publicland.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:57:23.659Z 302 GET /dl/il-macon.basemap.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:57:23.663Z 302 GET /dl/il-macon.publicland.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:57:23.700Z 206 GET /signed/ad5c77ad119d31d85932c5ea/il-macon.publicland.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:57:23.706Z 206 GET /signed/6f25a10d06b25180c7cea7d4/il-macon.basemap.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:57:26.735Z 302 GET /dl/il-macon.basemap.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:57:26.736Z 302 GET /dl/il-macon.publicland.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:57:26.761Z 206 GET /signed/598f31bb90fadac9e22a5943/il-macon.publicland.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:57:26.766Z 206 GET /signed/c3dedd9114190b606fad4fb5/il-macon.basemap.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:57:30.756Z 302 GET /dl/il-macon.basemap.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:57:30.765Z 302 GET /dl/il-macon.publicland.pmtiles bytes=0-16383 sent=0
+2026-11-18T01:57:30.779Z 206 GET /signed/ac57c1bb3869f3e4805b185b/il-macon.basemap.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:57:30.780Z 206 GET /signed/6f3d0c3823b25b201ad2e2df/il-macon.publicland.pmtiles bytes=0-16383 sent=16384 signed
+2026-11-18T01:57:38.960Z 302 GET /dl/il-macon.basemap.pmtiles bytes=6415-470336 sent=0
+2026-11-18T01:57:40.017Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=6415-470336 sent=463922 signed
+2026-11-18T01:57:40.399Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=513732-544094 sent=30363 signed
+2026-11-18T01:57:40.443Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=572493-605628 sent=33136 signed
+2026-11-18T01:57:40.480Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=641198-693453 sent=52256 signed
+2026-11-18T01:57:40.521Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=777960-822695 sent=44736 signed
+2026-11-18T01:57:40.572Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=959593-1062688 sent=103096 signed
+2026-11-18T01:57:40.677Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=1289169-1331302 sent=42134 signed
+2026-11-18T01:57:40.755Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=1351868-1359382 sent=7515 signed
+2026-11-18T01:57:40.796Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=1362954-1489575 sent=126622 signed
+2026-11-18T01:57:40.877Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=1509673-1522709 sent=13037 signed
+2026-11-18T01:57:40.916Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=1934274-2025499 sent=91226 signed
+2026-11-18T01:57:40.993Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=2063368-2072659 sent=9292 signed
+2026-11-18T01:57:41.042Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=2081505-2223605 sent=142101 signed
+2026-11-18T01:57:41.164Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=2229686-2241421 sent=11736 signed
+2026-11-18T01:57:41.210Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=2248729-2323119 sent=74391 signed
+2026-11-18T01:57:41.313Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=2365600-2377045 sent=11446 signed
+2026-11-18T01:57:41.350Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=2494913-2494984 sent=72 signed
+2026-11-18T01:57:41.416Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=3189690-3389567 sent=199878 signed
+2026-11-18T01:57:41.542Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=3464409-3484947 sent=20539 signed
+2026-11-18T01:57:41.591Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=3504607-3762229 sent=257623 signed
+2026-11-18T01:57:41.709Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=3781004-3792993 sent=11990 signed
+2026-11-18T01:57:41.756Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=3818689-3956492 sent=137804 signed
+2026-11-18T01:57:41.861Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=4041125-4045379 sent=4255 signed
+2026-11-18T01:57:41.902Z 206 GET /signed/b5964409f8aeffbff8d6370c/il-macon.basemap.pmtiles bytes=4052423-4058640 sent=6218 signed
+2026-11-18T01:57:41.993Z 302 GET /dl/il-macon.publicland.pmtiles bytes=4731-10531 sent=0
+2026-11-18T01:57:42.025Z 206 GET /signed/46bb47e2469a0120f611e17c/il-macon.publicland.pmtiles bytes=4731-10531 sent=5801 signed
+2026-11-18T01:57:42.598Z 206 GET /signed/46bb47e2469a0120f611e17c/il-macon.publicland.pmtiles bytes=15509-22327 sent=6819 signed
+2026-11-18T01:57:42.638Z 206 GET /signed/46bb47e2469a0120f611e17c/il-macon.publicland.pmtiles bytes=27335-36784 sent=9450 signed
+2026-11-18T01:57:42.685Z 206 GET /signed/46bb47e2469a0120f611e17c/il-macon.publicland.pmtiles bytes=43566-46100 sent=2535 signed
+2026-11-18T01:57:42.783Z 206 GET /signed/46bb47e2469a0120f611e17c/il-macon.publicland.pmtiles bytes=46928-53926 sent=6999 signed
+2026-11-18T01:57:42.835Z 206 GET /signed/46bb47e2469a0120f611e17c/il-macon.publicland.pmtiles bytes=57545-58036 sent=492 signed
+2026-11-18T01:57:42.889Z 206 GET /signed/46bb47e2469a0120f611e17c/il-macon.publicland.pmtiles bytes=69698-74487 sent=4790 signed
+2026-11-18T01:57:42.933Z 206 GET /signed/46bb47e2469a0120f611e17c/il-macon.publicland.pmtiles bytes=76071-76498 sent=428 signed
+2026-11-18T01:57:42.956Z 206 GET /signed/46bb47e2469a0120f611e17c/il-macon.publicland.pmtiles bytes=76714-81636 sent=4923 signed
+2026-11-18T01:57:43.034Z 206 GET /signed/46bb47e2469a0120f611e17c/il-macon.publicland.pmtiles bytes=82565-83180 sent=616 signed
+2026-11-18T01:57:43.064Z 206 GET /signed/46bb47e2469a0120f611e17c/il-macon.publicland.pmtiles bytes=84561-88738 sent=4178 signed
+2026-11-18T01:57:43.104Z 206 GET /signed/46bb47e2469a0120f611e17c/il-macon.publicland.pmtiles bytes=94903-95614 sent=712 signed
+2026-11-18T02:00:37.524Z 200 GET /catalog.json - sent=10682
+2026-11-18T02:00:38.175Z 302 GET /dl/il-macon.basemap.pmtiles bytes=0-4194303 sent=0
+2026-11-18T02:00:40.488Z 206 GET /signed/b81546727b35703cff7ddc03/il-macon.basemap.pmtiles bytes=0-4194303 sent=4194304 signed
+2026-11-18T02:00:41.173Z 206 GET /signed/b81546727b35703cff7ddc03/il-macon.basemap.pmtiles bytes=4194304-4271624 sent=77321 signed
+2026-11-18T02:00:41.299Z 302 GET /dl/il-macon.publicland.pmtiles bytes=0-99814 sent=0
+2026-11-18T02:00:41.339Z 206 GET /signed/289ce983aa50654534a731b5/il-macon.publicland.pmtiles bytes=0-99814 sent=99815 signed
+2026-11-18T02:01:08.879Z 302 GET /dl/il-champaign.basemap.pmtiles bytes=0-4194303 sent=0
+2026-11-18T02:01:11.451Z 206 GET /signed/939dd4446c59b6b27d568e22/il-champaign.basemap.pmtiles bytes=0-4194303 sent=4194304 signed
+2026-11-18T02:01:13.638Z 206 GET /signed/939dd4446c59b6b27d568e22/il-champaign.basemap.pmtiles bytes=4194304-8388607 sent=4194304 signed
+2026-11-18T02:01:15.533Z 206 GET /signed/939dd4446c59b6b27d568e22/il-champaign.basemap.pmtiles bytes=8388608-12035804 sent=3647197 signed
+2026-11-18T02:01:16.169Z 302 GET /dl/il-champaign.publicland.pmtiles bytes=0-132840 sent=0
+2026-11-18T02:01:16.218Z 206 GET /signed/53d27ed454f487f5d4e2a97c/il-champaign.publicland.pmtiles bytes=0-132840 sent=132841 signed
+2026-11-18T02:01:43.238Z 302 GET /dl/il-champaign.aerial.pmtiles bytes=0-4194303 sent=0
+2026-11-18T02:01:45.768Z 206 GET /signed/dcab6db8a790cc7fa5c2c1cd/il-champaign.aerial.pmtiles bytes=0-4194303 sent=4194304 signed
+2026-11-18T02:01:47.162Z 206 GET /signed/dcab6db8a790cc7fa5c2c1cd/il-champaign.aerial.pmtiles bytes=4194304-8388607 sent=4194304 signed
+2026-11-18T02:01:49.073Z 206 GET /signed/dcab6db8a790cc7fa5c2c1cd/il-champaign.aerial.pmtiles bytes=8388608-12582911 sent=4194304 signed
+2026-11-18T02:01:50.850Z 206 GET /signed/dcab6db8a790cc7fa5c2c1cd/il-champaign.aerial.pmtiles bytes=12582912-16777215 sent=4194304 signed
+2026-11-18T02:01:52.814Z 206 GET /signed/dcab6db8a790cc7fa5c2c1cd/il-champaign.aerial.pmtiles bytes=16777216-20971519 sent=4194304 signed
+2026-11-18T02:01:54.386Z 206 GET /signed/dcab6db8a790cc7fa5c2c1cd/il-champaign.aerial.pmtiles bytes=20971520-25165823 sent=4194304 signed
+2026-11-18T02:01:56.293Z 206 GET /signed/dcab6db8a790cc7fa5c2c1cd/il-champaign.aerial.pmtiles bytes=25165824-29360127 sent=4194304 signed
+2026-11-18T02:01:58.301Z 206 GET /signed/dcab6db8a790cc7fa5c2c1cd/il-champaign.aerial.pmtiles bytes=29360128-33554431 sent=4194304 signed
+2026-11-18T02:02:00.598Z 206 GET /signed/dcab6db8a790cc7fa5c2c1cd/il-champaign.aerial.pmtiles bytes=33554432-37748735 sent=4194304 signed
+2026-11-18T02:02:02.340Z 206 GET /signed/dcab6db8a790cc7fa5c2c1cd/il-champaign.aerial.pmtiles bytes=37748736-41943039 sent=4194304 signed
+2026-11-18T02:02:04.374Z 206 GET /signed/dcab6db8a790cc7fa5c2c1cd/il-champaign.aerial.pmtiles bytes=41943040-46137343 sent=4194304 signed
+2026-11-18T02:02:04.924Z 403 GET /signed/dcab6db8a790cc7fa5c2c1cd/il-champaign.aerial.pmtiles bytes=46137344-50331647 sent=0 expired
+2026-11-18T02:02:04.946Z 302 GET /dl/il-champaign.aerial.pmtiles bytes=46137344-50331647 sent=0
+2026-11-18T02:02:07.321Z 206 GET /signed/0eff0c1bf95d20b130d84dde/il-champaign.aerial.pmtiles bytes=46137344-50331647 sent=4194304 signed
+2026-11-18T02:02:09.338Z 206 GET /signed/0eff0c1bf95d20b130d84dde/il-champaign.aerial.pmtiles bytes=50331648-54525951 sent=4194304 signed
+2026-11-18T02:02:11.518Z 206 GET /signed/0eff0c1bf95d20b130d84dde/il-champaign.aerial.pmtiles bytes=54525952-58720255 sent=4194304 signed
+2026-11-18T02:02:13.201Z 206 GET /signed/0eff0c1bf95d20b130d84dde/il-champaign.aerial.pmtiles bytes=58720256-62914559 sent=4194304 signed
+2026-11-18T02:02:15.057Z 206 GET /signed/0eff0c1bf95d20b130d84dde/il-champaign.aerial.pmtiles bytes=62914560-67108863 sent=4194304 signed
+2026-11-18T02:02:16.737Z 206 GET /signed/0eff0c1bf95d20b130d84dde/il-champaign.aerial.pmtiles bytes=67108864-71303167 sent=4194304 signed
+2026-11-18T02:02:18.927Z 206 GET /signed/0eff0c1bf95d20b130d84dde/il-champaign.aerial.pmtiles bytes=71303168-75497471 sent=4194304 signed
+2026-11-18T02:02:20.679Z 206 GET /signed/0eff0c1bf95d20b130d84dde/il-champaign.aerial.pmtiles bytes=75497472-79691775 sent=4194304 signed
+2026-11-18T02:02:22.588Z 206 GET /signed/0eff0c1bf95d20b130d84dde/il-champaign.aerial.pmtiles bytes=79691776-83886079 sent=4194304 signed
+2026-11-18T02:02:24.614Z 206 GET /signed/0eff0c1bf95d20b130d84dde/il-champaign.aerial.pmtiles bytes=83886080-88080383 sent=4194304 signed
+2026-11-18T02:02:24.991Z 403 GET /signed/0eff0c1bf95d20b130d84dde/il-champaign.aerial.pmtiles bytes=88080384-92274687 sent=0 expired
+2026-11-18T02:02:25.020Z 302 GET /dl/il-champaign.aerial.pmtiles bytes=88080384-92274687 sent=0
+2026-11-18T02:02:27.917Z 206 GET /signed/8772c47d3716959a9cd3786b/il-champaign.aerial.pmtiles bytes=88080384-92274687 sent=4194304 signed
+2026-11-18T02:02:29.821Z 206 GET /signed/8772c47d3716959a9cd3786b/il-champaign.aerial.pmtiles bytes=92274688-96468991 sent=4194304 signed
+2026-11-18T02:02:31.743Z 206 GET /signed/8772c47d3716959a9cd3786b/il-champaign.aerial.pmtiles bytes=96468992-100663295 sent=4194304 signed
+2026-11-18T02:02:34.068Z 206 GET /signed/8772c47d3716959a9cd3786b/il-champaign.aerial.pmtiles bytes=100663296-104857599 sent=4194304 signed
+2026-11-18T02:02:35.755Z 206 GET /signed/8772c47d3716959a9cd3786b/il-champaign.aerial.pmtiles bytes=104857600-109051903 sent=4194304 signed
+2026-11-18T02:02:38.061Z 206 GET /signed/8772c47d3716959a9cd3786b/il-champaign.aerial.pmtiles bytes=109051904-113246207 sent=4194304 signed
+2026-11-18T02:02:39.946Z 206 GET /signed/8772c47d3716959a9cd3786b/il-champaign.aerial.pmtiles bytes=113246208-117440511 sent=4194304 signed
+2026-11-18T02:02:42.234Z 206 GET /signed/8772c47d3716959a9cd3786b/il-champaign.aerial.pmtiles bytes=117440512-121634815 sent=4194304 signed
+2026-11-18T02:02:44.310Z 206 GET /signed/8772c47d3716959a9cd3786b/il-champaign.aerial.pmtiles bytes=121634816-125829119 sent=4194304 signed
+2026-11-18T02:02:46.279Z 206 GET /signed/8772c47d3716959a9cd3786b/il-champaign.aerial.pmtiles bytes=125829120-130023423 sent=4194304 signed
+2026-11-18T02:02:47.185Z 403 GET /signed/8772c47d3716959a9cd3786b/il-champaign.aerial.pmtiles bytes=130023424-134217727 sent=0 expired
+2026-11-18T02:02:47.218Z 302 GET /dl/il-champaign.aerial.pmtiles bytes=130023424-134217727 sent=0
+2026-11-18T02:02:48.967Z 206 GET /signed/1cde87cb5f956c4a0951f418/il-champaign.aerial.pmtiles bytes=130023424-134217727 sent=4194304 signed
+2026-11-18T02:02:51.033Z 206 GET /signed/1cde87cb5f956c4a0951f418/il-champaign.aerial.pmtiles bytes=134217728-138412031 sent=4194304 signed
+2026-11-18T02:02:53.487Z 206 GET /signed/1cde87cb5f956c4a0951f418/il-champaign.aerial.pmtiles bytes=138412032-142606335 sent=4194304 signed
+2026-11-18T02:02:56.141Z 206 GET /signed/1cde87cb5f956c4a0951f418/il-champaign.aerial.pmtiles bytes=142606336-146800639 sent=4194304 signed
+2026-11-18T02:02:58.853Z 206 GET /signed/1cde87cb5f956c4a0951f418/il-champaign.aerial.pmtiles bytes=146800640-150994943 sent=4194304 signed
+2026-11-18T02:03:00.920Z 206 GET /signed/1cde87cb5f956c4a0951f418/il-champaign.aerial.pmtiles bytes=150994944-155189247 sent=4194304 signed
+2026-11-18T02:03:02.931Z 206 GET /signed/1cde87cb5f956c4a0951f418/il-champaign.aerial.pmtiles bytes=155189248-159383551 sent=4194304 signed
+2026-11-18T02:03:04.781Z 206 GET /signed/1cde87cb5f956c4a0951f418/il-champaign.aerial.pmtiles bytes=159383552-163577855 sent=4194304 signed
+2026-11-18T02:03:06.787Z 206 GET /signed/1cde87cb5f956c4a0951f418/il-champaign.aerial.pmtiles bytes=163577856-167772159 sent=4194304 signed
+2026-11-18T02:03:08.512Z 206 GET /signed/1cde87cb5f956c4a0951f418/il-champaign.aerial.pmtiles bytes=167772160-171966463 sent=4194304 signed
+2026-11-18T02:03:08.882Z 403 GET /signed/1cde87cb5f956c4a0951f418/il-champaign.aerial.pmtiles bytes=171966464-176160767 sent=0 expired
+2026-11-18T02:03:08.899Z 302 GET /dl/il-champaign.aerial.pmtiles bytes=171966464-176160767 sent=0
+2026-11-18T02:03:11.352Z 206 GET /signed/5fc7c505e965a9518e3688cf/il-champaign.aerial.pmtiles bytes=171966464-176160767 sent=4194304 signed
+2026-11-18T02:03:13.264Z 206 GET /signed/5fc7c505e965a9518e3688cf/il-champaign.aerial.pmtiles bytes=176160768-180355071 sent=4194304 signed
+2026-11-18T02:03:15.349Z 206 GET /signed/5fc7c505e965a9518e3688cf/il-champaign.aerial.pmtiles bytes=180355072-184549375 sent=4194304 signed
+2026-11-18T02:03:17.265Z 206 GET /signed/5fc7c505e965a9518e3688cf/il-champaign.aerial.pmtiles bytes=184549376-188743679 sent=4194304 signed
+2026-11-18T02:03:19.554Z 206 GET /signed/5fc7c505e965a9518e3688cf/il-champaign.aerial.pmtiles bytes=188743680-192937983 sent=4194304 signed
+2026-11-18T02:03:20.964Z 206 GET /signed/5fc7c505e965a9518e3688cf/il-champaign.aerial.pmtiles bytes=192937984-197132287 sent=4194304 signed
+2026-11-18T02:03:22.678Z 206 GET /signed/5fc7c505e965a9518e3688cf/il-champaign.aerial.pmtiles bytes=197132288-201326591 sent=4194304 signed
+2026-11-18T02:03:24.335Z 206 GET /signed/5fc7c505e965a9518e3688cf/il-champaign.aerial.pmtiles bytes=201326592-205520895 sent=4194304 signed
+2026-11-18T02:03:25.917Z 206 GET /signed/5fc7c505e965a9518e3688cf/il-champaign.aerial.pmtiles bytes=205520896-209715199 sent=4194304 signed
+2026-11-18T02:03:27.470Z 206 GET /signed/5fc7c505e965a9518e3688cf/il-champaign.aerial.pmtiles bytes=209715200-213909503 sent=4194304 signed
+2026-11-18T02:03:29.331Z 206 GET /signed/5fc7c505e965a9518e3688cf/il-champaign.aerial.pmtiles bytes=213909504-218103807 sent=4194304 signed
+2026-11-18T02:03:29.923Z 403 GET /signed/5fc7c505e965a9518e3688cf/il-champaign.aerial.pmtiles bytes=218103808-222298111 sent=0 expired
+2026-11-18T02:03:29.943Z 302 GET /dl/il-champaign.aerial.pmtiles bytes=218103808-222298111 sent=0
+2026-11-18T02:03:32.463Z 206 GET /signed/e88564e6feccd8bf45324385/il-champaign.aerial.pmtiles bytes=218103808-222298111 sent=4194304 signed
+2026-11-18T02:03:34.080Z 206 GET /signed/e88564e6feccd8bf45324385/il-champaign.aerial.pmtiles bytes=222298112-225572889 sent=3274778 signed

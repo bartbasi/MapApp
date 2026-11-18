@@ -1,0 +1,10 @@
+stop 01:55:06
+start 01:55:07
+before-open 01:55:47
+opened 01:55:48
+airplane-on 01:58:00
+airplane-off 01:59:48
+airplane-on 02:05:22
+kill 02:10:02
+reopen 02:10:21
+airplane-confirmed 02:13:40

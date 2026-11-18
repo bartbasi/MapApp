@@ -2,7 +2,7 @@
 
 Build tested: commit f23847c (HEAD of main when the build was cut), masked build (`VITE_MAPAPP_MASK_OWNERS=1`), catalog `http://10.0.2.2:8765/catalog.json`, kept as `build/step3-masked-debug.apk` (26 MB, no download folders in it). Emulator `mapapp_fold` (Android 16). Unfolded is display 4619827259835644672 (2208 x 1840), folded is display 4619827551948147201 (1080 x 2092). Data came from `release-test-server.mjs` at full speed, then at `--kbps 80`. No real phone was touched. Owner names read OWNER NAME in every screenshot. Parcels are named by ID.
 
-Text quoted below was read from the WebView through the DevTools port (`cdp.mjs`) unless a screenshot is named. Sizes the app calls "MB" are mebibytes (bytes / 1,048,576). Files on the phone were counted with `run-as ... ls -l`. Server logs: `server-log-session1-full-speed.txt`, `server-log-session3-80kBps.txt` (the first session's log lagged behind the app by a minute or more; see check 5).
+Text quoted below was read from the WebView through the DevTools port (`cdp.mjs`) unless a screenshot is named. In the first run the app's "MB" were mebibytes (bytes / 1,048,576). From commit 48dcd32 on, 1 MB is 1,000,000 bytes everywhere (see the second run); the byte comparisons in this first section were made against the old unit. Files on the phone were counted with `run-as ... ls -l`. Server logs: `server-log-session1-full-speed.txt`, `server-log-session3-80kBps.txt` (the first session's log lagged behind the app by a minute or more; see check 5).
 
 ## Results
 
@@ -88,3 +88,50 @@ Screenshot kept: `46-unfolded-readout-lon-89.0625.png` (online). The airplane-mo
 - **F7 Extracted public land** has a header max zoom higher than its highest tile, so `pmtiles verify` rejects it ("header MaxZoom=14 does not match max tile z 13" or "11"). Map and aerial extracts verify. The app draws it.
 - **F8 Sources and licenses** lists one line per downloaded area under each layer (six lines each with six areas).
 - **F9 Naming and step sizes.** An area covering both counties (253 by 185 km, 365 MB) was named "Macon County area 8". "Bigger area" grows by different factors depending on the zoom (3 taps gave 0.8 km at one zoom, 6.6 km at another, and 4 taps gave 71 km).
+
+
+# Second run: regression on commit 42ddb78
+
+Build: HEAD 42ddb78 (masked, catalog 10.0.2.2:8765), `build/step3-masked-debug.apk`, 27,665,254 bytes, SHA-256 `803f4ced9c08d67f62a4285e957507785544e87ae3c388ea6ce0b657e0cfbc45`. The APK was cut before faa515c (which changed the test server, a script and docs). The server was the faa515c one (UTC time on every line). Screenshots are in `run2/`. 1 MB is now 1,000,000 bytes, so the first run's "mebibyte" remark no longer applies. Text was read through the debug port. The emulator was unfolded unless named.
+
+## Fix status of the first run's faults
+| Fault | Fixed in | Second run |
+|---|---|---|
+| F1 Back | 0258ee3, 48dcd32 | fixed |
+| F2 Name field | 42ddb78 | fixed |
+| F3 no imagery card | 42ddb78 | fixed |
+| F4 county card | 42ddb78 | fixed |
+| F5 property lines wording | 0258ee3, 42ddb78 | fixed |
+| F6 notification sentence, MB | 42ddb78, 48dcd32 | fixed |
+| F7 public land verify | 4bf5069 | fixed |
+| F8 Sources lists | 42ddb78 | one line per download is still listed, grouped per layer; accepted as designed |
+| F9 name, step sizes | 42ddb78 | name fixed; steps still a little uneven (N2) |
+
+## Results
+- **Back (F1): pass.** With the button: Pick an area goes to the list, the list closes, Layers closes, Sources goes to Layers and then Layers closes. With nothing open, Back leaves the app; on return the process was the same, but the map showed dark for about 8 s first (N4; `01-back-nothing-open-return.png`). A swipe from the left edge also acted as Back (the emulator is on three-button navigation, so this was an injected edge swipe, not real gesture navigation). With the keyboard up, Back hides the keyboard only; the next Back goes up one screen.
+- **Name (F2): pass.** Folded, the name sits above the size and Download: "Name: Macon County area 2" and Change (`07-folded-pick-name-row.png`). Change opens "Name of this area" with Done; with the real keyboard up the field, Done and Download stay visible (`07-folded-pick-change-keyboard.png`). The size stayed 1.3 MB while typing.
+- **County card (F4): pass.** After map only: Map "On this phone." 4.3 MB, Public land "On this phone." 0.1 MB, Aerial imagery 141 MB, "Property lines are not part of the download: they come with the app for Macon County and work offline." (`04-unfolded-macon-card-after-map-only.png`). Ticking imagery gave "To download 141 MB". The area folders: first download basemap + publicland, second aerial only (140,565,035 bytes). No second base map. The list reads "Macon County, aerial imagery" and "Macon County" apart (text; its screenshot was not kept).
+- **Public land verify (F7): pass.** Farmland area: publicland verify exit 0 (10,751 bytes, max zoom 13), basemap 0, aerial 0. Champaign basemap, public land, aerial: all 0, aerial identical (`cmp`) to the hosted file. Kill-test area: all three 0.
+- **No imagery here (F3): pass.** Folded in Hybrid outside imagery: the full card with "Download imagery" and "Show the map" at the top, clear of the marker and readout; after a tap it becomes the compact "No imagery here" (`09-folded-hybrid-no-imagery-card.png`, compact form). Rotated: compact card, marker and readout clear (`23-rotated-no-imagery-card.png`). Unfolded upright: text read, no screenshot kept.
+- **F5 and F6: pass.** The property lines sentence is on both county cards (Champaign: "none are offered for Champaign County yet") and in the picker. "Android may ask about notifications. They only show progress, and the download works either way." sits under each Download button; Android's dialog came after the tap. Sizes, shown against disk: county map + public land 4.4 MB, disk 4,271,625 + 99,815 = 4,371,440 bytes; Macon imagery 141 MB, disk 140,565,035; Champaign map + public land 12.2 MB, disk 12,168,646; Champaign imagery 226 MB, disk 225,572,890. The notification read "55.3 MB of 141 MB" while the screen read 57.6 of 141 MB moments later: same unit.
+- **F8: accepted.** Sources lists a line per download under each layer.
+- **F9: name pass, steps note N2.** An area across both counties is named "Champaign and Macon area 1". Bigger area steps: 2.2 by 1.5 km, 4.3 by 3.1, 8.7 by 6.2, 17 by 12 (2x each); the first taps right after opening were smaller (0.7 by 0.5 miles to 1.3 by 1.0 after three taps).
+- **Outlines under the marker: pass.** With a fix at Decatur and the list open the blue dot and its circle stayed on top of the outlines (`15-unfolded-champaign-complete-marker-readout-kept.png`). While picking, the frame left the dot clear (seen live, screenshot not kept).
+
+## The reviewer's additions
+1. **Public land in airplane mode from a downloaded area: shown.** Only one area was on the phone (13 by 9.8 km at Decatur, public land 49,965 bytes; all county downloads deleted), app force-stopped, airplane mode confirmed (setting 1, "Active default network: none", ping unreachable). Many public land polygons drew, and a tap on the orange one opened "Sand Creek Open Space Reservation", Limited: permit needed, 777 acres, with the access text (`13-airplane-public-land-tap.png`; the polygons before the tap were seen live and are visible in that screenshot's map). Whole Macon County in airplane mode: it draws (`18-airplane-whole-macon-county.png`); public land is not visible at that zoom.
+2. **Champaign County: shown.** Map + public land card 12.2 MB, disk 12,168,646 bytes. Imagery card 226 MB, disk 225,572,890 bytes, identical to the hosted file, verify 0. Panned there (Urbana, -88.2072, 40.1106): Map and Hybrid drew with imagery (`16b-unfolded-champaign-hybrid-drawn.png`).
+3. **Marker and readout at completion and at deletion: shown.** A Champaign download completed with the fix at Decatur: 14 polls in 17 s and 14 screenshots; the readout text was present in every poll (`marker-readout-poll-county-complete.txt`), the dot and the property lines were in the completion frame (`15-unfolded-champaign-complete-marker-readout-kept.png`). A blink shorter than my 1.2 s sampling would not show. Deleting an area: 6 frames over 7 s; dot and readout stayed (`17-unfolded-just-after-delete-marker-readout.png`).
+4. **Times on the server log: shown.** App stopped 01:55:06 UTC, started 01:55:07, "Offline maps" opened 01:55:48; the only request in the log in that time is `GET /catalog.json` at 01:55:48.356 (`server-log-run2-timed-a.txt`, `server-times-note.txt`). With airplane mode confirmed at 02:13:40, the last request in the log is 02:11:08 and there is none after (`server-log-run2-timed-b-100kBps.txt`). Caveat: an unfinished download resumes at app start by design; in the kill test below the first request came 18 s after the reopen.
+5. **Kill and resume on this build: pass.** 100 kB/s, area 4.0 MB shown. Force-stop at 02:10:02 with 251,795 bytes in the part file. Reopen 02:10:21; the first request, at 02:10:39, was `bytes=1692967-1744734`, past the last pre-kill request (`bytes=1551045-1572146`); nothing was fetched again. Finished: basemap 785,112 + aerial 3,235,201 + public land 11,859 = 4,032,172 bytes. Verify exit 0 on all three. In airplane mode the area drew Aerial (`20-airplane-area-aerial.png`) and Hybrid, and a parcel tap gave parcel 08-06-23-100-007, 90.3 acres (`21-airplane-area-parcel-tap.png`).
+6. Tested commit 42ddb78, APK SHA-256 above.
+7. MB corrected above.
+- **Step 2 line check, airplane mode with the area: pass.** -89.0609: parcel 08-06-23-100-005, 213 ft (65 m) W. -89.0615: parcel 08-06-23-100-005, 45 ft (14 m) W. -89.0625: parcel 08-06-23-100-007, 236 ft (72 m) E.
+- **Crash log:** 0 `FATAL EXCEPTION`. Two ANRs, both of system apps (`com.android.settings`, `com.android.carrierdefaultapp`), none of MapApp (`crash-log-grep.txt`).
+
+## New findings
+- N1 After a reopen following a force-stop, the first resumed request came 18 s after the app was started (the first run's was faster).
+- N2 "Bigger area" steps are uneven right after the picker opens.
+- N3 The emulator reports airplane mode on one to five seconds before the network is really gone. My first airplane attempt in this run opened the app while it was still online; I repeated it. Tester note, not an app fault.
+- N4 The first return from Back with nothing open shows a dark map for about 8 s.
+- Not tested: a download started on Wi-Fi waiting rather than using mobile data (a later change).

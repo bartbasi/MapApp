@@ -1,0 +1,1 @@
+FATAL: 0  ANR in com.android.settings and com.android.carrierdefaultapp only (not MapApp)
