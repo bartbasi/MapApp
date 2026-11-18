@@ -4,7 +4,7 @@ Last updated: 2026-11-17, end of Step 3, waiting for the owner.
 
 ## Where the project stands
 
-**Step 3 (offline downloads) is built, tested on the emulator twice, and reviewed.** The report is `docs/reports/step-3.md`. The design is D33. Its three checks pass on the emulator. Nothing in its downloads has run on a real phone.
+**Step 3 (offline downloads) is built, tested on the emulator three times, and reviewed twice.** The report is `docs/reports/step-3.md`. The design is D33. Its three checks pass on the emulator. Nothing in its downloads has run on a real phone.
 
 **Step 3 is not pushed.** `main` is ahead of `origin/main` (5c706d9, the end of Step 2). The push waits for the owner's word on the new screenshots, which show Macon County parcel lines and IDs with owners masked (report question 1). His yes on 2026-11-17 named the Step 2 screenshots.
 

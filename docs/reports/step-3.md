@@ -207,7 +207,7 @@ The first run on the emulator found nine faults. The second and third runs confi
 
 ## Questions for you
 
-1. **May Step 3 go on GitHub?** It is 27 commits or a few more, with 188 new image files. As in Step 2, some of the screenshots show Macon County parcel lines and parcel IDs, with owner names masked. I have not counted how many. The evidence text also names a few parcels by their ID. Your earlier yes named the Step 2 screenshots. If you say no, I must rewrite the local history to take the images out before pushing the code, because they are already in commits.
+1. **May Step 3 go on GitHub?** It is 31 commits with 202 new image files. As in Step 2, some of the screenshots show Macon County parcel lines and parcel IDs, with owner names masked. I have not counted how many. The evidence text also names a few parcels by their ID. Your earlier yes named the Step 2 screenshots. If you say no, I must rewrite the local history to take the images out before pushing the code, because they are already in commits.
 2. **May I publish the map archives as GitHub release files?** Six files, 383 MB, no parcel data. Things to know before you answer:
    - It depends on question 1. The app finds its maps through a small list file in the repository, so nothing switches on until I can push.
    - A published file cannot be taken back once people have fetched it. A release's files are never changed; new data goes out as a new release.
