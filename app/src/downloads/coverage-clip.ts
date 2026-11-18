@@ -1,8 +1,16 @@
 // MapApp. Copyright 2026 Play, Inc.
 // Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE.
 
-// Cuts an archive's coverage outline down to a rectangle, for the metadata of
-// a downloaded area (D33). An area's archive must not claim to cover land
+// Cuts an archive's coverage outline down to a rectangle.
+//
+// Nothing calls this today. Only parcel archives carry an outline, and parcel
+// data never comes from a catalog (catalog.ts refusal()), so no download path
+// meets one. It is kept, with its tests, because D33 says an area's copy of
+// parcel data must carry the outline cut to the area if the owner ever allows
+// parcel hosting; that day it is ready and checked. Until then, delete it
+// freely if it gets in the way.
+//
+// What it was for: the metadata of a downloaded area (D33). An area's archive must not claim to cover land
 // outside the rectangle it was cut to: the readout would say "Not in a parcel"
 // there, the fault D32 describes.
 //

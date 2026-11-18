@@ -15,7 +15,7 @@ import type { Platform } from '../platform/platform';
 import { orderArchives } from './archive-order';
 import { loadDataSession, reloadDataSession } from './data-session';
 import { summarizeInstalled } from './installed';
-import { buildStyle, rasterDrawOrder, rasterSourceId } from './style/build-style';
+import { buildStyle, rasterDrawOrder, rasterSourceId, tileSourcesToReload } from './style/build-style';
 import { parcelSourceId } from './style/parcels';
 import { createTileLoader, parseTileUrl, tileUrlTemplate } from './tile-protocol';
 import type { Bounds } from './tile-math';
@@ -189,5 +189,15 @@ describe('the style with downloaded areas', () => {
   it('names parcel sources uniquely too', () => {
     expect(parcelSourceId(entry('il-macon', 'parcels'))).toBe('parcels:il-macon');
     expect(parcelSourceId(entry('il-macon', 'parcels', { area: NEW_AREA }))).toBe(`parcels:il-macon@${NEW_AREA}`);
+  });
+});
+
+describe('reloading tiles after a download (item 6)', () => {
+  it('reloads every map and imagery source but never the property lines', () => {
+    const installed = summarizeInstalled(orderArchives([bundled, entry('il-macon', 'aerial', { minzoom: 7, maxzoom: 16 }), entry('il-macon', 'parcels', { minzoom: 10, maxzoom: 16 }), entry('il-macon', 'publicland', { minzoom: 10, maxzoom: 14 })]));
+    const style = buildStyle({ base: 'hybrid', overlays: { publicland: true, parcels: true }, installed, glyphs: 'http://x/{fontstack}/{range}.pbf' });
+    expect(Object.keys(style.sources)).toContain('parcels:il-macon');
+    const ids = tileSourcesToReload(style.sources).map((s) => s.id);
+    expect(ids.sort()).toEqual(['aerial:il-macon', 'basemap', 'publicland'].sort());
   });
 });

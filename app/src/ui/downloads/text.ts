@@ -103,10 +103,13 @@ function layerOrder(layer: string): number {
 // ---------------------------------------------------------------- statuses
 
 export type StatusTone = 'done' | 'active' | 'idle' | 'problem';
-export type StatusIcon = 'check' | 'download' | 'clock' | 'pause' | 'offline' | 'caution';
+export type StatusIcon = 'check' | 'download' | 'clock' | 'pause' | 'offline' | 'caution' | 'mobile-data';
 
-/** What the user can do with a download, besides delete and show on the map. */
-export type MainAction = 'pause' | 'resume' | 'retry' | 'again' | null;
+/**
+ * What the user can do with a download, besides delete and show on the map.
+ * 'use-mobile-data' lets a download that waits for Wi-Fi go on over mobile data.
+ */
+export type MainAction = 'pause' | 'resume' | 'retry' | 'again' | 'use-mobile-data' | null;
 
 export interface StatusText {
   title: string;
@@ -165,7 +168,7 @@ export function progressLine(done: number, total: number): string {
   return `${a} of ${b}`;
 }
 
-export function statusText(view: Pick<AreaView, 'status' | 'error' | 'bytesDone' | 'bytesTotal'>): StatusText {
+export function statusText(view: Pick<AreaView, 'status' | 'error' | 'waitingFor' | 'bytesDone' | 'bytesTotal'>): StatusText {
   const progress = progressLine(view.bytesDone, view.bytesTotal);
   switch (view.status) {
     case 'queued':
@@ -175,6 +178,10 @@ export function statusText(view: Pick<AreaView, 'status' | 'error' | 'bytesDone'
     case 'paused':
       return { title: 'Paused', detail: `${progress}. Tap Resume to go on.`, icon: 'pause', tone: 'idle', progress: true, action: 'resume' };
     case 'waiting':
+      // On mobile data, a download the user did not allow it waits for Wi-Fi (D33). It never uses the data plan by itself.
+      if (view.waitingFor === 'unmetered') {
+        return { title: 'Waiting for Wi-Fi', detail: `${progress}. Goes on by itself on Wi-Fi.`, icon: 'mobile-data', tone: 'idle', progress: true, action: 'use-mobile-data' };
+      }
       return { title: 'Waiting for a connection', detail: `${progress}. Goes on by itself when the phone is online.`, icon: 'offline', tone: 'idle', progress: true, action: 'pause' };
     case 'failed': {
       const e = ERROR_TEXT[view.error ?? 'other'];
@@ -191,7 +198,26 @@ export const ACTION_LABELS: Readonly<Record<Exclude<MainAction, null>, string>> 
   resume: 'Resume',
   retry: 'Try again',
   again: 'Download again',
+  'use-mobile-data': 'Use mobile data',
 };
+
+// ---------------------------------------------------------------- mobile data
+
+/**
+ * The rule the words below describe (D33, contract.ts AreaJob.allowMetered):
+ * a download uses mobile data only if the user said yes when it started, or
+ * later with "Use mobile data". Any other download waits for Wi-Fi while the
+ * phone is on mobile data, and goes on by itself on Wi-Fi.
+ */
+export const METERED_NOTE_TITLE = 'You are on mobile data';
+export const METERED_NOTE = 'A new download asks before it uses your data plan. Downloads started on Wi-Fi wait for Wi-Fi.';
+/** Under the size of a picked area, on mobile data, before the question. */
+export const METERED_ASK_FIRST = 'You are on mobile data. You are asked before this download uses your data plan.';
+
+/** The question before a download on mobile data. Yes starts it with mobile data allowed; no starts nothing. */
+export function meteredQuestion(bytes: number): { title: string; detail: string } {
+  return { title: `Use ${formatSize(bytes)} of mobile data?`, detail: 'This comes out of your data plan. On Wi-Fi it costs nothing.' };
+}
 
 // ---------------------------------------------------------------- a damaged record
 
@@ -223,10 +249,14 @@ function fmtLength(n: number): string {
 
 // ---------------------------------------------------------------- when a download cannot start
 
+/** The list of maps is of a newer kind than this version of the app reads (errors.ts CatalogUnsupportedError). */
+export const CATALOG_UNSUPPORTED_TEXT = 'This version of the app cannot read the list of maps. Update the app.';
+
 /**
  * Why a download could not start or go on, in plain words, from the
  * service's error name ('offline', 'no-space', 'nothing',
- * 'catalog-unavailable'). Any other failure gets a general sentence.
+ * 'catalog-unavailable', 'catalog-unsupported'). Any other failure gets a
+ * general sentence.
  */
 export function startErrorText(code: string | undefined, space?: { neededBytes?: unknown; freeBytes?: unknown }): string {
   switch (code) {
@@ -242,6 +272,8 @@ export function startErrorText(code: string | undefined, space?: { neededBytes?:
       return 'There is nothing to download here.';
     case 'catalog-unavailable':
       return 'The list of maps could not be fetched. Check the connection and try again.';
+    case 'catalog-unsupported':
+      return CATALOG_UNSUPPORTED_TEXT;
     default:
       return 'The download could not start. Check the connection and try again.';
   }

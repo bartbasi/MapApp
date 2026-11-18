@@ -1,8 +1,9 @@
 // MapApp. Copyright 2026 Play, Inc.
 // Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE.
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_CATALOG_URL, buildCatalogUrl, loadStoredCatalog, parseCatalog, parseCatalogText } from './catalog';
+import { CatalogUnsupportedError } from './errors';
 import { fs, localPath } from './test-node';
 import { memoryStorage, testMeta } from './test-platform';
 
@@ -36,16 +37,59 @@ describe('catalog checking', () => {
     expect(c.archives[1]!.meta.minzoom).toBe(7);
   });
 
-  it('accepts an http base, for the test server', () => {
-    expect(parseCatalog(bad((c) => (c['base'] = 'http://10.0.2.2:8765/'))).base).toBe('http://10.0.2.2:8765/');
+  it('accepts an http base only in development, or from the same http origin as the catalog', () => {
+    const http = bad((c) => (c['base'] = 'http://10.0.2.2:8765/dl/'));
+    expect(parseCatalog(http, { allowHttp: true }).base).toBe('http://10.0.2.2:8765/dl/');
+    // The release test server: the catalog and its files on one http origin.
+    expect(parseCatalog(http, { allowHttp: false, catalogUrl: 'http://10.0.2.2:8765/catalog.json' }).base).toBe('http://10.0.2.2:8765/dl/');
+    // Anything else outside development must be https.
+    expect(() => parseCatalog(http, { allowHttp: false })).toThrow('catalog: the base address must be https');
+    expect(() => parseCatalog(http, { allowHttp: false, catalogUrl: 'https://raw.githubusercontent.com/x/catalog.json' })).toThrow(/https/);
+    expect(() => parseCatalog(http, { allowHttp: false, catalogUrl: 'http://10.0.2.2:9999/catalog.json' })).toThrow(/https/);
+    expect(parseCatalog(good(), { allowHttp: false }).base).toMatch(/^https:/);
+  });
+
+  it('defaults to accepting http in a development build only', () => {
+    const http = bad((c) => (c['base'] = 'http://10.0.2.2:8765/'));
+    if (import.meta.env.DEV) expect(parseCatalog(http).base).toBe('http://10.0.2.2:8765/');
+    else expect(() => parseCatalog(http)).toThrow(/https/);
+  });
+
+  it('gives CatalogUnsupportedError, not a plain failure, for a schema it cannot read', () => {
+    for (const schema of [2, '1', undefined]) {
+      let e: unknown;
+      try {
+        parseCatalog(bad((c) => (c['schema'] = schema)));
+      } catch (err) {
+        e = err;
+      }
+      expect(e).toBeInstanceOf(CatalogUnsupportedError);
+      expect(e).toMatchObject({ code: 'catalog-unsupported' });
+    }
+  });
+
+  it('drops parcel data and any archive with a coverage outline, with a warning, and keeps the rest', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const c = good();
+      const list = c['archives'] as Record<string, unknown>[];
+      list.push({ county: 'il-macon', layer: 'parcels', file: 'il-macon.parcels.pmtiles', bytes: 3000, sha256: SHA, meta: testMeta('il-macon', 'parcels', { bounds: [-89.2, 39.6, -88.7, 40.1], minzoom: 10, maxzoom: 16, bytes: 3000 }) });
+      const outline = { type: 'Polygon', coordinates: [[[-89.2, 39.6], [-88.7, 39.6], [-88.7, 40.1], [-89.2, 39.6]]] } as const;
+      list.push({ county: 'il-macon', layer: 'publicland', file: 'il-macon.publicland.pmtiles', bytes: 4000, sha256: SHA, meta: { ...testMeta('il-macon', 'publicland', { bounds: [-89.2, 39.6, -88.7, 40.1], minzoom: 10, maxzoom: 14, bytes: 4000 }), coverage: outline } });
+      const parsed = parseCatalog(c);
+      expect(parsed.archives.map((a) => a.layer)).toEqual(['basemap', 'aerial']);
+      expect(warn).toHaveBeenCalledTimes(2);
+      expect(String(warn.mock.calls[0]![0])).toContain('il-macon/parcels left out');
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   const refusals: [string, (c: Record<string, unknown>, a: Record<string, unknown>) => void][] = [
-    ['a schema other than 1', (c) => (c['schema'] = 2)],
     ['no release', (c) => delete c['release']],
     ['a release tag with a slash', (c) => (c['release'] = 'a/b')],
     ['a base with no slash at the end', (c) => (c['base'] = 'https://example.org/x')],
-    ['a base that is not http', (c) => (c['base'] = 'ftp://example.org/x/')],
+    ['a base that is not https', (c) => (c['base'] = 'ftp://example.org/x/')],
     ['a base that is not an address', (c) => (c['base'] = 'files/')],
     ['a base with a query', (c) => (c['base'] = 'https://example.org/?a=/')],
     ['archives that are not a list', (c) => (c['archives'] = {})],
@@ -99,6 +143,8 @@ describe('the stored catalog', () => {
     expect(loadStoredCatalog(memoryStorage(null))).toBeNull();
     expect(loadStoredCatalog(memoryStorage('{"schema":1'))).toBeNull();
     expect(loadStoredCatalog(memoryStorage(JSON.stringify(bad((c) => (c['schema'] = 9)))))).toBeNull();
+    // A kept catalog is held to the same address rule.
+    expect(loadStoredCatalog(memoryStorage(JSON.stringify(bad((c) => (c['base'] = 'http://example.org/')))), { allowHttp: false })).toBeNull();
   });
 });
 

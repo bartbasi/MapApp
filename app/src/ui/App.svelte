@@ -120,8 +120,13 @@
   const parcelInfo = $derived(tapped ? parcelPanel(tapped.lookup, masked, countiesWithLines) : null);
   /** The parcel part of the details panel: shown alone, or under a public land site when it names a parcel. */
   const showParcelInfo = $derived(!!parcelInfo && (!site || parcelInfo.kind === 'parcels'));
-  /** What a new download includes besides the map: the overlays that are on, and imagery when the base view shows it. */
-  const layersOn = $derived(['basemap', ...(publicLandOn ? ['publicland'] : []), ...(parcelsOn ? ['parcels'] : []), ...(shownView !== 'map' ? ['aerial'] : [])]);
+  /**
+   * What a new download includes besides the map: the overlays that are on,
+   * and imagery when the base view shows it. Never property lines: parcel
+   * data is never downloaded (downloads/catalog.ts refusal()). Whether they
+   * are on is passed apart, for the sentence that says so.
+   */
+  const layersOn = $derived(['basemap', ...(publicLandOn ? ['publicland'] : []), ...(shownView !== 'map' ? ['aerial'] : [])]);
 
   function styleOptions(): StyleOptions {
     return {
@@ -560,6 +565,7 @@
           service={downloads}
           ui={downloadsUi}
           {layersOn}
+          {parcelsOn}
           linesWith={countiesWithLines}
           onShowArea={(b) => void showArea(b)}
           onZoom={(d) => mapRef && zoomFrame(mapRef, downloadsUi, d)}

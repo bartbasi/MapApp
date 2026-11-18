@@ -17,13 +17,15 @@
   import NetworkNote from './NetworkNote.svelte';
   import type { DownloadsUi } from './downloads-ui.svelte';
   import { errorCode } from './estimate-runner';
-  import { formatSize, startErrorText, type MainAction } from './text';
+  import { CATALOG_UNSUPPORTED_TEXT, formatSize, startErrorText, type MainAction } from './text';
 
   interface Props {
     service: DownloadService;
     ui: DownloadsUi;
     /** Layers on now: overlays switched on, and 'aerial' when the base view uses imagery. */
     layersOn: readonly string[];
+    /** Property lines are on. They are never part of a download; the screens say so. */
+    parcelsOn: boolean;
     /** Counties whose property lines came with the app. Property lines are never part of a download. */
     linesWith: readonly string[];
     /** Moves the map so this rectangle shows, clear of the panel. */
@@ -31,14 +33,14 @@
     onZoom: (direction: 1 | -1) => void;
   }
 
-  let { service, ui, layersOn, linesWith, onShowArea, onZoom }: Props = $props();
+  let { service, ui, layersOn, parcelsOn, linesWith, onShowArea, onZoom }: Props = $props();
 
   let root = $state<HTMLElement | null>(null);
   let areas = $state.raw<readonly AreaView[]>([]);
   let network = $state.raw<NetworkState>({ online: true, metered: false });
   let freeBytes = $state<number | undefined>(undefined);
-  /** Shown only while the list of counties is not in hand. */
-  let offersState = $state<'loading' | 'ready' | 'failed'>('loading');
+  /** Shown only while the list of counties is not in hand. 'unsupported': this version of the app cannot read it. */
+  let offersState = $state<'loading' | 'ready' | 'failed' | 'unsupported'>('loading');
 
   $effect(() => {
     areas = service.areas();
@@ -66,7 +68,7 @@
       offersState = 'ready';
     } catch (e) {
       console.warn('the list of counties could not be fetched:', e);
-      offersState = 'failed';
+      offersState = errorCode(e) === 'catalog-unsupported' ? 'unsupported' : 'failed';
     }
   }
 
@@ -106,11 +108,13 @@
     try {
       if (action === 'pause') await service.pause(view.record.id);
       else if (action === 'resume' || action === 'retry') await service.resume(view.record.id);
+      else if (action === 'use-mobile-data') await service.setAllowMetered(view.record.id, true);
       else {
-        // The data changed or arrived damaged: plan it again from what was asked for.
+        // The data changed or arrived damaged: plan it again from what was asked
+        // for, with the same answer about mobile data the user gave before.
         const request = requestOf(view);
         await service.remove(view.record.id);
-        const id = await service.start(request, view.record.name);
+        const id = await service.start(request, view.record.name, { allowMetered: view.allowMetered });
         if (ui.shown === view.record.id) ui.shown = id;
       }
     } catch (e) {
@@ -128,8 +132,9 @@
     }
   }
 
-  async function startCounty(request: AreaRequest, name: string) {
-    const id = await service.start(request, name);
+  /** allowMetered: the user said yes to mobile data for this download. */
+  async function startCounty(request: AreaRequest, name: string, allowMetered: boolean) {
+    const id = await service.start(request, name, { allowMetered });
     markStarted();
     ui.shown = id;
   }
@@ -166,7 +171,7 @@
 
 <div bind:this={root}>
   {#if ui.mode === 'pick'}
-    <AreaPicker {service} {ui} offers={ui.offers ?? []} {areas} {layersOn} {linesWith} {network} {freeBytes} {notifyNote} {onZoom} onStarted={started} />
+    <AreaPicker {service} {ui} offers={ui.offers ?? []} {areas} {layersOn} {parcelsOn} {linesWith} {network} {freeBytes} {notifyNote} {onZoom} onStarted={started} />
   {:else}
     <NetworkNote {network} />
 
@@ -196,6 +201,8 @@
     <h3>Whole county</h3>
     {#if offersState === 'loading' && !ui.offers}
       <p class="working"><span class="spinner" aria-hidden="true"></span> Getting the list of counties</p>
+    {:else if !ui.offers && offersState === 'unsupported'}
+      <p class="problem">{CATALOG_UNSUPPORTED_TEXT}</p>
     {:else if !ui.offers}
       <p class="problem">
         {network.online ? 'The list of counties could not be fetched.' : 'The list of counties needs a connection the first time. It is kept on the phone after that.'}
@@ -203,7 +210,7 @@
       {#if network.online}<DlButton icon="retry" label="Try again" onclick={() => void loadOffers()} />{/if}
     {:else}
       {#each ui.offers as offer (offer.county)}
-        <CountyCard {offer} {layersOn} {linesWith} {areas} {network} {freeBytes} {notifyNote} onStart={startCounty} />
+        <CountyCard {offer} {layersOn} {parcelsOn} {linesWith} {areas} {network} {freeBytes} {notifyNote} onStart={startCounty} />
       {/each}
     {/if}
 

@@ -28,7 +28,7 @@ import { PUBLIC_LAND_LAYER, readPublicLandSite, type PublicLandSite } from './pu
 import { publicLandLabelPoints, type LabelSource } from './public-land-labels';
 import { revealOffset } from './reveal';
 import { DOUBLE_TAP_MS, TAP_REACH_STEPS_PX, isSecondTap, type Tap } from './taps';
-import { buildStyle, type LIVE_SOURCES, type StyleOptions } from './style/build-style';
+import { buildStyle, tileSourcesToReload, type LIVE_SOURCES, type StyleOptions } from './style/build-style';
 import { styleImage } from './style/images';
 import { DOWNLOAD_AREAS_SOURCE } from './style/download-areas';
 import { PARCEL_RELATION_SOURCE, PARCEL_SELECTED_SOURCE } from './style/parcels';
@@ -292,18 +292,16 @@ export class MapView {
   }
 
   /**
-   * Drops the tiles the map holds for every archive source and fetches them
+   * Drops the tiles the map holds for every archive source but the parcel ones, and fetches them
    * again, keeping the camera. Call it after the installed archives changed
    * (data-session.ts reloadDataSession): a source whose address did not
    * change would otherwise keep the empty tiles it got before an area was
    * downloaded, or the tiles of an area that was removed.
    */
   reloadTiles(): void {
-    const sources = this.map.getStyle()?.sources ?? {};
-    for (const [id, spec] of Object.entries(sources)) {
-      if ((spec.type === 'vector' || spec.type === 'raster') && spec.tiles) {
-        this.map.getSource<VectorTileSource | RasterTileSource>(id)?.setTiles(spec.tiles);
-      }
+    // Parcel sources are left alone: a download never changes parcel data, and a reload makes the lines blink.
+    for (const { id, tiles } of tileSourcesToReload(this.map.getStyle()?.sources ?? {})) {
+      this.map.getSource<VectorTileSource | RasterTileSource>(id)?.setTiles(tiles);
     }
   }
 

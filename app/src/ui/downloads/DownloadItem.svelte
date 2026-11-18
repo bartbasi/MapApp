@@ -33,7 +33,7 @@
   const name = $derived(damaged ? DAMAGED_NAME : view.record.name || DAMAGED_NAME);
   const pct = $derived(percentDone(view.bytesDone, view.bytesTotal));
   const stopped = $derived(view.status === 'paused' || view.status === 'waiting' || view.status === 'queued');
-  const actionIcon = { pause: 'pause', resume: 'resume', retry: 'retry', again: 'download' } as const;
+  const actionIcon = { pause: 'pause', resume: 'resume', retry: 'retry', again: 'download', 'use-mobile-data': 'mobile-data' } as const;
 </script>
 
 <article class:shown class={damaged ? 'problem' : s.tone} aria-label={name}>

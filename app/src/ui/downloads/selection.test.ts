@@ -43,6 +43,7 @@ describe('county sizes', () => {
     const view = (layers: string[], status: AreaView['status']): AreaView => ({
       record: { id: 'a', name: 'Macon County', bounds: macon.bounds, county: 'il-macon', layers, aerialMaxzoom: 16, created: '', release: '', dataDate: '', bytes: 1 },
       status,
+      allowMetered: false,
       bytesDone: 0,
       bytesTotal: 1,
     });

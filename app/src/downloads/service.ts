@@ -22,8 +22,9 @@ import type {
   FileJob,
   NetworkState,
 } from './contract';
-import { CatalogUnavailableError, NotEnoughSpaceError, NothingToDownloadError, OfflineError, isAbortError } from './errors';
+import { CatalogUnavailableError, CatalogUnsupportedError, NotEnoughSpaceError, NothingToDownloadError, OfflineError, isAbortError } from './errors';
 import { checkRequest, planRequest, requestKey, requestNeedsReads, type RequestPlan } from './request-plan';
+import { ReadCache, raceAbort } from './remote-source';
 import { unionBounds } from '../map/tile-math';
 
 /** Space left free on the phone after a download, on top of its own size. */
@@ -37,6 +38,10 @@ export interface DownloadServiceOptions {
   catalogUrl?: string;
   /** Where the last good catalog is kept. Defaults to the browser's local storage. */
   storage?: CatalogStorage;
+  /** Accept an http base address in the catalog. Defaults to true in a development build only (catalog.ts). */
+  allowHttp?: boolean;
+  /** Directory reads kept between estimates. A new one is made when left out. */
+  readCache?: ReadCache;
   /** For tests. */
   now?: () => number;
   random?: () => number;
@@ -74,6 +79,16 @@ function newestDataDate(plan: RequestPlan): string {
   return best;
 }
 
+/**
+ * One file of the job. A whole file carries its SHA-256 and no ETag, on
+ * purpose: the checksum is the real guard, checked when the file is complete,
+ * and pinning an ETag would cost one more read through the release host's
+ * redirect for each file, against addresses whose ETag behaviour on the real
+ * host is not tested yet (D33). A release's files never change, so a changed
+ * whole file is a fault the checksum reports as 'corrupt'. An extract keeps
+ * the ETag its plan was made from, because its head was built from the
+ * hosted file's directories and is wrong for any other version of it.
+ */
 function fileJob(file: RequestPlan['files'][number]): FileJob {
   const job: FileJob = {
     county: file.archive.county,
@@ -102,6 +117,11 @@ export function createDownloadService(parts: DownloadParts, options: DownloadSer
   let catalogFetch: Promise<Catalog> | null = null;
   /** The plans of the latest estimate, reused by start() for the same request. */
   let lastPlan: RequestPlan | null = null;
+  /** Directory reads of the hosted files, kept for the life of the service (remote-source.ts). */
+  const reads = options.readCache ?? new ReadCache();
+  let cachedRelease: string | null = null;
+  /** An http base is accepted only from the same http origin as the catalog, outside development. */
+  const catalogChecks = { catalogUrl, ...(options.allowHttp !== undefined ? { allowHttp: options.allowHttp } : {}) };
 
   let net: NetworkState = { online: true, metered: false };
   const states = new Map<string, AreaState>();
@@ -116,8 +136,15 @@ export function createDownloadService(parts: DownloadParts, options: DownloadSer
   // ------------------------------------------------------------ areas
   function rebuildViews(): void {
     const list: AreaView[] = [...states.values()].map((s) => {
-      const view: AreaView = { record: parseAreaRecord(s.record, s.id).record, status: s.status, bytesDone: s.bytesDone, bytesTotal: s.bytesTotal };
+      const view: AreaView = {
+        record: parseAreaRecord(s.record, s.id).record,
+        status: s.status,
+        allowMetered: s.allowMetered === true,
+        bytesDone: s.bytesDone,
+        bytesTotal: s.bytesTotal,
+      };
       if (s.error !== undefined) view.error = s.error;
+      if (s.status === 'waiting' && s.waitingFor !== undefined) view.waitingFor = s.waitingFor;
       return view;
     });
     list.sort((a, b) => (a.record.created < b.record.created ? 1 : a.record.created > b.record.created ? -1 : compareAreaIdsNewestFirst(a.record.id, b.record.id)));
@@ -181,31 +208,47 @@ export function createDownloadService(parts: DownloadParts, options: DownloadSer
   // ------------------------------------------------------------ catalog
   async function fetchCatalog(signal?: AbortSignal): Promise<Catalog> {
     const text = await remote.text(catalogUrl, signal);
-    const parsed = parseCatalogText(text);
+    const parsed = parseCatalogText(text, catalogChecks);
     storage.save(text);
     return parsed;
   }
 
-  /** The catalog: fresh if it can be had, else the last good one, else CatalogUnavailableError. */
+  function useCatalog(c: Catalog): Catalog {
+    // Reads of an older release are of no use once the catalog has moved on.
+    if (cachedRelease !== c.release) reads.clear();
+    cachedRelease = c.release;
+    catalog = c;
+    return c;
+  }
+
+  function storedCatalog(): Catalog | null {
+    return catalog ?? loadStoredCatalog(storage, catalogChecks);
+  }
+
+  /**
+   * The catalog: fresh if it can be had, else the last good one, else
+   * CatalogUnavailableError. A catalog of a schema this app cannot read gives
+   * CatalogUnsupportedError, with no fallback to the kept copy: a new schema
+   * means the publisher meant older apps to stop, and the user must update.
+   */
   async function getCatalog(signal?: AbortSignal): Promise<Catalog> {
     if (catalog && now() - catalogFetchedAt < CATALOG_MAX_AGE_MS) return catalog;
     if (net.online) {
       try {
         catalogFetch ??= fetchCatalog().finally(() => (catalogFetch = null));
-        const fresh = await (signal ? raceAbort(catalogFetch, signal) : catalogFetch);
-        catalog = fresh;
+        const fresh = await raceAbort(catalogFetch, signal);
         catalogFetchedAt = now();
-        return fresh;
+        return useCatalog(fresh);
       } catch (e) {
-        if (isAbortError(e)) throw e;
+        if (isAbortError(e) || e instanceof CatalogUnsupportedError) throw e;
         console.warn('the catalog could not be fetched:', (e as Error).message);
-        catalog ??= loadStoredCatalog(storage);
-        if (catalog) return catalog;
+        const kept = storedCatalog();
+        if (kept) return useCatalog(kept);
         throw new CatalogUnavailableError('The list of downloads could not be fetched.', { cause: e });
       }
     }
-    catalog ??= loadStoredCatalog(storage);
-    if (catalog) return catalog;
+    const kept = storedCatalog();
+    if (kept) return useCatalog(kept);
     throw new CatalogUnavailableError('The list of downloads needs a connection the first time.');
   }
 
@@ -216,7 +259,7 @@ export function createDownloadService(parts: DownloadParts, options: DownloadSer
     if (lastPlan?.key === key) return lastPlan;
     if (!net.online && requestNeedsReads(cat, request)) throw new OfflineError();
     try {
-      const p = await planRequest(cat, request, remote, signal);
+      const p = await planRequest(cat, request, { remote, cache: reads, ...(signal ? { signal } : {}) });
       lastPlan = p;
       return p;
     } catch (e) {
@@ -251,7 +294,7 @@ export function createDownloadService(parts: DownloadParts, options: DownloadSer
       return (await plan(request, signal)).estimate;
     },
 
-    async start(request, name) {
+    async start(request, name, startOptions) {
       checkRequest(request);
       if (!net.online) throw new OfflineError();
       const p = await plan(request);
@@ -275,7 +318,8 @@ export function createDownloadService(parts: DownloadParts, options: DownloadSer
         bytes: p.estimate.bytes,
       };
       if (p.county !== undefined) record.county = p.county;
-      const job: AreaJob = { id, record: JSON.stringify(record), files: p.files.map(fileJob) };
+      // Mobile data only when the user was asked and said yes (S1, D33).
+      const job: AreaJob = { id, record: JSON.stringify(record), files: p.files.map(fileJob), allowMetered: startOptions?.allowMetered === true };
       await jobs.start(job);
       // The downloader reports the new area through onChange; the list makes sure.
       await refresh().catch((e: unknown) => console.warn('the list of areas could not be read:', e));
@@ -290,6 +334,11 @@ export function createDownloadService(parts: DownloadParts, options: DownloadSer
     async resume(id) {
       if (!net.online) throw new OfflineError();
       await jobs.resume(id);
+      await refresh();
+    },
+
+    async setAllowMetered(id, allow) {
+      await jobs.setAllowMetered(id, allow);
       await refresh();
     },
 
@@ -323,23 +372,3 @@ export function createDownloadService(parts: DownloadParts, options: DownloadSer
     },
   };
 }
-
-/** Rejects with the signal's reason when it aborts, without stopping the shared promise. */
-function raceAbort<T>(p: Promise<T>, signal: AbortSignal): Promise<T> {
-  signal.throwIfAborted();
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = () => reject(signal.reason);
-    signal.addEventListener('abort', onAbort, { once: true });
-    p.then(
-      (v) => {
-        signal.removeEventListener('abort', onAbort);
-        resolve(v);
-      },
-      (e: unknown) => {
-        signal.removeEventListener('abort', onAbort);
-        reject(e);
-      },
-    );
-  });
-}
-

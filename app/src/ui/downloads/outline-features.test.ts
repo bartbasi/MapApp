@@ -8,6 +8,7 @@ import { outlineFeatures } from './outline-features';
 const view = (id: string, name: string, bounds: [number, number, number, number], layers = ['basemap']): AreaView => ({
   record: { id, name, bounds, layers, aerialMaxzoom: 16, created: '', release: '', dataDate: '', bytes: 1 },
   status: 'complete',
+  allowMetered: false,
   bytesDone: 1,
   bytesTotal: 1,
 });

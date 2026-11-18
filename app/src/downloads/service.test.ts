@@ -5,6 +5,7 @@
 // release of small made-up archives, the in-memory downloader the browser
 // stand-in uses, and a network the test switches on and off.
 
+import { Compression } from 'pmtiles';
 import { describe, expect, it, vi } from 'vitest';
 import type { Bounds } from '../map/tile-math';
 import { CoverageArea } from '../parcels/coverage-area';
@@ -13,6 +14,8 @@ import type { AreaJob, AreaRequest, AreaStatus, AreaView, Catalog, CatalogArchiv
 import { CatalogUnavailableError, NotEnoughSpaceError, NothingToDownloadError, OfflineError } from './errors';
 import { checkExtract } from './extract-check';
 import { planExtract } from './extract-planner';
+import { ReadCache } from './remote-source';
+import { planRequest } from './request-plan';
 import { SPACE_MARGIN_BYTES, createDownloadService, type DownloadManager } from './service';
 import { memorySource, writeTestArchive, type TestTile } from './test-archive';
 import { MemoryRemote, TestNetwork, bytesFile, catalogText, memoryStorage, sha256Hex, testMeta } from './test-platform';
@@ -32,6 +35,10 @@ interface LayerSpec {
   /** Where the archive has tiles; the metadata's bounds are the county's. */
   tilesIn?: Bounds;
   coverage?: CatalogArchive['meta']['coverage'];
+  /** Leaf directories of this many entries, so planning must read leaves. */
+  leafSize?: number;
+  /** Directories stored uncompressed, so they are large enough to lie past the first read. */
+  plainDirectories?: boolean;
 }
 
 const LAYERS: LayerSpec[] = [
@@ -70,7 +77,7 @@ async function makeRelease(counties: { id: string; bounds: Bounds }[] = [{ id: '
   for (const c of counties) {
     for (const l of layers) {
       const tiles = tilesFor(`${c.id} ${l.layer}`, l.tilesIn ?? c.bounds, l.minzoom, l.maxzoom);
-      const data = await writeTestArchive(tiles, { minzoom: l.minzoom, maxzoom: l.maxzoom, bounds: c.bounds, metadata: { name: l.layer } });
+      const data = await writeTestArchive(tiles, { minzoom: l.minzoom, maxzoom: l.maxzoom, bounds: c.bounds, metadata: { name: l.layer }, ...(l.leafSize ? { leafSize: l.leafSize } : {}), ...(l.plainDirectories ? { internalCompression: Compression.None } : {}) });
       const file = `${c.id}.${l.layer}.pmtiles`;
       bytes.set(BASE + file, data);
       const meta = testMeta(c.id, l.layer, { bounds: c.bounds, minzoom: l.minzoom, maxzoom: l.maxzoom, bytes: data.length, coverage: l.coverage, dataDate: l.layer === 'aerial' ? '2025-06-30' : '2025-01-01' });
@@ -93,7 +100,7 @@ interface Setup {
   free: { bytes: number | undefined };
 }
 
-async function setup(hosted?: Hosted, o: { storage?: ReturnType<typeof memoryStorage>; online?: boolean } = {}): Promise<Setup> {
+async function setup(hosted?: Hosted, o: { storage?: ReturnType<typeof memoryStorage>; online?: boolean; readCache?: ReadCache } = {}): Promise<Setup> {
   const h = hosted ?? (await makeRelease());
   const remote = new MemoryRemote();
   for (const [url, data] of h.bytes) remote.files.set(url, bytesFile(data, `"${url.length}-${data.length}"`));
@@ -108,7 +115,7 @@ async function setup(hosted?: Hosted, o: { storage?: ReturnType<typeof memorySto
   const storage = o.storage ?? memoryStorage();
   const clock = { t: Date.UTC(2026, 10, 17, 12) };
   let n = 0;
-  const service = createDownloadService({ remote, jobs, network }, { catalogUrl: CATALOG_URL, storage, now: () => clock.t, random: () => (n++ % 36) / 36 });
+  const service = createDownloadService({ remote, jobs, network }, { catalogUrl: CATALOG_URL, storage, now: () => clock.t, random: () => (n++ % 36) / 36, ...(o.readCache ? { readCache: o.readCache } : {}) });
   await service.ready;
   return { hosted: h, remote, network, jobs, storage, service, clock, free };
 }
@@ -178,6 +185,17 @@ describe('offers', () => {
     s.remote.texts.set(CATALOG_URL, JSON.stringify({ ...s.hosted.catalog, base: 'https://host.test/no-slash' }));
     await expect(s.service.offers()).rejects.toMatchObject({ code: 'catalog-unavailable' });
     expect(s.storage.text).toBeNull();
+  });
+
+  it('rejects with catalog-unsupported for a schema it cannot read, with no fallback to the kept copy', async () => {
+    const storage = memoryStorage();
+    const first = await setup(undefined, { storage });
+    await first.service.offers();
+    const later = await setup(first.hosted, { storage });
+    later.remote.texts.set(CATALOG_URL, JSON.stringify({ ...first.hosted.catalog, schema: 2 }));
+    await expect(later.service.offers()).rejects.toMatchObject({ code: 'catalog-unsupported' });
+    // The kept copy is not replaced by the one that cannot be read.
+    expect(JSON.parse(storage.text!).schema).toBe(1);
   });
 
   it('fetches the catalog again once it is old', async () => {
@@ -365,10 +383,10 @@ describe('start and the download', () => {
 
   it('plans again when the request differs', async () => {
     const s = await setup();
-    await s.service.estimate(rect(['basemap']));
-    const reads = s.remote.reads.length;
-    await s.service.estimate(rect(['basemap'], 13, [-89.01, 39.8, -88.9, 39.87]));
-    expect(s.remote.reads.length).toBeGreaterThan(reads);
+    const a = await s.service.estimate(rect(['basemap']));
+    const b = await s.service.estimate(rect(['basemap'], 13, [-89.05, 39.8, -88.9, 39.87]));
+    expect(b.bytes).toBeGreaterThan(a.bytes);
+    expect(b.layers[0]!.tiles).toBeGreaterThan(a.layers[0]!.tiles);
   });
 
   it('refuses to start without room for the download and the margin', async () => {
@@ -435,7 +453,7 @@ describe('the area list', () => {
     const s = await setup();
     const hosted = s.hosted.bytes.get(`${BASE}il-macon.publicland.pmtiles`)!;
     const meta = JSON.stringify(s.hosted.catalog.archives.find((a) => a.layer === 'publicland')!.meta);
-    await s.jobs.start({ id: 'a000000001-broken00', record: 'not json', files: [{ county: 'il-macon', layer: 'publicland', url: `${BASE}il-macon.publicland.pmtiles`, head: new Uint8Array(0), ranges: [{ offset: 0, length: hosted.length }], bytes: hosted.length, meta }] });
+    await s.jobs.start({ id: 'a000000001-broken00', record: 'not json', files: [{ county: 'il-macon', layer: 'publicland', url: `${BASE}il-macon.publicland.pmtiles`, head: new Uint8Array(0), ranges: [{ offset: 0, length: hosted.length }], bytes: hosted.length, meta }], allowMetered: false });
     const v = await until(s.service, 'a000000001-broken00', 'complete');
     expect(v.record).toMatchObject({ id: 'a000000001-broken00', name: '', layers: [] });
     await s.service.remove('a000000001-broken00');
@@ -579,9 +597,105 @@ describe('pause, resume, remove and failures', () => {
   });
 });
 
-describe('coverage outlines', () => {
-  // An outline over the west half of the county.
-  const WEST: CatalogArchive['meta']['coverage'] = {
+describe('mobile data (S1)', () => {
+  /** Lets a few reads through, then holds the rest until opened. */
+  function slow(s: Setup, through = 3): { open(): void } {
+    let count = 0;
+    let open: () => void = () => {};
+    const gate = new Promise<void>((r) => (open = r));
+    s.remote.beforeRead = () => (++count > through ? gate : undefined);
+    return {
+      open: () => {
+        s.remote.beforeRead = null;
+        open();
+      },
+    };
+  }
+
+  it('a download started on mobile data without a yes fetches nothing and waits for Wi-Fi', async () => {
+    const s = await setup();
+    s.network.set(true, true);
+    const startSpy = vi.spyOn(s.jobs, 'start');
+    const id = await s.service.start(county(['basemap']), 'x');
+    expect((startSpy.mock.calls[0]![0] as AreaJob).allowMetered).toBe(false);
+    const v = await until(s.service, id, 'waiting');
+    expect(v).toMatchObject({ status: 'waiting', waitingFor: 'unmetered', allowMetered: false, bytesDone: 0 });
+    expect(s.remote.reads).toHaveLength(0);
+    // Wi-Fi again: it goes on by itself.
+    s.network.set(true, false);
+    expect((await until(s.service, id, 'complete')).bytesDone).toBe(s.hosted.bytes.get(`${BASE}il-macon.basemap.pmtiles`)!.length);
+  });
+
+  it('Use mobile data lets a waiting download go on over mobile data', async () => {
+    const s = await setup();
+    s.network.set(true, true);
+    const id = await s.service.start(county(['basemap']), 'x');
+    await until(s.service, id, 'waiting');
+    await s.service.setAllowMetered(id, true);
+    const v = await until(s.service, id, 'complete');
+    expect(v.allowMetered).toBe(true);
+    expect(v.waitingFor).toBeUndefined();
+  });
+
+  it('a download started with a yes uses mobile data from the start', async () => {
+    const s = await setup();
+    s.network.set(true, true);
+    const startSpy = vi.spyOn(s.jobs, 'start');
+    const id = await s.service.start(county(['basemap']), 'x', { allowMetered: true });
+    expect((startSpy.mock.calls[0]![0] as AreaJob).allowMetered).toBe(true);
+    expect(await until(s.service, id, 'complete', 'waiting')).toMatchObject({ status: 'complete', allowMetered: true });
+  });
+
+  it('a download started on Wi-Fi stops when the phone moves to mobile data, and goes on back on Wi-Fi', async () => {
+    const s = await setup();
+    const g = slow(s);
+    const id = await s.service.start(county(['basemap']), 'x');
+    await vi.waitFor(() => expect(view(s.service, id)!.bytesDone).toBeGreaterThan(0));
+    s.network.set(true, true);
+    const v = await until(s.service, id, 'waiting');
+    expect(v.waitingFor).toBe('unmetered');
+    const readsWhenStopped = s.remote.reads.length;
+    g.open();
+    await new Promise((r) => setTimeout(r, 30));
+    // Nothing more was fetched over mobile data.
+    expect(s.remote.reads.length).toBe(readsWhenStopped);
+    expect(view(s.service, id)!.status).toBe('waiting');
+    s.network.set(true, false);
+    await until(s.service, id, 'complete');
+    expect(s.jobs.fileBytes(id, 0)).toEqual(s.hosted.bytes.get(`${BASE}il-macon.basemap.pmtiles`));
+  });
+
+  it('withdrawing the yes while it downloads over mobile data makes it wait', async () => {
+    const s = await setup();
+    s.network.set(true, true);
+    const g = slow(s);
+    const id = await s.service.start(county(['basemap']), 'x', { allowMetered: true });
+    await vi.waitFor(() => expect(view(s.service, id)!.bytesDone).toBeGreaterThan(0));
+    await s.service.setAllowMetered(id, false);
+    expect(view(s.service, id)).toMatchObject({ status: 'waiting', waitingFor: 'unmetered', allowMetered: false });
+    g.open();
+  });
+
+  it('with no connection at all it waits for a connection, not for Wi-Fi', async () => {
+    const s = await setup();
+    let count = 0;
+    s.remote.beforeRead = () => {
+      if (++count === 2) {
+        s.remote.online = false;
+        s.network.set(false);
+      }
+    };
+    const id = await s.service.start(county(['basemap']), 'x');
+    expect((await until(s.service, id, 'waiting')).waitingFor).toBe('connection');
+    s.remote.online = true;
+    s.network.set(true, true);
+    // Back, but on mobile data: now it waits for Wi-Fi.
+    await vi.waitFor(() => expect(view(s.service, id)!.waitingFor).toBe('unmetered'));
+  });
+});
+
+describe('parcel data never comes from a catalog (S2)', () => {
+  const OUTLINE: CatalogArchive['meta']['coverage'] = {
     type: 'Polygon',
     coordinates: [
       [
@@ -593,33 +707,115 @@ describe('coverage outlines', () => {
       ],
     ],
   };
-  const layers: LayerSpec[] = [{ layer: 'basemap', minzoom: 0, maxzoom: 11, coverage: WEST }];
 
-  it("an area's copy carries the outline cut to the rectangle", async () => {
-    const s = await setup(await makeRelease(undefined, layers));
-    const id = await s.service.start(rect(['basemap']), 'x');
-    await until(s.service, id, 'complete');
-    const meta = s.jobs.completedArchives()[0]!.meta;
-    expect(meta.coverage).toBeDefined();
-    const cover = new CoverageArea(meta.coverage!);
-    expect(cover.contains(-88.97, 39.83)).toBe(true); // in the box and the outline
-    expect(cover.contains(-88.92, 39.83)).toBe(false); // in the box, east of the outline
-    expect(cover.contains(-89.1, 39.83)).toBe(false); // in the outline, west of the box
-    const [w, s0, e, n] = cover.bbox;
-    expect([w, s0, e, n]).toEqual([BOX[0], BOX[1], -88.95, BOX[3]]);
+  it('leaves out a parcels layer and any archive with a coverage outline, with a warning', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const hosted = await makeRelease(undefined, [
+        { layer: 'basemap', minzoom: 0, maxzoom: 11 },
+        { layer: 'parcels', minzoom: 10, maxzoom: 11 },
+        { layer: 'publicland', minzoom: 10, maxzoom: 11, coverage: OUTLINE },
+      ]);
+      const s = await setup(hosted);
+      const offers = await s.service.offers();
+      expect(offers[0]!.layers.map((l) => l.layer)).toEqual(['basemap']);
+      const warned = warn.mock.calls.map((c) => String(c[0]));
+      expect(warned.some((w) => w.includes('il-macon/parcels left out'))).toBe(true);
+      expect(warned.some((w) => w.includes('il-macon/publicland left out'))).toBe(true);
+      const est = await s.service.estimate(rect(['basemap', 'parcels', 'publicland']));
+      expect(est.layers.map((l) => l.layer)).toEqual(['basemap']);
+      expect(est.missing).toEqual(['parcels', 'publicland']);
+      expect(s.remote.reads.some((r) => !r.url.includes('basemap'))).toBe(false);
+      await expect(s.service.start(county(['parcels']), 'x')).rejects.toBeInstanceOf(NothingToDownloadError);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
-  it('a rectangle outside the outline leaves the layer out, with no read', async () => {
-    const s = await setup(await makeRelease(undefined, layers));
-    const est = await s.service.estimate(rect(['basemap'], 13, [-88.9, 39.8, -88.8, 39.87]));
-    expect(est).toEqual({ bytes: 0, layers: [], missing: ['basemap'] });
-    expect(s.remote.reads).toHaveLength(0);
+  it('planRequest never plans parcels, even from a catalog that was not checked', async () => {
+    const hosted = await makeRelease(undefined, [
+      { layer: 'basemap', minzoom: 0, maxzoom: 11 },
+      { layer: 'parcels', minzoom: 10, maxzoom: 11 },
+    ]);
+    const remote = new MemoryRemote();
+    for (const [url, data] of hosted.bytes) remote.files.set(url, bytesFile(data));
+    for (const where of [{ bounds: BOX }, { county: 'il-macon' }]) {
+      const plan = await planRequest(hosted.catalog, { where, layers: ['parcels', 'basemap'], aerialMaxzoom: 16 }, remote);
+      expect(plan.files.map((f) => f.archive.layer)).toEqual(['basemap']);
+      expect(plan.estimate.missing).toEqual(['parcels']);
+    }
+    expect(remote.reads.some((r) => r.url.includes('parcels'))).toBe(false);
   });
 
-  it('a whole county keeps the outline as it is', async () => {
-    const s = await setup(await makeRelease(undefined, layers));
-    const id = await s.service.start(county(['basemap']), 'x');
-    await until(s.service, id, 'complete');
-    expect(s.jobs.completedArchives()[0]!.meta.coverage).toEqual(WEST);
+  it("an archive with an outline is never planned, and an area's copy never carries one", async () => {
+    const hosted = await makeRelease(undefined, [{ layer: 'basemap', minzoom: 0, maxzoom: 11 }]);
+    const remote = new MemoryRemote();
+    for (const [url, data] of hosted.bytes) remote.files.set(url, bytesFile(data));
+    const base = hosted.catalog.archives[0]!;
+    const withOutline = { ...hosted.catalog, archives: [{ ...base, meta: { ...base.meta, coverage: OUTLINE } }] };
+    expect((await planRequest(withOutline, rect(['basemap']), remote)).files).toHaveLength(0);
+    const plain = await planRequest(hosted.catalog, rect(['basemap']), remote);
+    expect(plain.files[0]!.meta.coverage).toBeUndefined();
+  });
+});
+
+describe('directory reads are kept between estimates (S3)', () => {
+  // About 10,000 tiles in leaves of 64, so the directories reach well past the first 16 KB read.
+  const leafy: LayerSpec[] = [{ layer: 'basemap', minzoom: 0, maxzoom: 16, leafSize: 64, plainDirectories: true }];
+  /** The frame moved around a little, as a user does: some steps overlap, two go back. */
+  const frames: Bounds[] = [BOX, [-89.01, 39.8, -88.91, 39.87], [-89.0, 39.81, -88.9, 39.88], BOX, [-89.1, 39.9, -89.0, 39.97], BOX];
+
+  async function readsFor(cache: ReadCache | undefined): Promise<{ total: number; perEstimate: number[] }> {
+    const s = await setup(await makeRelease(undefined, leafy), cache ? { readCache: cache } : {});
+    const perEstimate: number[] = [];
+    for (const f of frames) {
+      const before = s.remote.reads.length;
+      await s.service.estimate(rect(['basemap'], 12, f));
+      perEstimate.push(s.remote.reads.length - before);
+    }
+    return { total: s.remote.reads.length, perEstimate };
+  }
+
+  it('reads each header, root and leaf directory once for the life of the service', async () => {
+    const kept = await readsFor(undefined);
+    const none = await readsFor(new ReadCache(0));
+    console.log(`RemoteFiles.read calls for ${frames.length} estimates: ${none.total} with nothing kept (${none.perEstimate.join(', ')}), ${kept.total} with reads kept (${kept.perEstimate.join(', ')})`);
+    expect(kept.total).toBeLessThan(none.total);
+    // The header and some leaves.
+    expect(kept.perEstimate[0]).toBeGreaterThan(1);
+    // Going back to a frame read before reads nothing.
+    expect(kept.perEstimate[3]).toBe(0);
+    expect(kept.perEstimate[5]).toBe(0);
+    // A frame further off reads only the leaves it did not have.
+    expect(kept.perEstimate[4]).toBeLessThan(none.perEstimate[4]!);
+    // Without the cache every estimate reads the header and its leaves again.
+    expect(none.perEstimate.every((n) => n > 1)).toBe(true);
+  });
+
+  it('a new release forgets the reads of the old one', async () => {
+    const s = await setup(await makeRelease(undefined, leafy));
+    await s.service.estimate(rect(['basemap']));
+    const first = s.remote.reads.length;
+    s.remote.texts.set(CATALOG_URL, catalogText({ ...s.hosted.catalog, release: 'data-2026-12-01' }));
+    s.clock.t += 11 * 60 * 1000;
+    await s.service.estimate(rect(['basemap']));
+    expect(s.remote.reads.length).toBe(2 * first);
+  });
+
+  it('an aborted estimate does not fail another that shares its reads', async () => {
+    const s = await setup(await makeRelease(undefined, leafy));
+    await s.service.offers();
+    let open: () => void = () => {};
+    const gate = new Promise<void>((r) => (open = r));
+    s.remote.beforeRead = () => gate;
+    const a = new AbortController();
+    const first = s.service.estimate(rect(['basemap'], 12), a.signal);
+    const second = s.service.estimate(rect(['basemap'], 11));
+    await new Promise((r) => setTimeout(r, 5));
+    a.abort();
+    s.remote.beforeRead = null;
+    open();
+    await expect(first).rejects.toMatchObject({ name: 'AbortError' });
+    expect((await second).layers).toHaveLength(1);
   });
 });

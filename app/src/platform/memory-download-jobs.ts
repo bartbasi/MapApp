@@ -5,11 +5,15 @@
 // native one (contract.ts DownloadJobs) in a development browser, and the
 // downloader the manager's tests run against. It does the real work: writes
 // the head, fetches each range in pieces, checks the ETag, the size and the
-// checksum, and can stop and go on at any byte. What it does not do is outlive
-// the page: a reload forgets every area.
+// checksum, and can stop and go on at any byte. It keeps to the mobile data
+// rule as the native one must (contract.ts AreaJob.allowMetered): an area not
+// allowed mobile data fetches nothing while the connection is metered, waits
+// with `waitingFor` 'unmetered', and goes on by itself when the connection is
+// not metered or the area is allowed. What it does not do is outlive the
+// page: a reload forgets every area.
 
 import type { Source } from 'pmtiles';
-import type { AreaError, AreaJob, AreaState, AreaStatus, DownloadJobs, Network, RemoteFiles } from '../downloads/contract';
+import type { AreaError, AreaJob, AreaState, AreaStatus, DownloadJobs, Network, NetworkState, RemoteFiles } from '../downloads/contract';
 import { parseArchiveMeta, type ArchiveEntry } from './archive-meta';
 
 /** A failed read that came back from the server with a status. */
@@ -43,10 +47,15 @@ interface FileProgress {
   written: number;
 }
 
+type WaitingFor = 'connection' | 'unmetered';
+
 interface Area {
   job: AreaJob;
   status: AreaStatus;
   error?: AreaError;
+  /** With status 'waiting': what for. */
+  waitingFor?: WaitingFor;
+  allowMetered: boolean;
   files: FileProgress[];
   controller: AbortController | null;
   archives: ArchiveEntry[];
@@ -57,6 +66,7 @@ class Stop extends Error {
   constructor(
     readonly status: 'failed' | 'waiting',
     readonly error?: AreaError,
+    readonly waitingFor?: WaitingFor,
   ) {
     super(status);
   }
@@ -86,18 +96,22 @@ export class MemoryDownloadJobs implements DownloadJobs {
   private readonly retryMs: number;
   private readonly now: () => number;
   private readonly offNetwork: (() => void) | undefined;
-  private online = true;
+  private net: NetworkState = { online: true, metered: false };
+  /** Settles once the first network state is in. */
+  private readonly netReady: Promise<void>;
 
   constructor(private readonly options: MemoryDownloadJobsOptions) {
     this.chunkBytes = options.chunkBytes ?? 4 * 1024 * 1024;
     this.progressMs = options.progressMs ?? 1000;
     this.retryMs = options.retryMs ?? 5000;
     this.now = options.now ?? (() => Date.now());
-    this.offNetwork = options.network?.onChange((s) => {
-      this.online = s.online;
-      if (s.online) this.wakeWaiting();
-    });
-    void options.network?.get().then((s) => (this.online = s.online)).catch(() => {});
+    this.offNetwork = options.network?.onChange((s) => this.networkChanged(s));
+    this.netReady = options.network
+      ? options.network.get().then(
+          (s) => void (this.net = { ...s }),
+          () => {},
+        )
+      : Promise.resolve();
   }
 
   // ------------------------------------------------------------ DownloadJobs
@@ -106,9 +120,10 @@ export class MemoryDownloadJobs implements DownloadJobs {
     if (this.areas.has(job.id)) throw new Error(`area ${job.id} exists already`);
     // Checked now so a bad job fails at once and not when it completes.
     for (const f of job.files) parseArchiveMeta(JSON.parse(f.meta));
-    const area: Area = { job, status: 'queued', files: job.files.map(() => ({ data: null, written: 0 })), controller: null, archives: [] };
+    const area: Area = { job, status: 'queued', allowMetered: job.allowMetered === true, files: job.files.map(() => ({ data: null, written: 0 })), controller: null, archives: [] };
     this.areas.set(job.id, area);
     this.report(area);
+    await this.netReady;
     this.pump();
   }
 
@@ -123,6 +138,23 @@ export class MemoryDownloadJobs implements DownloadJobs {
     const area = this.areas.get(id);
     if (!area || area.status === 'complete' || area.status === 'downloading' || area.status === 'queued') return;
     this.setStatus(area, 'queued');
+    this.pump();
+  }
+
+  async setAllowMetered(id: string, allow: boolean): Promise<void> {
+    const area = this.areas.get(id);
+    if (!area) return;
+    area.allowMetered = allow;
+    const blocked = this.blockedBy(area);
+    if (area.status === 'downloading' && blocked) {
+      // Withdrawn while it uses mobile data: it stops and waits.
+      this.wait(area, blocked);
+      area.controller?.abort();
+    } else if (area.status === 'waiting' && !blocked) {
+      this.setStatus(area, 'queued');
+    } else {
+      this.report(area);
+    }
     this.pump();
   }
 
@@ -184,10 +216,12 @@ export class MemoryDownloadJobs implements DownloadJobs {
       id: a.job.id,
       record: a.job.record,
       status: a.status,
+      allowMetered: a.allowMetered,
       bytesDone: a.files.reduce((n, f) => n + f.written, 0),
       bytesTotal: totalOf(a.job),
     };
     if (a.error !== undefined) s.error = a.error;
+    if (a.status === 'waiting' && a.waitingFor !== undefined) s.waitingFor = a.waitingFor;
     return s;
   }
 
@@ -200,17 +234,60 @@ export class MemoryDownloadJobs implements DownloadJobs {
     a.status = status;
     if (error === undefined) delete a.error;
     else a.error = error;
+    if (status !== 'waiting') delete a.waitingFor;
     this.report(a);
   }
 
+  private wait(a: Area, why: WaitingFor): void {
+    a.waitingFor = why;
+    this.setStatus(a, 'waiting');
+  }
+
+  /** What stops an area from fetching now, or null when nothing does. */
+  private blockedBy(a: Area): WaitingFor | null {
+    if (!this.net.online) return 'connection';
+    if (this.net.metered && !a.allowMetered) return 'unmetered';
+    return null;
+  }
+
+  private networkChanged(state: NetworkState): void {
+    this.net = { ...state };
+    const run = this.running;
+    if (run && run.status === 'downloading') {
+      const blocked = this.blockedBy(run);
+      if (blocked) {
+        this.wait(run, blocked);
+        run.controller?.abort();
+      }
+    }
+    this.wakeWaiting();
+  }
+
+  /** Areas whose reason to wait has gone are queued again. Others are told the new reason, if it changed. */
   private wakeWaiting(): void {
-    for (const a of this.areas.values()) if (a.status === 'waiting') this.setStatus(a, 'queued');
+    for (const a of this.areas.values()) {
+      if (a.status !== 'waiting') continue;
+      const blocked = this.blockedBy(a);
+      if (!blocked) this.setStatus(a, 'queued');
+      else if (blocked !== a.waitingFor) this.wait(a, blocked);
+    }
     this.pump();
   }
 
   private pump(): void {
     if (this.running) return;
-    const next = [...this.areas.values()].find((a) => a.status === 'queued');
+    // The oldest queued area that may fetch now. One that may not waits, and the next one gets its turn.
+    let next: Area | undefined;
+    for (const a of this.areas.values()) {
+      if (a.status !== 'queued') continue;
+      const blocked = this.blockedBy(a);
+      if (!blocked) {
+        next = a;
+        break;
+      }
+      this.wait(a, blocked);
+      if (blocked === 'connection') this.scheduleRetry();
+    }
     if (!next) return;
     this.running = next;
     void this.run(next).finally(() => {
@@ -239,8 +316,12 @@ export class MemoryDownloadJobs implements DownloadJobs {
     } catch (e) {
       if (controller.signal.aborted) return; // paused or removed: the status is set already
       if (e instanceof Stop) {
-        this.setStatus(area, e.status, e.error);
-        if (e.status === 'waiting') this.scheduleRetry();
+        if (e.status === 'waiting') {
+          this.wait(area, e.waitingFor ?? 'connection');
+          this.scheduleRetry();
+        } else {
+          this.setStatus(area, e.status, e.error);
+        }
         return;
       }
       console.warn(`area ${area.job.id} failed:`, e);
@@ -253,7 +334,7 @@ export class MemoryDownloadJobs implements DownloadJobs {
   private scheduleRetry(): void {
     clearTimeout(this.retryTimer);
     this.retryTimer = setTimeout(() => {
-      if (this.online) this.wakeWaiting();
+      if (this.net.online) this.wakeWaiting();
       else this.scheduleRetry();
     }, this.retryMs);
   }
@@ -276,6 +357,8 @@ export class MemoryDownloadJobs implements DownloadJobs {
       }
       for (let done = skip; done < range.length; ) {
         signal.throwIfAborted();
+        const blocked = this.blockedBy(area);
+        if (blocked) throw new Stop('waiting', undefined, blocked);
         const length = Math.min(this.chunkBytes, range.length - done);
         const bytes = await this.read(file.url, range.offset + done, length, file.etag, signal);
         if (p.written + bytes.length > file.bytes) throw new Stop('failed', 'corrupt');
@@ -305,7 +388,7 @@ export class MemoryDownloadJobs implements DownloadJobs {
       if (signal.aborted) throw e;
       if (e instanceof RemoteStatusError) throw new Stop('failed', 'server');
       // No answer at all: the connection is gone, or the server is away for now.
-      throw new Stop('waiting');
+      throw new Stop('waiting', undefined, 'connection');
     }
     if (etag !== undefined && r.etag !== undefined && r.etag !== etag) throw new Stop('failed', 'changed');
     if (r.data.byteLength !== length) throw new Stop('failed', 'server');

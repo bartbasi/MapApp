@@ -11,17 +11,20 @@
 //   detail, which is cut from the hosted file like a rectangle (the county's
 //   bounds), so the user's detail choice holds there too.
 //
-// An archive whose plan holds no tile is left out, and so is one whose
-// coverage outline does not reach into the rectangle.
+// An archive whose plan holds no tile is left out.
+//
+// Parcel data is never planned, even when asked for and even when a catalog
+// lists it (catalog.ts refusal() gives the reasons). So no archive planned
+// here carries a coverage outline, and an area's copy never claims one.
 
 import { layerTitle } from '../map/installed';
 import { boundsOverlap, unionBounds, type Bounds } from '../map/tile-math';
 import type { ArchiveMeta } from '../platform/archive-meta';
-import { clipCoverage } from './coverage-clip';
+import { refusal } from './catalog';
 import type { AreaEstimate, AreaRequest, Catalog, CatalogArchive, LayerEstimate, RemoteFiles } from './contract';
 import { planWholeArchive, type DownloadPlan } from './download-plan';
 import { planExtract } from './extract-planner';
-import { RemoteSource } from './remote-source';
+import { RemoteSource, type ReadCache } from './remote-source';
 
 /** The layer whose detail the request can lower. */
 export const AERIAL_LAYER = 'aerial';
@@ -75,33 +78,33 @@ export function requestKey(request: AreaRequest, release: string): string {
   return JSON.stringify({ release, where, layers: [...new Set(request.layers)].sort(), aerialMaxzoom: request.aerialMaxzoom });
 }
 
-/** The metadata of an area's copy of a hosted archive: the plan's bounds, zooms and size, and the outline cut to the rectangle. */
-export function extractMeta(source: ArchiveMeta, plan: { bounds: Bounds; minzoom: number; maxzoom: number; bytes: number }, coverage: ArchiveMeta['coverage'] | null): ArchiveMeta {
+/**
+ * The metadata of an area's copy of a hosted archive: the plan's bounds,
+ * zooms and size. Never a coverage outline: an outline says where the data
+ * speaks for every place, which a cut-down copy cannot (see the top of this file).
+ */
+export function extractMeta(source: ArchiveMeta, plan: { bounds: Bounds; minzoom: number; maxzoom: number; bytes: number }): ArchiveMeta {
   const meta: ArchiveMeta = { ...source, bounds: [...plan.bounds], minzoom: plan.minzoom, maxzoom: plan.maxzoom, bytes: plan.bytes };
   delete meta.coverage;
-  if (coverage) meta.coverage = coverage;
   return meta;
 }
 
-async function planCut(
-  archive: CatalogArchive,
-  url: string,
-  bounds: Bounds,
-  maxzoom: number | undefined,
-  remote: RemoteFiles,
-  signal: AbortSignal | undefined,
-): Promise<PlannedFile | null> {
-  // An outline that does not reach into the rectangle means the copy would
-  // speak for no place at all: leave the layer out, with no read.
-  let coverage: ArchiveMeta['coverage'] | null = null;
-  if (archive.meta.coverage) {
-    coverage = clipCoverage(archive.meta.coverage, bounds);
-    if (!coverage) return null;
-  }
-  const source = new RemoteSource(remote, url, archive.bytes, signal);
+/** How planning reads the hosted files. */
+export interface PlanReads {
+  remote: RemoteFiles;
+  signal?: AbortSignal;
+  /** Directory reads kept between plans (remote-source.ts). */
+  cache?: ReadCache;
+}
+
+async function planCut(archive: CatalogArchive, url: string, bounds: Bounds, maxzoom: number | undefined, release: string, reads: PlanReads): Promise<PlannedFile | null> {
+  const source = new RemoteSource(reads.remote, url, archive.bytes, {
+    ...(reads.signal ? { signal: reads.signal } : {}),
+    ...(reads.cache ? { cache: { cache: reads.cache, release } } : {}),
+  });
   const plan = await planExtract(source, maxzoom === undefined ? { bounds } : { bounds, maxzoom });
   if (plan.addressedTiles === 0) return null;
-  return { archive, url, plan, whole: false, meta: extractMeta(archive.meta, plan, coverage), tiles: plan.addressedTiles };
+  return { archive, url, plan, whole: false, meta: extractMeta(archive.meta, plan), tiles: plan.addressedTiles };
 }
 
 /** The detail to cut a layer to, or null when the request's detail is below everything the archive has. */
@@ -116,17 +119,25 @@ export function requestNeedsReads(catalog: Catalog, request: AreaRequest): boole
   if ('bounds' in request.where) return true;
   const county = request.where.county;
   return catalog.archives.some((a) => {
-    if (a.county !== county || !request.layers.includes(a.layer)) return false;
+    if (a.county !== county || !request.layers.includes(a.layer) || refusal(a) !== null) return false;
     const maxzoom = layerMaxzoom(a, request);
     return maxzoom !== null && maxzoom !== undefined && maxzoom < a.meta.maxzoom;
   });
 }
 
-/** Plans a request against the catalog. Reads only directories, and only for a rectangle or for imagery at reduced detail. */
-export async function planRequest(catalog: Catalog, request: AreaRequest, remote: RemoteFiles, signal?: AbortSignal): Promise<RequestPlan> {
+/**
+ * Plans a request against the catalog. Reads only directories, and only for a
+ * rectangle or for imagery at reduced detail. Parcel data is never planned:
+ * asked for, it is named as missing.
+ */
+export async function planRequest(catalog: Catalog, request: AreaRequest, remote: RemoteFiles | PlanReads, signal?: AbortSignal): Promise<RequestPlan> {
   checkRequest(request);
-  signal?.throwIfAborted();
+  const reads: PlanReads = 'remote' in remote ? remote : { remote, ...(signal ? { signal } : {}) };
+  reads.signal?.throwIfAborted();
   const wanted = new Set(request.layers);
+  const release = catalog.release;
+  // The catalog was checked already; this keeps the rule however the catalog was made.
+  const archives = catalog.archives.filter((a) => refusal(a) === null);
   const urlOf = (a: CatalogArchive) => catalog.base + a.file;
   let bounds: Bounds;
   let county: string | undefined;
@@ -135,29 +146,29 @@ export async function planRequest(catalog: Catalog, request: AreaRequest, remote
   if ('bounds' in request.where) {
     bounds = [...request.where.bounds];
     const rect = bounds;
-    jobs = catalog.archives
+    jobs = archives
       .filter((a) => wanted.has(a.layer) && boundsOverlap(a.meta.bounds, rect))
       .map((a) => {
         const maxzoom = layerMaxzoom(a, request);
-        return maxzoom === null ? Promise.resolve(null) : planCut(a, urlOf(a), rect, maxzoom, remote, signal);
+        return maxzoom === null ? Promise.resolve(null) : planCut(a, urlOf(a), rect, maxzoom, release, reads);
       });
   } else {
     county = request.where.county;
-    const own = catalog.archives.filter((a) => a.county === county);
+    const own = archives.filter((a) => a.county === county);
     bounds = unionBounds(own.map((a) => a.meta.bounds)) ?? [0, 0, 0, 0];
     jobs = own
       .filter((a) => wanted.has(a.layer))
       .map((a) => {
         const maxzoom = layerMaxzoom(a, request);
         if (maxzoom === null) return Promise.resolve(null);
-        if (maxzoom !== undefined && maxzoom < a.meta.maxzoom) return planCut(a, urlOf(a), a.meta.bounds, maxzoom, remote, signal);
+        if (maxzoom !== undefined && maxzoom < a.meta.maxzoom) return planCut(a, urlOf(a), a.meta.bounds, maxzoom, release, reads);
         const file: PlannedFile = { archive: a, url: urlOf(a), plan: planWholeArchive(a.bytes), whole: true, meta: a.meta, tiles: 0 };
         return Promise.resolve(file);
       });
   }
 
   const files = (await Promise.all(jobs)).filter((f): f is PlannedFile => f !== null);
-  signal?.throwIfAborted();
+  reads.signal?.throwIfAborted();
   const layers: LayerEstimate[] = files.map((f) => ({
     county: f.archive.county,
     layer: f.archive.layer,

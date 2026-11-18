@@ -98,3 +98,36 @@ describe('FakeDownloadService', () => {
     });
   });
 });
+
+describe('the fake and mobile data (S1)', () => {
+  it('waits for Wi-Fi on mobile data unless the download was allowed it', async () => {
+    const s = new FakeDownloadService({ tickMs: 0, estimateMs: 0, network: { online: true, metered: true } });
+    const request = { where: { county: 'il-macon' }, layers: ['basemap'], aerialMaxzoom: 16 };
+    const plain = await s.start(request, 'plain');
+    expect(s.areas().find((a) => a.record.id === plain)).toMatchObject({ status: 'waiting', waitingFor: 'unmetered', allowMetered: false });
+    await s.setAllowMetered(plain, true);
+    expect(s.areas().find((a) => a.record.id === plain)).toMatchObject({ status: 'downloading', allowMetered: true });
+    s.setNetwork({ online: false, metered: false });
+    expect(s.areas().find((a) => a.record.id === plain)).toMatchObject({ status: 'waiting', waitingFor: 'connection' });
+    s.destroy();
+  });
+
+  it('a download started with a yes goes on over mobile data', async () => {
+    const s = new FakeDownloadService({ tickMs: 0, estimateMs: 0, network: { online: true, metered: true } });
+    const id = await s.start({ where: { county: 'il-macon' }, layers: ['basemap'], aerialMaxzoom: 16 }, 'x', { allowMetered: true });
+    expect(s.areas().find((a) => a.record.id === id)?.status).toBe('downloading');
+    s.destroy();
+  });
+});
+
+describe('the fake: a yes is not held up by a download waiting for Wi-Fi', () => {
+  it('lets the allowed download go ahead of one that waits for Wi-Fi', async () => {
+    const s = new FakeDownloadService({ tickMs: 0, scenario: 'states', network: { online: true, metered: true } });
+    const by = (name: string) => s.areas().find((a) => a.record.name === name)!;
+    expect(by('North timber')).toMatchObject({ status: 'waiting', waitingFor: 'unmetered' });
+    await s.setAllowMetered(by('Field edge').record.id, true);
+    expect(by('Field edge')).toMatchObject({ status: 'downloading', allowMetered: true });
+    expect(by('North timber').status).toBe('waiting');
+    s.destroy();
+  });
+});

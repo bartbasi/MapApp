@@ -124,15 +124,30 @@ interface NativeFileJob {
 /** The "Downloads" native plugin (android/.../downloads/DownloadsPlugin.java). */
 interface DownloadsPlugin {
   writeHead(o: { id: string; index: number; offset: number; data: string }): Promise<void>;
-  start(o: { id: string; record: string; files: NativeFileJob[] }): Promise<void>;
+  /** allowMetered: false means nothing is fetched over a metered connection (contract.ts AreaJob). Stored with the job. */
+  start(o: { id: string; record: string; files: NativeFileJob[]; allowMetered: boolean }): Promise<void>;
   pause(o: { id: string }): Promise<void>;
   resume(o: { id: string }): Promise<void>;
   remove(o: { id: string }): Promise<void>;
+  /** Changes and stores an area's allowMetered (contract.ts DownloadJobs.setAllowMetered). */
+  setAllowMetered(o: { id: string; allow: boolean }): Promise<void>;
   list(): Promise<{ areas: AreaState[] }>;
   freeBytes(): Promise<{ bytes?: number }>;
   text(o: { url: string }): Promise<{ text: string }>;
   read(o: { url: string; offset: number; length: number }): Promise<{ data: string; etag?: string; totalBytes?: number }>;
   addListener(event: 'change', listener: (state: AreaState) => void): Promise<PluginListenerHandle>;
+}
+
+/**
+ * An area's state as the native side reports it, made safe: allowMetered is
+ * false unless the native side says true, and waitingFor is kept only with
+ * status 'waiting' and only with a value the contract knows.
+ */
+export function areaStateFromNative(raw: AreaState): AreaState {
+  const out: AreaState = { ...raw, allowMetered: raw.allowMetered === true };
+  delete out.waitingFor;
+  if (raw.status === 'waiting' && (raw.waitingFor === 'connection' || raw.waitingFor === 'unmetered')) out.waitingFor = raw.waitingFor;
+  return out;
 }
 
 /** The "NetworkState" native plugin (android/.../downloads/NetworkStatePlugin.java). */
@@ -215,6 +230,7 @@ async function startJob(job: AreaJob): Promise<void> {
   await NativeDownloads.start({
     id: job.id,
     record: job.record,
+    allowMetered: job.allowMetered === true,
     files: job.files.map((f) => {
       const n: NativeFileJob = {
         county: f.county,
@@ -237,11 +253,12 @@ const androidJobs: DownloadJobs = {
   pause: (id) => NativeDownloads.pause({ id }),
   resume: (id) => NativeDownloads.resume({ id }),
   remove: (id) => NativeDownloads.remove({ id }),
+  setAllowMetered: (id, allow) => NativeDownloads.setAllowMetered({ id, allow }),
   async list() {
-    return (await NativeDownloads.list()).areas;
+    return (await NativeDownloads.list()).areas.map(areaStateFromNative);
   },
   onChange(listener) {
-    return subscribe((cb) => NativeDownloads.addListener('change', cb), listener);
+    return subscribe((cb) => NativeDownloads.addListener('change', cb), (state: AreaState) => listener(areaStateFromNative(state)));
   },
   async freeBytes() {
     try {

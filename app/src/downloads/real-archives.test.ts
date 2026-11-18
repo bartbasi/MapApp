@@ -188,7 +188,7 @@ for (const county of COUNTIES) {
           }
           // The metadata the download manager writes agrees with the archive and still validates.
           const sourceMeta = parseArchiveMeta(JSON.parse(fs!.readFileSync(localPath(`../../../data/build/${county}/publicland.meta.json`)!, 'utf8')));
-          const meta = parseArchiveMeta(extractMeta(sourceMeta, plan, null));
+          const meta = parseArchiveMeta(extractMeta(sourceMeta, plan));
           expect([meta.minzoom, meta.maxzoom]).toEqual([plan.minzoom, plan.maxzoom]);
           let verified = 'tool not present';
           if (haveTool) {

@@ -17,7 +17,7 @@
   import { EstimateRunner, errorCode, type EstimateState } from './estimate-runner';
   import { boundsSizeKm, suggestName } from './frame';
   import { IMAGERY_LAYER, chosenLayers, layerChoices, offeredLayers } from './selection';
-  import { DETAIL_TEXT, NOTIFY_NOTE, formatSize, hasRoom, layerLabel, listLayers, notEnoughSpaceText, propertyLinesNote, spanText, startErrorText, type DetailLevel } from './text';
+  import { CATALOG_UNSUPPORTED_TEXT, DETAIL_TEXT, METERED_ASK_FIRST, NOTIFY_NOTE, formatSize, hasRoom, layerLabel, listLayers, meteredQuestion, notEnoughSpaceText, propertyLinesNote, spanText, startErrorText, type DetailLevel } from './text';
 
   interface Props {
     service: DownloadService;
@@ -25,6 +25,8 @@
     offers: readonly CountyOffer[];
     areas: readonly AreaView[];
     layersOn: readonly string[];
+    /** Property lines are on. They are never part of a download; the screen says so. */
+    parcelsOn: boolean;
     /** Counties whose property lines came with the app. Property lines are never part of a download. */
     linesWith: readonly string[];
     network: NetworkState;
@@ -35,7 +37,7 @@
     onStarted: (id: string) => void;
   }
 
-  let { service, ui, offers, areas, layersOn, linesWith, network, freeBytes, notifyNote, onZoom, onStarted }: Props = $props();
+  let { service, ui, offers, areas, layersOn, parcelsOn, linesWith, network, freeBytes, notifyNote, onZoom, onStarted }: Props = $props();
 
   const LEVELS: (DetailLevel | 0)[] = [0, 14, 15, 16];
 
@@ -125,11 +127,13 @@
       confirming = true;
       return;
     }
+    // Only a yes to the mobile data question allows mobile data. Started on Wi-Fi, it waits for Wi-Fi.
+    const agreed = confirming;
     confirming = false;
     starting = true;
     startFailed = '';
     try {
-      const id = await service.start(request, shownName.trim() || suggested);
+      const id = await service.start(request, shownName.trim() || suggested, { allowMetered: agreed });
       onStarted(id);
     } catch (e) {
       console.warn('the area download could not start:', e);
@@ -166,7 +170,7 @@
   </label>
 {/each}
 
-{#if layersOn.includes('parcels')}
+{#if parcelsOn}
   <p class="lines"><Icon name="parcel" size={20} /> <span>{propertyLinesNote(linesWith)}</span></p>
 {/if}
 
@@ -196,12 +200,14 @@
       <p class="sub">Not offered here: {listLayers(missing).toLowerCase()}.</p>
     {/if}
     {#if network.metered}
-      <p class="metered"><Icon name="mobile-data" size={20} /> <span>You are on mobile data. This download uses your data plan.</span></p>
+      <p class="metered"><Icon name="mobile-data" size={20} /> <span>{METERED_ASK_FIRST}</span></p>
     {/if}
   {:else if est.kind === 'empty'}
     <p class="problem"><Icon name="info" size={22} /> <span><strong>Nothing to download here.</strong> Maps are offered for Champaign County and Macon County. Move the frame over one of them.</span></p>
   {:else if est.kind === 'offline'}
     <p class="problem"><Icon name="offline" size={22} /> <span><strong>You are offline.</strong> The size and the download need a connection.</span></p>
+  {:else if est.kind === 'unsupported'}
+    <p class="problem"><Icon name="caution" size={22} /> <span>{CATALOG_UNSUPPORTED_TEXT}</span></p>
   {:else if est.kind === 'error'}
     <p class="problem"><Icon name="caution" size={22} /> <span><strong>The size could not be worked out.</strong> Check the connection.</span></p>
     <DlButton icon="retry" label="Try again" onclick={() => runner.retry()} />
@@ -214,7 +220,7 @@
 
 {#if confirming}
   <div class="confirm" role="group" aria-label="Download on mobile data">
-    <p><Icon name="mobile-data" size={22} /> <span><strong>Use {formatSize(bytes)} of mobile data?</strong> This comes out of your data plan. On Wi-Fi it costs nothing.</span></p>
+    <p><Icon name="mobile-data" size={22} /> <span><strong>{meteredQuestion(bytes).title}</strong> {meteredQuestion(bytes).detail}</span></p>
     <div class="buttons">
       <DlButton kind="primary" icon="download" label="Download now" onclick={start} />
       <DlButton label="Not now" onclick={() => (confirming = false)} />

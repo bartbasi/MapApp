@@ -4,7 +4,7 @@
 // The errors the download service rejects with, so the screens can tell them
 // apart: by class (`instanceof`) or by `code`.
 
-export type DownloadErrorCode = 'offline' | 'no-space' | 'nothing' | 'catalog-unavailable';
+export type DownloadErrorCode = 'offline' | 'no-space' | 'nothing' | 'catalog-unavailable' | 'catalog-unsupported';
 
 export abstract class DownloadServiceError extends Error {
   abstract readonly code: DownloadErrorCode;
@@ -48,6 +48,18 @@ export class CatalogUnavailableError extends DownloadServiceError {
   override name = 'CatalogUnavailableError';
   constructor(message: string, options?: { cause?: unknown }) {
     super(message, options);
+  }
+}
+
+/**
+ * The catalog is of a schema this version of the app cannot read: the app
+ * must be updated. Not a connection problem, so the screens say something else.
+ */
+export class CatalogUnsupportedError extends DownloadServiceError {
+  readonly code = 'catalog-unsupported';
+  override name = 'CatalogUnsupportedError';
+  constructor(readonly schema: unknown) {
+    super(`The list of maps is of schema ${String(schema)}, which this version of the app cannot read.`);
   }
 }
 

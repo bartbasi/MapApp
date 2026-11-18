@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { AreaError, AreaStatus } from '../../downloads/contract';
-import { SPACE_MARGIN_BYTES, contentsLine, formatSize, hasRoom, isDamagedRecord, notEnoughSpaceText, propertyLinesNote, spaceNeeded, listLayers, percentDone, progressLine, spanText, startErrorText, statusText } from './text';
+import { ACTION_LABELS, CATALOG_UNSUPPORTED_TEXT, METERED_ASK_FIRST, METERED_NOTE, METERED_NOTE_TITLE, SPACE_MARGIN_BYTES, contentsLine, meteredQuestion, formatSize, hasRoom, isDamagedRecord, notEnoughSpaceText, propertyLinesNote, spaceNeeded, listLayers, percentDone, progressLine, spanText, startErrorText, statusText } from './text';
 
 const MB = 1_000_000;
 
@@ -138,5 +138,44 @@ describe('startErrorText', () => {
       'There is not enough space on the phone. It needs 80.0 MB free (the download and some room to spare) and has 20.0 MB. Delete a download or choose less.',
     );
     expect(startErrorText('no-space')).toBe('There is not enough space on the phone. Delete a download or choose less.');
+  });
+});
+
+describe('mobile data words (S1)', () => {
+  const waiting = (waitingFor?: 'connection' | 'unmetered') => ({ status: 'waiting' as const, ...(waitingFor ? { waitingFor } : {}), bytesDone: 11 * MB, bytesTotal: 24.4 * MB });
+
+  it('a download waiting for Wi-Fi says so, in one sentence, with a button to use mobile data', () => {
+    const t = statusText(waiting('unmetered'));
+    expect(t.title).toBe('Waiting for Wi-Fi');
+    expect(t.detail).toBe('11.0 of 24.4 MB. Goes on by itself on Wi-Fi.');
+    expect(t.action).toBe('use-mobile-data');
+    expect(ACTION_LABELS['use-mobile-data']).toBe('Use mobile data');
+  });
+
+  it('is told apart from one waiting for a connection', () => {
+    const t = statusText(waiting('connection'));
+    expect(t.title).toBe('Waiting for a connection');
+    expect(t.action).toBe('pause');
+    expect(statusText(waiting()).title).toBe('Waiting for a connection');
+    expect(t.icon).not.toBe(statusText(waiting('unmetered')).icon);
+  });
+
+  it('never says a download uses the data plan by itself', () => {
+    const words = [METERED_NOTE_TITLE, METERED_NOTE, METERED_ASK_FIRST, meteredQuestion(5 * MB).title, meteredQuestion(5 * MB).detail, statusText(waiting('unmetered')).detail];
+    for (const w of words) {
+      expect(w).not.toMatch(/\b(tiles?|archives?|zoom|extracts?)\b|\u2014/i);
+      // The two sentences that were not true: a download used the data plan whatever the user said.
+      expect(w).not.toContain('This download uses your data plan.');
+      expect(w).not.toContain('Downloads use your data plan.');
+    }
+    expect(METERED_NOTE).toContain('wait for Wi-Fi');
+    expect(METERED_ASK_FIRST).toContain('asked before');
+    expect(meteredQuestion(5 * MB).title).toBe('Use 5.0 MB of mobile data?');
+  });
+
+  it('says to update the app when the list of maps cannot be read', () => {
+    expect(startErrorText('catalog-unsupported')).toBe('This version of the app cannot read the list of maps. Update the app.');
+    expect(CATALOG_UNSUPPORTED_TEXT).toBe(startErrorText('catalog-unsupported'));
+    expect(startErrorText('catalog-unsupported')).not.toBe(startErrorText('catalog-unavailable'));
   });
 });

@@ -7,6 +7,7 @@
 
 import { ARCHIVE_ID_PATTERN, parseArchiveMeta } from '../platform/archive-meta';
 import type { Catalog, CatalogArchive } from './contract';
+import { CatalogUnsupportedError } from './errors';
 
 /** Where the app fetches the catalog unless the build says otherwise (D33). */
 export const DEFAULT_CATALOG_URL = 'https://raw.githubusercontent.com/bartbasi/MapApp/main/catalog/catalog.json';
@@ -27,14 +28,67 @@ function fail(message: string): never {
   throw new Error(`catalog: ${message}`);
 }
 
-function isHttpBase(base: string): boolean {
+/** The one layer name of parcel data (D27). */
+export const PARCELS_LAYER = 'parcels';
+
+/**
+ * How strict to be about the catalog's base address. A catalog's files are
+ * fetched from `https` addresses only, except in a development build, or when
+ * the catalog itself came from that same `http` origin (the release test
+ * server on this laptop, scripts/release-test-server.mjs).
+ */
+export interface CatalogCheckOptions {
+  /** Accept any `http` base. Defaults to true in a development build only. */
+  allowHttp?: boolean;
+  /** Where the catalog was fetched from. An `http` base of the same origin is then accepted. */
+  catalogUrl?: string;
+}
+
+function httpOriginOf(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    return u.protocol === 'http:' ? u.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+function checkBase(base: string, options: CatalogCheckOptions): void {
   let url: URL;
   try {
     url = new URL(base);
   } catch {
-    return false;
+    fail('the base address is not an address');
   }
-  return (url.protocol === 'https:' || url.protocol === 'http:') && base.endsWith('/') && url.search === '' && url.hash === '' && url.username === '' && url.password === '';
+  if (!base.endsWith('/') || url.search !== '' || url.hash !== '' || url.username !== '' || url.password !== '') {
+    fail('the base address must end with a slash and carry nothing else');
+  }
+  if (url.protocol === 'https:') return;
+  if (url.protocol !== 'http:') fail('the base address must be https');
+  const allowHttp = options.allowHttp ?? import.meta.env?.DEV === true;
+  if (!allowHttp && url.origin !== httpOriginOf(options.catalogUrl)) fail('the base address must be https');
+}
+
+/**
+ * Why an archive the catalog lists is left out, or null to keep it.
+ *
+ * Parcel data never comes from a catalog, whatever the catalog says. The
+ * guard in pipeline/publish.py is not enough on its own: the app does not
+ * trust the hosted file. The reasons:
+ * - Parcel hosting needs the owner's word first (D15, D25).
+ * - The position readout reads the parcel archives built once at start-up; it
+ *   would not see an area's copy until the app is opened again.
+ * - An area's copy lacks the parcels just outside its rectangle, within the
+ *   150 m the readout searches, so near the edge it would overstate the
+ *   distance to the nearest line (the fault D28 describes).
+ * An archive with a coverage outline is left out for the same reason: only
+ * parcel archives carry one (D32).
+ */
+export function refusal(a: CatalogArchive): string | null {
+  if (a.layer === PARCELS_LAYER) return 'parcel data is never downloaded';
+  if (a.meta.coverage) return 'it carries a coverage outline, which only parcel data has';
+  return null;
 }
 
 function parseArchive(raw: unknown, i: number): CatalogArchive {
@@ -65,38 +119,46 @@ function parseArchive(raw: unknown, i: number): CatalogArchive {
 
 /**
  * Checks a parsed catalog.json and returns it typed. Throws on anything that
- * does not match, so a damaged or tampered catalog is never half used.
+ * does not match, so a damaged or tampered catalog is never half used. A
+ * schema this app cannot read throws CatalogUnsupportedError. Parcel data is
+ * dropped with a warning (see refusal()).
  */
-export function parseCatalog(raw: unknown): Catalog {
+export function parseCatalog(raw: unknown, options: CatalogCheckOptions = {}): Catalog {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) fail('not an object');
   const o = raw as Record<string, unknown>;
-  if (o['schema'] !== 1) fail(`schema ${String(o['schema'])} is not one this app reads`);
+  if (o['schema'] !== 1) throw new CatalogUnsupportedError(o['schema']);
   const { release, published, base, archives } = o;
   if (typeof release !== 'string' || !RELEASE_PATTERN.test(release)) fail('the release tag is missing or not valid');
   if (typeof published !== 'string') fail('the publish date is missing');
-  if (typeof base !== 'string' || !isHttpBase(base)) fail('the base address must be http or https and end with a slash');
+  if (typeof base !== 'string') fail('the base address is missing');
+  checkBase(base, options);
   if (!Array.isArray(archives)) fail('the archives must be a list');
-  const out = archives.map(parseArchive);
+  const parsed = archives.map(parseArchive);
   const seen = new Set<string>();
-  for (const a of out) {
+  for (const a of parsed) {
     const key = `${a.county}/${a.layer}`;
     if (seen.has(key)) fail(`${key} is listed twice`);
     seen.add(key);
   }
-  const files = new Set(out.map((a) => a.file));
-  if (files.size !== out.length) fail('two archives share a file name');
+  const files = new Set(parsed.map((a) => a.file));
+  if (files.size !== parsed.length) fail('two archives share a file name');
+  const out = parsed.filter((a) => {
+    const why = refusal(a);
+    if (why) console.warn(`catalog: ${a.county}/${a.layer} left out: ${why}`);
+    return !why;
+  });
   return { schema: 1, release, published, base, archives: out };
 }
 
 /** Parses catalog text. Throws with a plain message when it is not JSON or not a valid catalog. */
-export function parseCatalogText(text: string): Catalog {
+export function parseCatalogText(text: string, options: CatalogCheckOptions = {}): Catalog {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
   } catch {
     fail('not JSON');
   }
-  return parseCatalog(raw);
+  return parseCatalog(raw, options);
 }
 
 /** Where the last good catalog is kept between runs. */
@@ -126,11 +188,11 @@ export const localCatalogStorage: CatalogStorage = {
 };
 
 /** The stored catalog, or null when there is none or it no longer checks out. */
-export function loadStoredCatalog(storage: CatalogStorage): Catalog | null {
+export function loadStoredCatalog(storage: CatalogStorage, options: CatalogCheckOptions = {}): Catalog | null {
   const text = storage.load();
   if (!text) return null;
   try {
-    return parseCatalogText(text);
+    return parseCatalogText(text, options);
   } catch {
     return null;
   }

@@ -97,6 +97,13 @@ export interface AreaJob {
   /** The area's own record as JSON text (AreaRecord). The downloader stores it and hands it back unread. */
   record: string;
   files: FileJob[];
+  /**
+   * False: the downloader fetches nothing for this area over a connection
+   * that is charged by use (mobile data). It waits, with `waitingFor`
+   * 'unmetered', and goes on by itself on Wi-Fi. True: the user agreed to
+   * mobile data for this area. The choice is stored with the job.
+   */
+  allowMetered: boolean;
 }
 
 export type AreaStatus =
@@ -129,6 +136,14 @@ export interface AreaState {
   record: string;
   status: AreaStatus;
   error?: AreaError;
+  /**
+   * With status 'waiting': what it waits for. 'connection' is any connection.
+   * 'unmetered' means the phone is online but only on a connection charged by
+   * use, and this area was not allowed to use it.
+   */
+  waitingFor?: 'connection' | 'unmetered';
+  /** The job's allowMetered, as it stands now. */
+  allowMetered: boolean;
   bytesDone: number;
   bytesTotal: number;
 }
@@ -147,6 +162,12 @@ export interface DownloadJobs {
   resume(id: string): Promise<void>;
   /** Removes an area in any state, with every file it has. */
   remove(id: string): Promise<void>;
+  /**
+   * Changes whether an area may use a connection charged by use. Allowing it
+   * lets an area that waits for 'unmetered' go on at once. Withdrawing it
+   * while the area downloads over such a connection makes it wait.
+   */
+  setAllowMetered(id: string, allow: boolean): Promise<void>;
   /** Every area the downloader knows, complete or not. */
   list(): Promise<AreaState[]>;
   /** Called on every change of status and, while downloading, about once a second. Returns the unsubscribe. */
@@ -222,6 +243,9 @@ export interface AreaView {
   record: AreaRecord;
   status: AreaStatus;
   error?: AreaError;
+  /** With status 'waiting': see AreaState.waitingFor. */
+  waitingFor?: 'connection' | 'unmetered';
+  allowMetered: boolean;
   bytesDone: number;
   bytesTotal: number;
 }
@@ -240,9 +264,16 @@ export interface DownloadService {
   /** The size of a request before it is started. Needs a connection. Rejects with AbortError when aborted. */
   estimate(request: AreaRequest, signal?: AbortSignal): Promise<AreaEstimate>;
   /** Starts a download and returns the new area's ID. */
-  start(request: AreaRequest, name: string): Promise<string>;
+  /**
+   * `allowMetered` is true only when the user was asked and agreed to use
+   * mobile data for this download. Left out, it is false: a download started
+   * on Wi-Fi never goes on over mobile data by itself.
+   */
+  start(request: AreaRequest, name: string, options?: { allowMetered?: boolean }): Promise<string>;
   pause(id: string): Promise<void>;
   resume(id: string): Promise<void>;
+  /** The user's answer to "use mobile data for this download?", for an area that waits for Wi-Fi. */
+  setAllowMetered(id: string, allow: boolean): Promise<void>;
   /** Deletes an area, downloaded or not. */
   remove(id: string): Promise<void>;
   /** Every area, newest first. */

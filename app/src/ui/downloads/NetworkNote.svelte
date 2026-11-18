@@ -4,11 +4,13 @@
 -->
 <!--
   The connection, when it matters for downloads: offline (what still works)
-  or on mobile data (downloads use the data plan). Nothing on Wi-Fi.
+  or on mobile data (a download uses the data plan only after a yes; the
+  others wait for Wi-Fi). Nothing on Wi-Fi.
 -->
 <script lang="ts">
   import type { NetworkState } from '../../downloads/contract';
   import Icon from '../Icon.svelte';
+  import { METERED_NOTE, METERED_NOTE_TITLE } from './text';
 
   interface Props {
     network: NetworkState;
@@ -29,8 +31,8 @@
   <div class="note metered" role="status">
     <Icon name="mobile-data" size={26} />
     <div>
-      <p class="title">You are on mobile data</p>
-      <p>Downloads use your data plan. You are asked before each one starts.</p>
+      <p class="title">{METERED_NOTE_TITLE}</p>
+      <p>{METERED_NOTE}</p>
     </div>
   </div>
 {/if}

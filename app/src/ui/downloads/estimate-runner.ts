@@ -17,6 +17,8 @@ export type EstimateState =
   | { kind: 'empty' }
   /** No connection, so no size. */
   | { kind: 'offline' }
+  /** The list of maps is of a kind this version of the app cannot read: the app must be updated. */
+  | { kind: 'unsupported' }
   | { kind: 'error' };
 
 export type Estimator = (request: AreaRequest, signal: AbortSignal) => Promise<AreaEstimate>;
@@ -116,6 +118,7 @@ export class EstimateRunner {
       if ((e as { name?: string } | null)?.name === 'AbortError') return;
       const code = errorCode(e);
       if (code === 'nothing') return this.set({ kind: 'empty' });
+      if (code === 'catalog-unsupported') return this.set({ kind: 'unsupported' });
       if (code === 'offline' || !this.online) return this.set({ kind: 'offline' });
       console.warn('the download size could not be worked out:', e);
       this.set({ kind: 'error' });

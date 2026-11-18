@@ -86,8 +86,8 @@ export function installDownloadHook(parts: DownloadParts): void {
       const p = await planExtract(remoteSource(parts, url), { bounds, ...(maxzoom !== undefined ? { maxzoom } : {}) });
       return describe(p);
     },
-    /** Plans every file, starts the area, and returns the plans for checking. */
-    async startArea(id: string, record: string, orders: FileOrder[]) {
+    /** Plans every file, starts the area, and returns the plans for checking. allowMetered as in contract.ts AreaJob. */
+    async startArea(id: string, record: string, orders: FileOrder[], allowMetered = false) {
       const files: FileJob[] = [];
       const plans = [];
       for (const o of orders) {
@@ -98,13 +98,14 @@ export function installDownloadHook(parts: DownloadParts): void {
         files.push(f);
         plans.push({ county: o.county, layer: o.layer, ...describe(p) });
       }
-      await parts.jobs.start({ id, record, files });
+      await parts.jobs.start({ id, record, files, allowMetered });
       return plans;
     },
     list: () => parts.jobs.list(),
     pause: (id: string) => parts.jobs.pause(id),
     resume: (id: string) => parts.jobs.resume(id),
     remove: (id: string) => parts.jobs.remove(id),
+    setAllowMetered: (id: string, allow: boolean) => parts.jobs.setAllowMetered(id, allow),
     freeBytes: () => parts.jobs.freeBytes(),
     networkNow: () => parts.network.get(),
   };

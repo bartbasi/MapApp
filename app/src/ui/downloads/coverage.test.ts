@@ -31,6 +31,7 @@ describe('needsDownload', () => {
     const area: AreaView = {
       record: { id: 'a', name: 'x', bounds: [-89, 39.8, -88.9, 39.9], layers: ['basemap'], aerialMaxzoom: 14, created: '', release: '', dataDate: '', bytes: 1 },
       status: 'complete',
+      allowMetered: false,
       bytesDone: 1,
       bytesTotal: 1,
     };
@@ -64,6 +65,7 @@ describe('inviteFor', () => {
     const v = (layers: string[], status: AreaView['status']): AreaView => ({
       record: { id: 'a', name: 'x', bounds: area, layers, aerialMaxzoom: 16, created: '', release: '', dataDate: '', bytes: 1 },
       status,
+      allowMetered: false,
       bytesDone: 1,
       bytesTotal: 1,
     });

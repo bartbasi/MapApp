@@ -33,7 +33,7 @@ import type { LayerSpecification, SourceSpecification, StyleSpecification } from
 import { DEFAULT_RASTER_TILE_SIZE, type ArchiveEntry } from '../../platform/archive-meta';
 import { attributionHtml, type InstalledLayer, type InstalledLayers } from '../installed';
 import { PUBLIC_LAND_LAYER } from '../public-land';
-import { tileUrlTemplate } from '../tile-protocol';
+import { parseTileUrl, tileUrlTemplate } from '../tile-protocol';
 import { aerialLayer } from './aerial';
 import { baseMapGroundLayers, baseMapLabelLayers, labelsOnImagery, labelsOnMap, plainBaseMapLayers } from './base-map';
 import { hybridLineLayers } from './hybrid';
@@ -88,6 +88,23 @@ export interface StyleOptions {
   parcelRelation?: FeatureCollection | null;
   /** Outlines of downloaded areas (ui/downloads/outline-features.ts). Always in the style, updated in place, empty unless the downloads panel lists them. */
   downloadAreas?: FeatureCollection | null;
+}
+
+/**
+ * The map sources whose tiles must be fetched again after the installed
+ * archives changed (a download completed or was removed), with their tile
+ * addresses. Parcel sources are left out: no download adds or removes parcel
+ * data (catalog.ts refusal()), and reloading them would make the property
+ * lines blink each time an area completes.
+ */
+export function tileSourcesToReload(sources: Readonly<Record<string, SourceSpecification>>): { id: string; tiles: string[] }[] {
+  const out: { id: string; tiles: string[] }[] = [];
+  for (const [id, spec] of Object.entries(sources)) {
+    if ((spec.type !== 'vector' && spec.type !== 'raster') || !spec.tiles) continue;
+    if (spec.tiles.some((t) => parseTileUrl(t.replace('{z}/{x}/{y}', '0/0/0'))?.layer === PARCELS_LAYER)) continue;
+    out.push({ id, tiles: spec.tiles });
+  }
+  return out;
 }
 
 /** The GeoJSON sources the map updates in place, without a style rebuild. */

@@ -7,6 +7,7 @@
 // when it is in use; other layers that are off can be added.
 
 import type { AreaView, CountyOffer } from '../../downloads/contract';
+import { PARCELS_LAYER } from '../../downloads/catalog';
 import { listLayers } from './text';
 
 export const BASE_LAYER = 'basemap';
@@ -34,6 +35,8 @@ export interface LayerChoice {
  */
 export function layerChoices(offered: readonly string[], layersOn: readonly string[]): LayerChoice[] {
   const on = new Set(layersOn);
+  // Parcel data is never downloaded, even if a list of maps were to offer it (downloads/catalog.ts).
+  offered = offered.filter((l) => l !== PARCELS_LAYER);
   const order = (l: string) => (l === BASE_LAYER ? 0 : l === IMAGERY_LAYER ? 2 : 1);
   return [...new Set(offered)]
     .sort((a, b) => order(a) - order(b))

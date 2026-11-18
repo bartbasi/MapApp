@@ -11,7 +11,8 @@
 //   ?fakeDownloads=states     one download in each status and each error
 //   ?fakeDownloads=county     Macon County downloaded and complete
 //   ?fakeDownloads=county-map Macon County's map and public land, without imagery
-//   &fakeNet=offline|metered  the network the screens see
+//   &fakeNet=offline|metered  the network the screens see (on mobile data, a
+//                             download not allowed it waits for Wi-Fi)
 //   &fakeFree=<MB>            free space on the phone
 //   &fakeSpeed=<MB a second>  how fast a download moves (default 2)
 //   &fakeCatalog=none         the list of counties was never fetched
@@ -97,6 +98,9 @@ interface FakeArea {
   request: AreaRequest;
   status: AreaStatus;
   error?: AreaError;
+  waitingFor?: 'connection' | 'unmetered';
+  /** The user agreed to mobile data for it (contract.ts AreaJob.allowMetered). */
+  allowMetered: boolean;
   bytesDone: number;
   /** Fail with this error once this many bytes are done. */
   failAt?: { bytes: number; error: AreaError };
@@ -168,7 +172,7 @@ export class FakeDownloadService implements DownloadService {
     return this.sizeOf(request);
   }
 
-  async start(request: AreaRequest, name: string): Promise<string> {
+  async start(request: AreaRequest, name: string, options?: { allowMetered?: boolean }): Promise<string> {
     if (!this.net.online) throw codedError('offline', 'There is no connection.');
     const est = this.sizeOf(request);
     if (est.bytes === 0) throw codedError('nothing', 'There is no map data to download for this place and these layers.');
@@ -190,7 +194,7 @@ export class FakeDownloadService implements DownloadService {
       dataDate: newestDate(request.layers),
       bytes: est.bytes,
     };
-    const area: FakeArea = { record, request, status: 'queued', bytesDone: 0 };
+    const area: FakeArea = { record, request, status: 'queued', bytesDone: 0, allowMetered: options?.allowMetered === true };
     if (this.nextFailure) {
       area.failAt = { bytes: Math.floor(est.bytes * this.nextFailure.fraction), error: this.nextFailure.error };
       this.nextFailure = null;
@@ -221,6 +225,18 @@ export class FakeDownloadService implements DownloadService {
     delete a.error;
     delete a.failAt;
     a.status = 'queued';
+    this.schedule();
+    this.changed();
+  }
+
+  async setAllowMetered(id: string, allow: boolean): Promise<void> {
+    const a = this.find(id);
+    if (!a) return;
+    a.allowMetered = allow;
+    if (allow && a.status === 'waiting' && a.waitingFor === 'unmetered') {
+      a.status = 'queued';
+      delete a.waitingFor;
+    }
     this.schedule();
     this.changed();
   }
@@ -362,15 +378,42 @@ export class FakeDownloadService implements DownloadService {
     if (this.free !== undefined) this.free = Math.max(0, this.free - bytes);
   }
 
-  /** One download runs at a time, the oldest first; the others wait their turn. Offline, the running one waits. */
+  /** What stops an area from downloading now: no connection, or mobile data it was not allowed. */
+  private blockedBy(a: FakeArea): 'connection' | 'unmetered' | null {
+    if (!this.net.online) return 'connection';
+    if (this.net.metered && !a.allowMetered) return 'unmetered';
+    return null;
+  }
+
+  private setRunning(a: FakeArea): void {
+    const blocked = this.blockedBy(a);
+    if (blocked) {
+      a.status = 'waiting';
+      a.waitingFor = blocked;
+    } else {
+      a.status = 'downloading';
+      delete a.waitingFor;
+    }
+  }
+
+  /**
+   * One download runs at a time, the oldest first; the others wait their
+   * turn. With no connection the running one waits for one; on mobile data
+   * it waits for Wi-Fi unless the user allowed mobile data for it.
+   */
   private schedule(): void {
-    const running = this.list.find((a) => a.status === 'downloading' || a.status === 'waiting');
+    const running = this.list.find((a) => a.status === 'downloading') ?? this.list.find((a) => a.status === 'waiting');
     if (running) {
-      running.status = this.net.online ? 'downloading' : 'waiting';
+      this.setRunning(running);
+      // One waiting for Wi-Fi does not hold up a download the user allowed mobile data, as on the phone.
+      if (running.status === 'waiting' && running.waitingFor === 'unmetered') {
+        const allowed = this.list.find((a) => a.status === 'queued' && this.blockedBy(a) === null);
+        if (allowed) this.setRunning(allowed);
+      }
       return;
     }
     const next = this.list.find((a) => a.status === 'queued');
-    if (next) next.status = this.net.online ? 'downloading' : 'waiting';
+    if (next) this.setRunning(next);
   }
 
   private find(id: string): FakeArea | undefined {
@@ -420,6 +463,8 @@ export class FakeDownloadService implements DownloadService {
         record: a.record,
         status: a.status,
         ...(a.error ? { error: a.error } : {}),
+        ...(a.status === 'waiting' && a.waitingFor ? { waitingFor: a.waitingFor } : {}),
+        allowMetered: a.allowMetered,
         bytesDone: a.bytesDone,
         bytesTotal: a.record.bytes,
       }));
@@ -436,7 +481,7 @@ export class FakeDownloadService implements DownloadService {
 
   private seed(scenario: FakeScenario): void {
     if (scenario === 'none') return;
-    const add = (name: string, request: AreaRequest, status: AreaStatus, fraction: number, created: string, error?: AreaError) => {
+    const add = (name: string, request: AreaRequest, status: AreaStatus, fraction: number, created: string, error?: AreaError, waitingFor?: 'connection' | 'unmetered') => {
       const est = this.sizeOf(request);
       const id = `area-${this.nextId++}`;
       const county = 'county' in request.where ? request.where.county : undefined;
@@ -446,6 +491,8 @@ export class FakeDownloadService implements DownloadService {
         request,
         status,
         ...(error ? { error } : {}),
+        ...(waitingFor ? { waitingFor } : {}),
+        allowMetered: false,
         bytesDone: Math.floor(est.bytes * fraction),
       });
     };
@@ -462,7 +509,8 @@ export class FakeDownloadService implements DownloadService {
     add('North timber', { where: { bounds: box(-89.06, 39.93, 0.03, 0.02) }, layers: all, aerialMaxzoom: 16 }, 'downloading', 0.45, '2026-11-17T06:10:00Z');
     add('Creek bottom', { where: { bounds: box(-88.98, 39.86, 0.025, 0.018) }, layers: all, aerialMaxzoom: 15 }, 'queued', 0, '2026-11-17T06:09:00Z');
     add('Champaign County', { where: { county: 'il-champaign' }, layers: ['basemap', 'publicland'], aerialMaxzoom: 16 }, 'paused', 0.3, '2026-11-17T06:08:00Z');
-    add('Lake shore', { where: { bounds: box(-88.91, 39.82, 0.02, 0.015) }, layers: all, aerialMaxzoom: 14 }, 'waiting', 0.6, '2026-11-17T06:07:00Z');
+    add('Lake shore', { where: { bounds: box(-88.91, 39.82, 0.02, 0.015) }, layers: all, aerialMaxzoom: 14 }, 'waiting', 0.6, '2026-11-17T06:07:00Z', undefined, 'connection');
+    add('Field edge', { where: { bounds: box(-88.86, 39.9, 0.02, 0.015) }, layers: all, aerialMaxzoom: 15 }, 'waiting', 0.25, '2026-11-17T06:06:00Z', undefined, 'unmetered');
     const errors: AreaError[] = ['changed', 'no-space', 'server', 'corrupt', 'other'];
     errors.forEach((error, i) => {
       add(`Stand ${i + 1}`, { where: { bounds: box(-89.12 + i * 0.05, 39.75, 0.015, 0.012) }, layers: all, aerialMaxzoom: 16 }, 'failed', 0.2 + i * 0.1, `2026-11-16T0${i}:00:00Z`, error);
@@ -474,6 +522,7 @@ export class FakeDownloadService implements DownloadService {
       request: { where: { bounds: [0, 0, 0, 0] }, layers: [], aerialMaxzoom: 0 },
       status: 'failed',
       error: 'other',
+      allowMetered: false,
       bytesDone: MB,
     });
     this.schedule();

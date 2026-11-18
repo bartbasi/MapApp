@@ -18,11 +18,13 @@
   import DlButton from './DlButton.svelte';
   import { chosenLayers, countyBytes, countyDownloadName, countyHoldings, countyImageryMaxzoom, layerChoices, missingLayers } from './selection';
   import { errorCode } from './estimate-runner';
-  import { NOTIFY_NOTE, formatSize, hasRoom, layerLabel, layerNote, notEnoughSpaceText, propertyLinesNote, startErrorText } from './text';
+  import { NOTIFY_NOTE, formatSize, hasRoom, layerLabel, layerNote, meteredQuestion, notEnoughSpaceText, propertyLinesNote, startErrorText } from './text';
 
   interface Props {
     offer: CountyOffer;
     layersOn: readonly string[];
+    /** Property lines are on. They are never part of a download; the screen says so. */
+    parcelsOn: boolean;
     /** Counties whose property lines came with the app. Property lines are never part of a download. */
     linesWith: readonly string[];
     areas: readonly AreaView[];
@@ -30,10 +32,11 @@
     freeBytes: number | undefined;
     /** Show the sentence about Android's notification question (until a first download has started). */
     notifyNote: boolean;
-    onStart: (request: AreaRequest, name: string) => Promise<void>;
+    /** allowMetered: the user said yes to mobile data for this download. */
+    onStart: (request: AreaRequest, name: string, allowMetered: boolean) => Promise<void>;
   }
 
-  let { offer, layersOn, linesWith, areas, network, freeBytes, notifyNote, onStart }: Props = $props();
+  let { offer, layersOn, parcelsOn, linesWith, areas, network, freeBytes, notifyNote, onStart }: Props = $props();
 
   const name = $derived(offer.countyName.replace(/, Illinois$/, ''));
   const choices = $derived(layerChoices(offer.layers.map((l) => l.layer), layersOn));
@@ -77,11 +80,13 @@
       confirming = true;
       return;
     }
+    // Only a yes to the mobile data question allows mobile data. Started on Wi-Fi, it waits for Wi-Fi.
+    const agreed = confirming;
     confirming = false;
     starting = true;
     failed = '';
     try {
-      await onStart({ where: { county: offer.county }, layers: missing, aerialMaxzoom: countyImageryMaxzoom(offer) }, countyDownloadName(name, missing, holdings));
+      await onStart({ where: { county: offer.county }, layers: missing, aerialMaxzoom: countyImageryMaxzoom(offer) }, countyDownloadName(name, missing, holdings), agreed);
     } catch (e) {
       console.warn('the county download could not start:', e);
       failed = startErrorText(errorCode(e), e as object);
@@ -127,7 +132,7 @@
       </li>
     {/each}
   </ul>
-  {#if layersOn.includes('parcels')}
+  {#if parcelsOn}
     <p class="lines"><Icon name="parcel" size={20} /> <span>{propertyLinesNote(linesWith, name)}</span></p>
   {/if}
 
@@ -145,7 +150,7 @@
       <p class="why problem"><strong>Not enough space.</strong> {notEnoughSpaceText(total, freeBytes ?? 0, true)}</p>
     {:else if confirming}
       <div class="confirm" role="group" aria-label="Download on mobile data">
-        <p><Icon name="mobile-data" size={22} /> <span><strong>Use {formatSize(total)} of mobile data?</strong> This comes out of your data plan. On Wi-Fi it costs nothing.</span></p>
+        <p><Icon name="mobile-data" size={22} /> <span><strong>{meteredQuestion(total).title}</strong> {meteredQuestion(total).detail}</span></p>
         <div class="buttons">
           <DlButton kind="primary" icon="download" label="Download now" onclick={start} />
           <DlButton label="Not now" onclick={() => (confirming = false)} />
