@@ -2,7 +2,7 @@
 # Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE.
 """Publish built archives as files of a GitHub release, with a catalog the app reads.
 
-    python -I pipeline/publish.py stage  <tag> [--base <url>]
+    python -I pipeline/publish.py stage  <tag> [--base <url>] [--layers basemap,publicland]
     python -I pipeline/publish.py upload <tag> --yes-publish
     python -I pipeline/publish.py verify <tag>
 
@@ -13,7 +13,8 @@ stage   Run this one in WSL: checking a raster archive needs GDAL.
         Checks each archive against the contract, and makes data/publish/<tag>/
         with the archives under flat names (<county>.<layer>.pmtiles) and a
         catalog.json. Nothing leaves this machine. With --base the catalog
-        points at another server, for tests against this laptop.
+        points at another server, for tests against this laptop. With --layers
+        only those layers are staged (each must be in PUBLISHABLE).
 upload  Creates the GitHub release <tag> and uploads the staged files. This is
         the step that publishes. It refuses to run without --yes-publish, and
         the owner's word is needed first (CLAUDE.md, rules 1 and 6). After the
@@ -97,8 +98,12 @@ def refuse_parcels(names):
         raise md.PipelineError("refusing to go on: parcel data is never published. Found: " + ", ".join(bad))
 
 
-def stage(tag, base):
+def stage(tag, base, layers=None):
     check_tag(tag)
+    layers = list(layers or PUBLISHABLE)
+    not_allowed = [x for x in layers if x not in PUBLISHABLE]
+    if not_allowed:
+        raise md.PipelineError("these layers may not be published: " + ", ".join(not_allowed))
     final = stage_dir(tag)
     if os.path.exists(final):
         raise md.PipelineError(f"{final} exists already. Remove it or use a new tag.")
@@ -110,7 +115,7 @@ def stage(tag, base):
         base += "/"
     entries = []
     for county in md.load_counties():
-        for layer in PUBLISHABLE:
+        for layer in layers:
             archive = os.path.join(md.BUILD, county["id"], f"{layer}.pmtiles")
             meta_path = os.path.join(md.BUILD, county["id"], f"{layer}.meta.json")
             if not os.path.exists(archive):
@@ -246,6 +251,7 @@ def main(argv):
     a = sub.add_parser("stage")
     a.add_argument("tag")
     a.add_argument("--base", help="address the catalog points at, for a test server")
+    a.add_argument("--layers", help="comma-separated layers to stage; default all that may be published")
     a = sub.add_parser("upload")
     a.add_argument("tag")
     a.add_argument("--yes-publish", action="store_true")
@@ -253,7 +259,7 @@ def main(argv):
     a.add_argument("tag")
     args = ap.parse_args(argv)
     if args.cmd == "stage":
-        stage(args.tag, args.base)
+        stage(args.tag, args.base, [x for x in args.layers.split(",") if x] if args.layers else None)
     elif args.cmd == "upload":
         upload(args.tag, args.yes_publish)
     else:

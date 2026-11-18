@@ -1,0 +1,22 @@
+The owner's phone (model SM_F946U1), build/location-debug.apk installed 2026-11-17 17:22.
+Read over the cable on 2026-11-17 with: adb shell dumpsys location | grep io.github.bartbasi.mapapp
+These are the last lines of Android's own location event log for the app. Times are the phone's local time.
+They show the app registered directly with the "gps" and "fused" providers (not through Google's
+fused_location_provider client, as the Step 2 build was), a fix delivered about once a second,
+and both registrations removed when the app went to the background.
+
+    11-17 18:28:50.971: fused provider delivered location[1] to 10525/io.github.bartbasi.mapapp/E4CB0CD6
+    11-17 18:28:51.956: gps provider delivered location[1] to 10525/io.github.bartbasi.mapapp/A7643A77
+    11-17 18:28:51.973: fused provider delivered location[1] to 10525/io.github.bartbasi.mapapp/E4CB0CD6
+    11-17 18:28:52.775: gps provider client 10525/io.github.bartbasi.mapapp/A7643A77 -> background
+    11-17 18:28:52.775: fused provider client 10525/io.github.bartbasi.mapapp/E4CB0CD6 -> background
+    11-17 18:28:52.775: fused provider request = ProviderRequest[@+10m0s0ms, HIGH_ACCURACY, WorkSource{10525 io.github.bartbasi.mapapp}]
+    11-17 18:28:52.788: gps provider -registration 10525/io.github.bartbasi.mapapp/A7643A77
+    11-17 18:28:52.799: fused provider -registration 10525/io.github.bartbasi.mapapp/E4CB0CD6
+
+For comparison, the Step 2 build on the same phone earlier that day (16:51):
+
+    11-17 16:51:31.435: gps provider +registration 10267/com.google.android.gms[fused_location_provider]/A2F127C9 -> Request[@+1s0ms HIGH_ACCURACY, minUpdateInterval=0, hiddenFromAppOps, WorkSource{10525 io.github.bartbasi.mapapp}]
+
+Only three delivery lines were captured, so "once a second" rests on those three time stamps.
+No position is in this file.
