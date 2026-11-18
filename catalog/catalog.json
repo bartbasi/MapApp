@@ -1,0 +1,255 @@
+{
+  "schema": 1,
+  "release": "data-2026-11-18",
+  "published": "2026-11-18",
+  "base": "https://github.com/bartbasi/MapApp/releases/download/data-2026-11-18/",
+  "archives": [
+    {
+      "county": "il-champaign",
+      "layer": "basemap",
+      "file": "il-champaign.basemap.pmtiles",
+      "bytes": 12035805,
+      "sha256": "2d19ea26b8189e3bfa5b157ca9d6a4d9e6c77ad98b9b3119ad0e4bdff67852ef",
+      "meta": {
+        "schema": 1,
+        "layer": "basemap",
+        "county": "il-champaign",
+        "countyName": "Champaign County, Illinois",
+        "kind": "vector",
+        "title": "Base map",
+        "minzoom": 0,
+        "maxzoom": 15,
+        "bounds": [
+          -88.4637,
+          39.879,
+          -87.9287,
+          40.4007
+        ],
+        "bytes": 12035805,
+        "buildDate": "2026-11-12",
+        "sources": [
+          {
+            "name": "OpenStreetMap",
+            "license": "Open Database License (ODbL) 1.0",
+            "credit": "© OpenStreetMap contributors. The tile files are offered under ODbL 1.0.",
+            "url": "https://www.openstreetmap.org/copyright",
+            "dataDate": "2026-11-12"
+          },
+          {
+            "name": "Protomaps basemap tile layout, version 4",
+            "license": "BSD 3-Clause (tile layout code); the tile data is OpenStreetMap data under ODbL 1.0",
+            "credit": "Protomaps © OpenStreetMap",
+            "url": "https://github.com/protomaps/basemaps",
+            "dataDate": "2026-11-12"
+          }
+        ],
+        "notes": "Cut from the Protomaps planet build 20261112.pmtiles, with OpenStreetMap data as of 2026-11-12T04:00:00Z. Tiles are whole: they include map data past the county line. The lowest zoom levels also carry Natural Earth data (public domain), as the Protomaps build supplies it. OpenStreetMap is edited by volunteers and can be wrong or out of date; it does not show property lines."
+      }
+    },
+    {
+      "county": "il-champaign",
+      "layer": "aerial",
+      "file": "il-champaign.aerial.pmtiles",
+      "bytes": 225572890,
+      "sha256": "a0af8489ea26b29b32d3e2c80b4d32d823ba25349bf4fd13fa9c30e72e106bb2",
+      "meta": {
+        "schema": 1,
+        "layer": "aerial",
+        "county": "il-champaign",
+        "countyName": "Champaign County, Illinois",
+        "kind": "raster",
+        "title": "Aerial imagery",
+        "minzoom": 7,
+        "maxzoom": 16,
+        "bounds": [
+          -88.4637,
+          39.879,
+          -87.9287,
+          40.4007
+        ],
+        "bytes": 225572890,
+        "buildDate": "2026-11-14",
+        "sources": [
+          {
+            "name": "USDA NAIP 2025, flown 2025-07-05 to 2025-09-14",
+            "license": "Public domain",
+            "credit": "Imagery: USDA NAIP 2025. USDA Farm Production and Conservation Business Center.",
+            "url": "https://catalog.data.gov/dataset/national-agriculture-imagery-program-naip-imagery",
+            "dataDate": "2025-09-14"
+          },
+          {
+            "name": "USDA NAIP 2023, flown 2023-08-11 to 2023-08-24",
+            "license": "Public domain",
+            "credit": "Imagery: USDA NAIP 2023. USDA Farm Production and Conservation Business Center.",
+            "url": "https://catalog.data.gov/dataset/national-agriculture-imagery-program-naip-imagery",
+            "dataDate": "2023-08-24"
+          }
+        ],
+        "notes": "Summer, leaf-on imagery, built from the 1.2 m level of each NAIP image, so it is less sharp than NAIP's full detail. Clipped to the county outline plus about 300 m and transparent beyond it. Where the newest year (2025) has no image, 2023 imagery fills in, so colors and season can change at those edges.",
+        "tileSize": 512
+      }
+    },
+    {
+      "county": "il-champaign",
+      "layer": "publicland",
+      "file": "il-champaign.publicland.pmtiles",
+      "bytes": 132841,
+      "sha256": "4b9f41850687a71f166617aa0ea7726feea025ceafe641b90e08b88e6abd6fae",
+      "meta": {
+        "schema": 1,
+        "layer": "publicland",
+        "county": "il-champaign",
+        "countyName": "Champaign County, Illinois",
+        "kind": "vector",
+        "title": "Public land",
+        "minzoom": 10,
+        "maxzoom": 14,
+        "bounds": [
+          -88.4637,
+          39.879,
+          -87.9287,
+          40.4007
+        ],
+        "bytes": 132841,
+        "buildDate": "2026-11-12",
+        "sources": [
+          {
+            "name": "USGS PAD-US 4.1",
+            "license": "Public domain",
+            "credit": "U.S. Geological Survey Gap Analysis Project, 2024, Protected Areas Database of the United States (PAD-US) 4.1, doi.org/10.5066/P96WBCHS",
+            "url": "https://doi.org/10.5066/P96WBCHS",
+            "dataDate": "2025-03-31"
+          },
+          {
+            "name": "Champaign County Regional Planning Commission, Champaign County Greenways",
+            "license": "Open Data Commons Open Database License (ODbL) 1.0",
+            "credit": "Champaign County Regional Planning Commission, Champaign County Greenways, ODbL",
+            "url": "https://data.ccrpc.org/dataset/champaign-county-greenways",
+            "dataDate": "2024-06-11"
+          }
+        ],
+        "notes": "'open' means open to the public on foot. It does not mean open to hunting: whether hunting is allowed is not in this layer. Boundaries are approximate and are not a legal survey. Left out: easements on private land that are closed to the public, planning boundaries such as military or proposed areas, and easement records that repeat a fee record. Champaign County Forest Preserve District land is drawn from the regional planning commission's open spaces, because PAD-US is out of date there. This archive combines public domain and ODbL data and is offered under the ODbL 1.0."
+      }
+    },
+    {
+      "county": "il-macon",
+      "layer": "basemap",
+      "file": "il-macon.basemap.pmtiles",
+      "bytes": 4271625,
+      "sha256": "12a1def389e29a134d5106a688b7d1a57b03d7ea1d9b4f6c3f63d35eeeac8568",
+      "meta": {
+        "schema": 1,
+        "layer": "basemap",
+        "county": "il-macon",
+        "countyName": "Macon County, Illinois",
+        "kind": "vector",
+        "title": "Base map",
+        "minzoom": 0,
+        "maxzoom": 15,
+        "bounds": [
+          -89.2179,
+          39.6526,
+          -88.745,
+          40.0554
+        ],
+        "bytes": 4271625,
+        "buildDate": "2026-11-12",
+        "sources": [
+          {
+            "name": "OpenStreetMap",
+            "license": "Open Database License (ODbL) 1.0",
+            "credit": "© OpenStreetMap contributors. The tile files are offered under ODbL 1.0.",
+            "url": "https://www.openstreetmap.org/copyright",
+            "dataDate": "2026-11-12"
+          },
+          {
+            "name": "Protomaps basemap tile layout, version 4",
+            "license": "BSD 3-Clause (tile layout code); the tile data is OpenStreetMap data under ODbL 1.0",
+            "credit": "Protomaps © OpenStreetMap",
+            "url": "https://github.com/protomaps/basemaps",
+            "dataDate": "2026-11-12"
+          }
+        ],
+        "notes": "Cut from the Protomaps planet build 20261112.pmtiles, with OpenStreetMap data as of 2026-11-12T04:00:00Z. Tiles are whole: they include map data past the county line. The lowest zoom levels also carry Natural Earth data (public domain), as the Protomaps build supplies it. OpenStreetMap is edited by volunteers and can be wrong or out of date; it does not show property lines."
+      }
+    },
+    {
+      "county": "il-macon",
+      "layer": "aerial",
+      "file": "il-macon.aerial.pmtiles",
+      "bytes": 140565035,
+      "sha256": "054e4e940fb37bc32ecaf86e4dc73bd4cec15e4957686564a24e96cb65fd2e39",
+      "meta": {
+        "schema": 1,
+        "layer": "aerial",
+        "county": "il-macon",
+        "countyName": "Macon County, Illinois",
+        "kind": "raster",
+        "title": "Aerial imagery",
+        "minzoom": 7,
+        "maxzoom": 16,
+        "bounds": [
+          -89.2179,
+          39.6526,
+          -88.745,
+          40.0554
+        ],
+        "bytes": 140565035,
+        "buildDate": "2026-11-14",
+        "sources": [
+          {
+            "name": "USDA NAIP 2025, flown 2025-08-01 to 2025-09-15",
+            "license": "Public domain",
+            "credit": "Imagery: USDA NAIP 2025. USDA Farm Production and Conservation Business Center.",
+            "url": "https://catalog.data.gov/dataset/national-agriculture-imagery-program-naip-imagery",
+            "dataDate": "2025-09-15"
+          },
+          {
+            "name": "USDA NAIP 2023, flown 2023-07-11 to 2023-08-19",
+            "license": "Public domain",
+            "credit": "Imagery: USDA NAIP 2023. USDA Farm Production and Conservation Business Center.",
+            "url": "https://catalog.data.gov/dataset/national-agriculture-imagery-program-naip-imagery",
+            "dataDate": "2023-08-19"
+          }
+        ],
+        "notes": "Summer, leaf-on imagery, built from the 1.2 m level of each NAIP image, so it is less sharp than NAIP's full detail. Clipped to the county outline plus about 300 m and transparent beyond it. Where the newest year (2025) has no image, 2023 imagery fills in, so colors and season can change at those edges.",
+        "tileSize": 512
+      }
+    },
+    {
+      "county": "il-macon",
+      "layer": "publicland",
+      "file": "il-macon.publicland.pmtiles",
+      "bytes": 99815,
+      "sha256": "4847e717033831571f4039c602f4d8163f234326fe1b41f32a85f8f4bb7e9937",
+      "meta": {
+        "schema": 1,
+        "layer": "publicland",
+        "county": "il-macon",
+        "countyName": "Macon County, Illinois",
+        "kind": "vector",
+        "title": "Public land",
+        "minzoom": 10,
+        "maxzoom": 14,
+        "bounds": [
+          -89.2179,
+          39.6526,
+          -88.745,
+          40.0554
+        ],
+        "bytes": 99815,
+        "buildDate": "2026-11-12",
+        "sources": [
+          {
+            "name": "USGS PAD-US 4.1",
+            "license": "Public domain",
+            "credit": "U.S. Geological Survey Gap Analysis Project, 2024, Protected Areas Database of the United States (PAD-US) 4.1, doi.org/10.5066/P96WBCHS",
+            "url": "https://doi.org/10.5066/P96WBCHS",
+            "dataDate": "2025-03-31"
+          }
+        ],
+        "notes": "'open' means open to the public on foot. It does not mean open to hunting: whether hunting is allowed is not in this layer. Boundaries are approximate and are not a legal survey. Left out: easements on private land that are closed to the public, planning boundaries such as military or proposed areas, and easement records that repeat a fee record."
+      }
+    }
+  ]
+}
