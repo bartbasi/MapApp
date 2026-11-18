@@ -51,7 +51,7 @@ The outdoor check, once the build is on your phone:
 | In airplane mode the parcel outlines draw and a tap returns the owner | Pass on the emulator. |
 | The parcel data holds no mailing address, site address or phone number, and none was requested | Pass. The archive holds four fields. All 111 requests to Macon County are logged. |
 | On a route across a property line the readout names the right parcel on each side, and its distance agrees with the county's own outline within 2 m | Pass. The largest difference is 0.054 m. |
-| You check the marker outdoors on your phone | Open. Needs your phone. |
+| You check the marker outdoors on your phone | Pass, by the owner's word on 2026-11-17, after this report was written. He said the blue dot was "spot on", the card showed 1 m accuracy, and the dot took "a few seconds" to appear. The build was the one with the new location plugin (D31). Walking across a known property line in Macon County has not been done. |
 
 ### Twenty random parcels
 

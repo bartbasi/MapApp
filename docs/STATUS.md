@@ -4,7 +4,7 @@ Last updated: 2026-11-17, Step 3 in progress.
 
 ## Step 3 in progress (read this first)
 
-The owner answered on 2026-11-17: the Step 2 screenshots may be pushed (done, `origin/main` at 5c706d9), the location plugin may be replaced (done, D31), and Step 3 may start. The Step 2 outdoor check on his phone is still open. `build/step2-debug.apk` is on his phone. `build/location-debug.apk` has the new location plugin and is not on his phone yet.
+The owner answered on 2026-11-17: the Step 2 screenshots may be pushed (done, `origin/main` at 5c706d9), the location plugin may be replaced (done, D31), and Step 3 may start. `build/location-debug.apk` (new location plugin) is on his phone. He did the Step 2 outdoor check with it on 2026-11-17: the dot was "spot on", accuracy 1 m, a few seconds to the first fix. Walking across a known property line in Macon County has not been done. He wants Champaign County property lines next; that waits on the consortium handing over the data (see `docs/research/county-parcel-terms.md`).
 
 Step 3 is offline downloads. The design is D33. The contract between its parts is `app/src/downloads/contract.ts`.
 
