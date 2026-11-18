@@ -35,8 +35,27 @@ export function splitIds(text: string): { text: string; id: boolean }[] {
   return out;
 }
 
-export function formatBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${bytes} bytes`;
+/**
+ * The app's one unit for sizes: 1 MB is 1,000,000 bytes and 1 GB is
+ * 1,000,000,000 bytes, as Android's own storage settings count them, so a
+ * size here matches what the phone says is free. Every screen, and the
+ * download notification, uses these numbers.
+ */
+export const MB = 1_000_000;
+export const GB = 1_000_000_000;
+
+/**
+ * A size in MB or GB. Under 100 MB with one decimal, so a 1.7 MB area does
+ * not read as 2 MB. Never in bytes or KB.
+ */
+export function formatSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB';
+  // Under 0.05 MB would round to 0.0 MB.
+  if (bytes < 0.05 * MB) return 'less than 0.1 MB';
+  if (bytes < 100 * MB) return `${(bytes / MB).toFixed(1)} MB`;
+  if (bytes < 1000 * MB) return `${Math.round(bytes / MB)} MB`;
+  return `${(bytes / GB).toFixed(bytes < 10 * GB ? 2 : 1)} GB`;
 }
+
+/** The same as formatSize: one unit everywhere. */
+export const formatBytes = formatSize;

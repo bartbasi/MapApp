@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import type { AreaRequest } from './contract';
 import { FakeDownloadService, fakeOptionsFrom } from './fake-service';
 
-const MB = 1024 * 1024;
+const MB = 1_000_000;
 const box: AreaRequest = { where: { bounds: [-89.1, 39.85, -88.9827, 39.9404] }, layers: ['basemap', 'aerial'], aerialMaxzoom: 16 };
 
 describe('FakeDownloadService', () => {

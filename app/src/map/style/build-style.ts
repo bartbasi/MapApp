@@ -24,7 +24,8 @@
 //
 // The order, bottom to top: background, base view, public land areas, the
 // glow on the parcel the phone is in, property lines, the tapped parcel,
-// labels, public land names, the phone's relation to the property lines
+// labels, public land names, the outlines of downloaded areas (while the
+// downloads panel shows them), the phone's relation to the property lines
 // (connector, tick, the caution stretch of line), the position marker (D26).
 
 import type { FeatureCollection, Point } from 'geojson';
@@ -36,6 +37,7 @@ import { tileUrlTemplate } from '../tile-protocol';
 import { aerialLayer } from './aerial';
 import { baseMapGroundLayers, baseMapLabelLayers, labelsOnImagery, labelsOnMap, plainBaseMapLayers } from './base-map';
 import { hybridLineLayers } from './hybrid';
+import { DOWNLOAD_AREAS_SOURCE, downloadAreaLayers } from './download-areas';
 import { basePalette, imageryPalette, plainPalette } from './palette';
 import {
   PARCEL_RELATION_SOURCE,
@@ -84,10 +86,12 @@ export interface StyleOptions {
   parcelSelected?: FeatureCollection | null;
   /** The phone's relation to the property lines (parcels/relation-features.ts). Always in the style, updated in place. */
   parcelRelation?: FeatureCollection | null;
+  /** Outlines of downloaded areas (ui/downloads/outline-features.ts). Always in the style, updated in place, empty unless the downloads panel lists them. */
+  downloadAreas?: FeatureCollection | null;
 }
 
 /** The GeoJSON sources the map updates in place, without a style rebuild. */
-export const LIVE_SOURCES = [POSITION_SOURCE, PARCEL_SELECTED_SOURCE, PARCEL_RELATION_SOURCE] as const;
+export const LIVE_SOURCES = [POSITION_SOURCE, PARCEL_SELECTED_SOURCE, PARCEL_RELATION_SOURCE, DOWNLOAD_AREAS_SOURCE] as const;
 
 const EMPTY_LABELS: FeatureCollection<Point> = { type: 'FeatureCollection', features: [] };
 const EMPTY_FEATURES: FeatureCollection = { type: 'FeatureCollection', features: [] };
@@ -222,6 +226,9 @@ export function buildStyle(opts: StyleOptions): StyleSpecification {
     relation.push(...parcelRelationLayers(PARCEL_RELATION_SOURCE));
   }
 
+  // Outlines of downloaded areas: above labels, under everything about the phone's position (D26).
+  sources[DOWNLOAD_AREAS_SOURCE] = { type: 'geojson', data: opts.downloadAreas ?? EMPTY_FEATURES };
+
   // The position marker goes last, above every other layer (D26).
   sources[POSITION_SOURCE] = { type: 'geojson', data: opts.position ?? EMPTY_FEATURES };
 
@@ -242,6 +249,7 @@ export function buildStyle(opts: StyleOptions): StyleSpecification {
       ...parcelLines,
       ...labels,
       ...overlayLabels,
+      ...downloadAreaLayers(DOWNLOAD_AREAS_SOURCE),
       ...relation,
       ...positionLayers(POSITION_SOURCE, onImagery),
     ],

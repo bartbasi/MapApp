@@ -32,7 +32,10 @@ import type {
   NetworkState,
 } from './contract';
 
-const MB = 1024 * 1024;
+import { SPACE_MARGIN_BYTES } from './service';
+
+/** The app's unit for sizes (ui/format.ts): 1 MB is 1,000,000 bytes. */
+const MB = 1_000_000;
 
 /** The two counties as the catalog lists them, with the sizes of the built archives of 2026-11-17. */
 export const FAKE_OFFERS: readonly CountyOffer[] = [
@@ -103,9 +106,6 @@ function codedError(code: 'offline' | 'no-space' | 'nothing' | 'catalog-unavaila
   return Object.assign(new Error(message), { code }, extra);
 }
 
-/** Room the real service keeps free beside a download (service.ts). */
-const SPACE_MARGIN = 50 * MB;
-
 function abortError(): Error {
   const e = new Error('aborted');
   e.name = 'AbortError';
@@ -140,7 +140,7 @@ export class FakeDownloadService implements DownloadService {
 
   constructor(options: FakeOptions = {}) {
     this.net = options.network ?? { online: true, metered: false };
-    this.free = 'freeBytes' in options ? options.freeBytes : 9.6 * 1024 * MB;
+    this.free = 'freeBytes' in options ? options.freeBytes : 9.6 * 1000 * MB;
     this.speed = options.speed ?? 2 * MB;
     this.estimateMs = options.estimateMs ?? 700;
     this.catalogFetched = !options.noCatalog;
@@ -171,7 +171,7 @@ export class FakeDownloadService implements DownloadService {
     if (!this.net.online) throw codedError('offline', 'There is no connection.');
     const est = this.sizeOf(request);
     if (est.bytes === 0) throw codedError('nothing', 'There is no map data to download for this place and these layers.');
-    const needed = est.bytes + SPACE_MARGIN;
+    const needed = est.bytes + SPACE_MARGIN_BYTES;
     if (this.free !== undefined && this.free < needed) throw codedError('no-space', 'Not enough space.', { neededBytes: needed, freeBytes: this.free });
     const id = `area-${this.nextId++}`;
     const county = 'county' in request.where ? request.where.county : undefined;

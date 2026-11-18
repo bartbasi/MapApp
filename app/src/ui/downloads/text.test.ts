@@ -3,9 +3,9 @@
 
 import { describe, expect, it } from 'vitest';
 import type { AreaError, AreaStatus } from '../../downloads/contract';
-import { contentsLine, formatSize, isDamagedRecord, listLayers, percentDone, progressLine, spanText, startErrorText, statusText } from './text';
+import { SPACE_MARGIN_BYTES, contentsLine, formatSize, hasRoom, isDamagedRecord, notEnoughSpaceText, propertyLinesNote, spaceNeeded, listLayers, percentDone, progressLine, spanText, startErrorText, statusText } from './text';
 
-const MB = 1024 * 1024;
+const MB = 1_000_000;
 
 describe('formatSize', () => {
   it('gives MB with one decimal under 100 MB', () => {
@@ -13,11 +13,16 @@ describe('formatSize', () => {
     expect(formatSize(22.7 * MB)).toBe('22.7 MB');
   });
   it('gives whole MB from 100 MB, and GB from 1000 MB', () => {
-    expect(formatSize(140565035)).toBe('134 MB');
-    expect(formatSize(225572890)).toBe('215 MB');
-    expect(formatSize(1000 * MB)).toBe('0.98 GB');
-    expect(formatSize(9.6 * 1024 * MB)).toBe('9.60 GB');
-    expect(formatSize(12.5 * 1024 * MB)).toBe('12.5 GB');
+    expect(formatSize(140565035)).toBe('141 MB');
+    expect(formatSize(225572890)).toBe('226 MB');
+    expect(formatSize(1000 * MB)).toBe('1.00 GB');
+    expect(formatSize(9.6e9)).toBe('9.60 GB');
+    expect(formatSize(12.5e9)).toBe('12.5 GB');
+  });
+
+  it('counts in decimal MB, as Android shows storage: 12,035,805 bytes is 12.0 MB', () => {
+    expect(formatSize(12035805)).toBe('12.0 MB');
+    expect(formatSize(4271625)).toBe('4.3 MB');
   });
   it('never shows bytes or KB', () => {
     expect(formatSize(99815)).toBe('0.1 MB');
@@ -36,8 +41,9 @@ describe('percentDone and progressLine', () => {
   it('names the unit once when both sides share it', () => {
     expect(progressLine(11 * MB, 24.4 * MB)).toBe('11.0 of 24.4 MB');
     expect(progressLine(0.05 * MB, 2 * MB)).toBe('0.1 of 2.0 MB');
-    expect(progressLine(0.01 * MB, 2 * MB)).toBe('less than 0.1 MB of 2.0 MB');
-    expect(progressLine(600 * MB, 1200 * MB)).toBe('600 MB of 1.17 GB');
+    expect(progressLine(0.01 * MB, 2 * MB)).toBe('0 of 2.0 MB');
+    expect(progressLine(0, 3.4 * MB)).toBe('0 of 3.4 MB');
+    expect(progressLine(600 * MB, 1200 * MB)).toBe('600 MB of 1.20 GB');
   });
 });
 
@@ -88,6 +94,27 @@ describe('layer words', () => {
     expect(listLayers(['basemap', 'publicland', 'aerial'])).toBe('Map, public land and aerial imagery');
     expect(contentsLine(['aerial', 'basemap'], 15)).toBe('Map and aerial imagery (medium detail).');
     expect(contentsLine(['basemap', 'publicland'], 16)).toBe('Map and public land.');
+  });
+});
+
+describe('space on the phone', () => {
+  it('asks for the download and the room the service keeps spare, as start() does', () => {
+    expect(spaceNeeded(10 * MB)).toBe(10 * MB + SPACE_MARGIN_BYTES);
+    expect(hasRoom(10 * MB, 10 * MB + SPACE_MARGIN_BYTES)).toBe(true);
+    expect(hasRoom(10 * MB, 10 * MB + SPACE_MARGIN_BYTES - 1)).toBe(false);
+    expect(hasRoom(10 * MB, undefined)).toBe(true);
+    expect(notEnoughSpaceText(1.9 * MB, 20 * MB, false)).toBe(
+      `It needs ${formatSize(1.9 * MB + SPACE_MARGIN_BYTES)} free (the download and some room to spare) and the phone has 20.0 MB. Delete a download, choose less imagery detail, or pick a smaller area.`,
+    );
+  });
+});
+
+describe('propertyLinesNote', () => {
+  it('says property lines come with the app, never in a download', () => {
+    expect(propertyLinesNote(['Macon County'], 'Macon County')).toBe('Property lines are not part of the download: they come with the app for Macon County and work offline.');
+    expect(propertyLinesNote(['Macon County'], 'Champaign County, Illinois')).toBe('Property lines are not part of the download, and none are offered for Champaign County yet.');
+    expect(propertyLinesNote(['Macon County'])).toBe('Property lines are not part of the download: they come with the app for Macon County and work offline there.');
+    expect(propertyLinesNote([])).toBe('Property lines are not part of the download, and none are on this phone yet.');
   });
 });
 

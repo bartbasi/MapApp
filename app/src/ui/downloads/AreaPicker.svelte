@@ -17,7 +17,7 @@
   import { EstimateRunner, errorCode, type EstimateState } from './estimate-runner';
   import { boundsCenter, boundsSizeKm, suggestName } from './frame';
   import { IMAGERY_LAYER, chosenLayers, layerChoices, offeredLayers } from './selection';
-  import { DETAIL_TEXT, formatSize, layerLabel, listLayers, spanText, startErrorText, type DetailLevel } from './text';
+  import { DETAIL_TEXT, formatSize, hasRoom, layerLabel, listLayers, notEnoughSpaceText, propertyLinesNote, spanText, startErrorText, type DetailLevel } from './text';
 
   interface Props {
     service: DownloadService;
@@ -25,24 +25,23 @@
     offers: readonly CountyOffer[];
     areas: readonly AreaView[];
     layersOn: readonly string[];
+    /** Counties whose property lines came with the app. Property lines are never part of a download. */
+    linesWith: readonly string[];
     network: NetworkState;
     freeBytes: number | undefined;
     onZoom: (direction: 1 | -1) => void;
     onStarted: (id: string) => void;
   }
 
-  let { service, ui, offers, areas, layersOn, network, freeBytes, onZoom, onStarted }: Props = $props();
+  let { service, ui, offers, areas, layersOn, linesWith, network, freeBytes, onZoom, onStarted }: Props = $props();
 
   const LEVELS: (DetailLevel | 0)[] = [0, 14, 15, 16];
 
-  // Imagery starts at high detail when the user is looking at it, and off when not.
-  let detail = $state<DetailLevel | 0>(0);
-  let detailSet = false;
-  $effect.pre(() => {
-    if (detailSet) return;
-    detailSet = true;
-    detail = layersOn.includes(IMAGERY_LAYER) ? 16 : 0;
-  });
+  // Imagery starts at high detail when the user is looking at it, and off
+  // when not, until the user chooses; the choice is kept (DownloadsUi.detail).
+  const detail = $derived<DetailLevel | 0>(
+    ui.detail !== null && (LEVELS as number[]).includes(ui.detail) ? (ui.detail as DetailLevel | 0) : layersOn.includes(IMAGERY_LAYER) ? 16 : 0,
+  );
 
   const choices = $derived(layerChoices(offeredLayers(offers), layersOn).filter((c) => c.layer !== IMAGERY_LAYER));
   let picked = $state<Set<string>>(new Set());
@@ -76,7 +75,8 @@
   });
   const missing = $derived(est.kind === 'ready' ? est.estimate.missing : []);
   const bytes = $derived(est.kind === 'ready' ? est.estimate.bytes : 0);
-  const tooBig = $derived(est.kind === 'ready' && freeBytes !== undefined && bytes > freeBytes);
+  // The same rule as the download service: the download and the room it keeps spare.
+  const tooBig = $derived(est.kind === 'ready' && !hasRoom(bytes, freeBytes));
   const canStart = $derived(est.kind === 'ready' && !tooBig && network.online);
 
   let confirming = $state(false);
@@ -89,7 +89,7 @@
   });
 
   function setDetail(level: DetailLevel | 0) {
-    detail = level;
+    ui.detail = level;
   }
 
   function toggle(layer: string, on: boolean) {
@@ -146,6 +146,10 @@
   </label>
 {/each}
 
+{#if layersOn.includes('parcels')}
+  <p class="lines"><Icon name="parcel" size={20} /> <span>{propertyLinesNote(linesWith)}</span></p>
+{/if}
+
 <label class="name">
   <span>Name</span>
   <input type="text" value={shownName} maxlength="60" autocomplete="off" enterkeyhint="done"
@@ -176,7 +180,7 @@
     <DlButton icon="retry" label="Try again" onclick={() => runner.retry()} />
   {/if}
   {#if tooBig}
-    <p class="problem"><Icon name="caution" size={22} /> <span><strong>Not enough space.</strong> This needs {formatSize(bytes)} and the phone has {formatSize(freeBytes ?? 0)} free. Delete a download, choose less imagery detail, or pick a smaller area.</span></p>
+    <p class="problem"><Icon name="caution" size={22} /> <span><strong>Not enough space.</strong> {notEnoughSpaceText(bytes, freeBytes ?? 0, false)}</span></p>
   {/if}
 </div>
 
@@ -319,6 +323,15 @@
   .row input:focus-visible + .box {
     outline: 3px solid var(--focus);
     outline-offset: 2px;
+  }
+
+  .lines {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin: 8px 0 0;
+    font-size: 0.9rem;
+    color: var(--text-muted);
   }
 
   .name {

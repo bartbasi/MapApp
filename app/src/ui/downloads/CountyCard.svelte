@@ -13,18 +13,20 @@
   import DlButton from './DlButton.svelte';
   import { chosenLayers, countyAlreadyHas, countyBytes, countyImageryMaxzoom, layerChoices } from './selection';
   import { errorCode } from './estimate-runner';
-  import { formatSize, layerLabel, layerNote, startErrorText, statusText } from './text';
+  import { formatSize, hasRoom, layerLabel, layerNote, notEnoughSpaceText, propertyLinesNote, startErrorText, statusText } from './text';
 
   interface Props {
     offer: CountyOffer;
     layersOn: readonly string[];
+    /** Counties whose property lines came with the app. Property lines are never part of a download. */
+    linesWith: readonly string[];
     areas: readonly AreaView[];
     network: NetworkState;
     freeBytes: number | undefined;
     onStart: (request: AreaRequest, name: string) => Promise<void>;
   }
 
-  let { offer, layersOn, areas, network, freeBytes, onStart }: Props = $props();
+  let { offer, layersOn, linesWith, areas, network, freeBytes, onStart }: Props = $props();
 
   const name = $derived(offer.countyName.replace(/, Illinois$/, ''));
   const choices = $derived(layerChoices(offer.layers.map((l) => l.layer), layersOn));
@@ -41,7 +43,8 @@
   const layers = $derived(chosenLayers(choices, picked));
   const total = $derived(countyBytes(offer, layers));
   const existing = $derived(countyAlreadyHas(areas, offer.county, layers));
-  const tooBig = $derived(freeBytes !== undefined && total > freeBytes);
+  // The same rule as the download service: the download and the room it keeps spare.
+  const tooBig = $derived(!hasRoom(total, freeBytes));
   let confirming = $state(false);
   let starting = $state(false);
   let failed = $state('');
@@ -103,6 +106,9 @@
       </li>
     {/each}
   </ul>
+  {#if layersOn.includes('parcels')}
+    <p class="lines"><Icon name="parcel" size={20} /> <span>{propertyLinesNote(linesWith, name)}</span></p>
+  {/if}
 
   <div class="foot">
     <p class="total"><span>Total</span> <strong>{formatSize(total)}</strong></p>
@@ -112,7 +118,7 @@
     {:else if !network.online}
       <p class="why">Downloading needs a connection.</p>
     {:else if tooBig}
-      <p class="why problem">Not enough space. This needs {formatSize(total)} and the phone has {formatSize(freeBytes ?? 0)} free. Delete a download, leave out imagery, or pick a smaller area.</p>
+      <p class="why problem"><strong>Not enough space.</strong> {notEnoughSpaceText(total, freeBytes ?? 0, true)}</p>
     {:else if confirming}
       <div class="confirm" role="group" aria-label="Download on mobile data">
         <p><Icon name="mobile-data" size={22} /> <span><strong>Use {formatSize(total)} of mobile data?</strong> This comes out of your data plan. On Wi-Fi it costs nothing.</span></p>
@@ -240,6 +246,17 @@
     flex: none;
     font-weight: 600;
     white-space: nowrap;
+  }
+
+  .lines {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin: 4px 0 0;
+    padding: 8px 0 2px;
+    border-top: 1px solid var(--line);
+    font-size: 0.9rem;
+    color: var(--text-muted);
   }
 
   .foot {

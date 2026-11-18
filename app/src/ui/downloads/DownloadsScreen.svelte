@@ -24,12 +24,14 @@
     ui: DownloadsUi;
     /** Layers on now: overlays switched on, and 'aerial' when the base view uses imagery. */
     layersOn: readonly string[];
+    /** Counties whose property lines came with the app. Property lines are never part of a download. */
+    linesWith: readonly string[];
     /** Moves the map so this rectangle shows, clear of the panel. */
     onShowArea: (bounds: Bounds) => void;
     onZoom: (direction: 1 | -1) => void;
   }
 
-  let { service, ui, layersOn, onShowArea, onZoom }: Props = $props();
+  let { service, ui, layersOn, linesWith, onShowArea, onZoom }: Props = $props();
 
   let root = $state<HTMLElement | null>(null);
   let areas = $state.raw<readonly AreaView[]>([]);
@@ -139,7 +141,7 @@
 
 <div bind:this={root}>
   {#if ui.mode === 'pick'}
-    <AreaPicker {service} {ui} offers={ui.offers ?? []} {areas} {layersOn} {network} {freeBytes} {onZoom} onStarted={started} />
+    <AreaPicker {service} {ui} offers={ui.offers ?? []} {areas} {layersOn} {linesWith} {network} {freeBytes} {onZoom} onStarted={started} />
   {:else}
     <NetworkNote {network} />
 
@@ -176,7 +178,7 @@
       {#if network.online}<DlButton icon="retry" label="Try again" onclick={() => void loadOffers()} />{/if}
     {:else}
       {#each ui.offers as offer (offer.county)}
-        <CountyCard {offer} {layersOn} {areas} {network} {freeBytes} onStart={startCounty} />
+        <CountyCard {offer} {layersOn} {linesWith} {areas} {network} {freeBytes} onStart={startCounty} />
       {/each}
     {/if}
 

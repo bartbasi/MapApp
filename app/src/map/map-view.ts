@@ -30,6 +30,7 @@ import { revealOffset } from './reveal';
 import { DOUBLE_TAP_MS, TAP_REACH_STEPS_PX, isSecondTap, type Tap } from './taps';
 import { buildStyle, type LIVE_SOURCES, type StyleOptions } from './style/build-style';
 import { styleImage } from './style/images';
+import { DOWNLOAD_AREAS_SOURCE } from './style/download-areas';
 import { PARCEL_RELATION_SOURCE, PARCEL_SELECTED_SOURCE } from './style/parcels';
 import { POSITION_SOURCE } from './style/position';
 import { PUBLIC_LAND_FILL, PUBLIC_LAND_LABEL_MINZOOM } from './style/public-land';
@@ -199,12 +200,13 @@ export class MapView {
       position: this.live.get(POSITION_SOURCE)?.data ?? null,
       parcelSelected: this.live.get(PARCEL_SELECTED_SOURCE)?.data ?? null,
       parcelRelation: this.live.get(PARCEL_RELATION_SOURCE)?.data ?? null,
+      downloadAreas: this.live.get(DOWNLOAD_AREAS_SOURCE)?.data ?? null,
     };
   }
 
   /** The style options without the in-place data, for telling whether a rebuild is needed. */
   private styleKey(options: StyleOptions): string {
-    return JSON.stringify(buildStyle({ ...this.withLabels(options), position: null, parcelSelected: null, parcelRelation: null }));
+    return JSON.stringify(buildStyle({ ...this.withLabels(options), position: null, parcelSelected: null, parcelRelation: null, downloadAreas: null }));
   }
 
   /**

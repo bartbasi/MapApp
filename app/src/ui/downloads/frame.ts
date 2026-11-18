@@ -124,3 +124,35 @@ export function suggestName(center: { lng: number; lat: number }, counties: read
     if (!taken.has(name.toLowerCase())) return name;
   }
 }
+
+// ---------------------------------------------------------------- keeping clear of the position marker
+
+/** Meters on the ground per CSS pixel at a latitude and map zoom (MapLibre's 512 pixel world at zoom 0). */
+export function metersPerPixel(lat: number, zoom: number): number {
+  return (40075016.686 * Math.cos((lat * Math.PI) / 180)) / (512 * 2 ** zoom);
+}
+
+/** The hole is never smaller than this radius, which clears the dot and its white edge. */
+export const MARKER_HOLE_MIN = 16;
+/** Space between the marker (or its accuracy circle) and the frame's dimming and lines. */
+export const MARKER_HOLE_MARGIN = 8;
+/** A very poor fix would open a hole bigger than the frame; past this the circle's edge may run under the dimming. */
+export const MARKER_HOLE_MAX = 180;
+
+/**
+ * The circle the frame leaves clear around the phone's position, so the
+ * dimming and the frame's lines never cover the dot or its accuracy circle
+ * (D26). Null when there is no position.
+ */
+export function markerHole(at: { x: number; y: number } | null, accuracyPx: number): { x: number; y: number; r: number } | null {
+  if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return null;
+  const acc = Number.isFinite(accuracyPx) && accuracyPx > 0 ? accuracyPx : 0;
+  return { x: at.x, y: at.y, r: Math.min(Math.max(acc, MARKER_HOLE_MIN), MARKER_HOLE_MAX) + MARKER_HOLE_MARGIN };
+}
+
+/** True when a circle and a screen rectangle overlap, for keeping the frame's words off the marker. */
+export function circleMeetsRect(c: { x: number; y: number; r: number }, r: ScreenRect): boolean {
+  const nx = Math.min(Math.max(c.x, r.left), r.right);
+  const ny = Math.min(Math.max(c.y, r.top), r.bottom);
+  return (c.x - nx) ** 2 + (c.y - ny) ** 2 < c.r ** 2;
+}

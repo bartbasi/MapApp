@@ -7,22 +7,11 @@
 // area, and a download is on this phone or not.
 
 import type { AreaError, AreaView } from '../../downloads/contract';
+import { SPACE_MARGIN_BYTES } from '../../downloads/service';
+import { formatSize } from '../format';
 
-const MB = 1024 * 1024;
-const GB = 1024 * MB;
-
-/**
- * A size in MB or GB, as the rest of the app counts them (1 MB is 1024 KB).
- * Under 100 MB with one decimal, so a 1.7 MB area does not read as 2 MB.
- */
-export function formatSize(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB';
-  // Under 0.05 MB would round to 0.0 MB.
-  if (bytes < 0.05 * MB) return 'less than 0.1 MB';
-  if (bytes < 100 * MB) return `${(bytes / MB).toFixed(1)} MB`;
-  if (bytes < 1000 * MB) return `${Math.round(bytes / MB)} MB`;
-  return `${(bytes / GB).toFixed(bytes < 10 * GB ? 2 : 1)} GB`;
-}
+/** Sizes in decimal MB and GB, the app's one unit (format.ts). */
+export { formatSize };
 
 /** Whole percent done, never 100 before the last byte. */
 export function percentDone(done: number, total: number): number {
@@ -167,7 +156,8 @@ export const ERROR_TEXT: Readonly<Record<AreaError, ErrorText>> = {
 
 /** "11.0 of 24.4 MB" (or "1.2 of 2.3 GB"), with the unit once when both share it. */
 export function progressLine(done: number, total: number): string {
-  const a = formatSize(done);
+  // At the very start "less than 0.1 MB of 3.4 MB" reads badly: say 0.
+  const a = done < 50_000 ? '0 MB' : formatSize(done);
   const b = formatSize(total);
   const ua = a.split(' ').pop();
   const ub = b.split(' ').pop();
@@ -255,4 +245,60 @@ export function startErrorText(code: string | undefined, space?: { neededBytes?:
     default:
       return 'The download could not start. Check the connection and try again.';
   }
+}
+
+// ---------------------------------------------------------------- space on the phone
+
+/**
+ * Room the download service keeps free beside every download
+ * (downloads/service.ts). The screens check against the same number, so a
+ * download they offer is one the service will start.
+ */
+export { SPACE_MARGIN_BYTES };
+
+/** Free space a download needs: its own size and the room kept spare. */
+export function spaceNeeded(downloadBytes: number): number {
+  return downloadBytes + SPACE_MARGIN_BYTES;
+}
+
+/** True when the phone has room for a download, or cannot tell. */
+export function hasRoom(downloadBytes: number, freeBytes: number | undefined): boolean {
+  return freeBytes === undefined || freeBytes >= spaceNeeded(downloadBytes);
+}
+
+/** "Not enough space. It needs ... free ... and the phone has ...", with what to do. */
+export function notEnoughSpaceText(downloadBytes: number, freeBytes: number, county: boolean): string {
+  const fix = county ? 'Delete a download, leave out imagery, or pick a smaller area.' : 'Delete a download, choose less imagery detail, or pick a smaller area.';
+  return `It needs ${formatSize(spaceNeeded(downloadBytes))} free (the download and some room to spare) and the phone has ${formatSize(freeBytes)}. ${fix}`;
+}
+
+// ---------------------------------------------------------------- property lines
+
+/** "Macon County" from "Macon County, Illinois". */
+function shortCounty(name: string): string {
+  return name.replace(/, Illinois$/, '');
+}
+
+function andList(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/**
+ * One sentence for when property lines are on: they are never part of a
+ * download (D33), because they come with the app. `linesWith` names the
+ * counties whose property lines are on this phone. With `county`, the
+ * sentence is about that county.
+ */
+export function propertyLinesNote(linesWith: readonly string[], county?: string): string {
+  const have = linesWith.map(shortCounty);
+  if (county !== undefined) {
+    const c = shortCounty(county);
+    return have.includes(c)
+      ? `Property lines are not part of the download: they come with the app for ${c} and work offline.`
+      : `Property lines are not part of the download, and none are offered for ${c} yet.`;
+  }
+  return have.length
+    ? `Property lines are not part of the download: they come with the app for ${andList(have)} and work offline there.`
+    : 'Property lines are not part of the download, and none are on this phone yet.';
 }

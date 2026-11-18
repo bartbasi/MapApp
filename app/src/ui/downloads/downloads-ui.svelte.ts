@@ -17,6 +17,12 @@ export class DownloadsUi {
   shown = $state<string | null>(null);
   /** The ground the picker's frame holds now, or null before the map has placed it. */
   pickBounds = $state.raw<Bounds | null>(null);
+  /**
+   * The imagery detail the user chose while picking (0 for none), or null
+   * before any choice: then it follows the base view. Kept, so going back
+   * to the list and picking again does not undo the choice.
+   */
+  detail = $state<number | null>(null);
   /** The counties on offer, once fetched. Kept so the panel does not fetch them each time it opens. */
   offers = $state.raw<CountyOffer[] | null>(null);
 }

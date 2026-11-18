@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { Bounds } from '../../map/tile-math';
-import { FRAME_MARGIN, FRAME_MIN, boundsOfPoints, boundsSizeKm, frameCorners, frameRect, roundBounds, sameBounds, suggestName } from './frame';
+import { FRAME_MARGIN, FRAME_MIN, MARKER_HOLE_MARGIN, MARKER_HOLE_MAX, MARKER_HOLE_MIN, boundsOfPoints, circleMeetsRect, markerHole, metersPerPixel, boundsSizeKm, frameCorners, frameRect, roundBounds, sameBounds, suggestName } from './frame';
 
 describe('frameRect', () => {
   it('fills what shows of the map, less a margin', () => {
@@ -90,5 +90,28 @@ describe('suggestName', () => {
 
   it('falls back to "Area" outside the counties', () => {
     expect(suggestName({ lng: -90, lat: 41 }, counties, ['Area 1'])).toBe('Area 2');
+  });
+});
+
+describe('the clear circle around the position marker', () => {
+  it('clears the accuracy circle with a margin, and at least the dot', () => {
+    expect(markerHole({ x: 100, y: 200 }, 40)).toEqual({ x: 100, y: 200, r: 40 + MARKER_HOLE_MARGIN });
+    expect(markerHole({ x: 100, y: 200 }, 2)).toEqual({ x: 100, y: 200, r: MARKER_HOLE_MIN + MARKER_HOLE_MARGIN });
+    expect(markerHole({ x: 100, y: 200 }, Number.NaN)!.r).toBe(MARKER_HOLE_MIN + MARKER_HOLE_MARGIN);
+    expect(markerHole({ x: 100, y: 200 }, 5000)!.r).toBe(MARKER_HOLE_MAX + MARKER_HOLE_MARGIN);
+    expect(markerHole(null, 10)).toBeNull();
+  });
+
+  it('turns meters into pixels as the map does', () => {
+    // At the equator, zoom 0 shows 40,075 km across 512 px.
+    expect(metersPerPixel(0, 0)).toBeCloseTo(78271.5, 0);
+    // At 40 N and zoom 16 one pixel is about 0.9 m, so a 10 m accuracy circle is about 11 px.
+    expect(10 / metersPerPixel(40, 16)).toBeCloseTo(10.9, 0);
+  });
+
+  it('knows when the circle reaches the frame words', () => {
+    const tag = { left: 20, top: 100, right: 300, bottom: 148 };
+    expect(circleMeetsRect({ x: 150, y: 160, r: 20 }, tag)).toBe(true);
+    expect(circleMeetsRect({ x: 150, y: 200, r: 20 }, tag)).toBe(false);
   });
 });

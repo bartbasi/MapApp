@@ -9,6 +9,7 @@ import { firstSentence, summarizeInstalled } from '../installed';
 import { PARCEL_LAYER } from '../../parcels/stored-parcel-source';
 import { LIVE_SOURCES, PARCELS_LAYER, availableBaseViews, buildStyle, effectiveBaseView, type StyleOptions } from './build-style';
 import { PARCEL_RELATION_LAYER_IDS, PARCEL_RELATION_SOURCE, PARCEL_SELECTED_SOURCE } from './parcels';
+import { DOWNLOAD_AREAS_SOURCE, DOWNLOAD_AREA_LAYER_IDS } from './download-areas';
 import { POSITION_LAYER_IDS, POSITION_SOURCE } from './position';
 
 const CHAMPAIGN: [number, number, number, number] = [-88.47, 39.87, -87.92, 40.41];
@@ -62,7 +63,8 @@ type Style = ReturnType<typeof buildStyle>;
 /** Every layer, the position marker's included. */
 const allIds = (s: Style) => s.layers.map((l) => l.id);
 /** The map's own layers: the position marker is always there and is tested on its own below. */
-const ids = (s: Style) => allIds(s).filter((id) => !id.startsWith('position-'));
+/** Layer IDs without the ones always in the style for live data (the marker, the outlines of downloads). */
+const ids = (s: Style) => allIds(s).filter((id) => !id.startsWith('position-') && !id.startsWith('download-area-'));
 /** The map data sources, leaving out the ones the map fills in place (the marker, the tapped parcel, the relation). */
 const dataSources = (s: Style) => Object.keys(s.sources).filter((k) => !(LIVE_SOURCES as readonly string[]).includes(k));
 const sourceOf = (s: Style, id: string) => {
@@ -381,10 +383,37 @@ describe('buildStyle: the position marker', () => {
   });
 
   it('is drawn with nothing installed', () => {
-    expect(allIds(buildStyle(opts({ installed: summarizeInstalled([]) }))).slice(1)).toEqual([...POSITION_LAYER_IDS]);
+    expect(allIds(buildStyle(opts({ installed: summarizeInstalled([]) }))).slice(1)).toEqual([...DOWNLOAD_AREA_LAYER_IDS, ...POSITION_LAYER_IDS]);
   });
 
   it('passes the style spec validator with a marker in it', () => {
     expect(validateStyleMin(buildStyle(opts({ base: 'hybrid', position: marker })))).toEqual([]);
+  });
+});
+
+describe('buildStyle: outlines of downloaded areas', () => {
+  const areas: FeatureCollection = {
+    type: 'FeatureCollection',
+    features: [
+      { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[-89.1, 39.9], [-89, 39.9], [-89, 40], [-89.1, 40], [-89.1, 39.9]]] }, properties: { shown: true } },
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [-89.1, 40] }, properties: { name: 'North timber' } },
+    ],
+  };
+
+  it('sit under the position marker and its relation to the property lines, in every base view (D26)', () => {
+    for (const base of ['map', 'aerial', 'hybrid'] as const) {
+      const order = allIds(buildStyle(opts({ base, overlays: { publicland: true, parcels: true }, downloadAreas: areas })));
+      const lastOutline = Math.max(...DOWNLOAD_AREA_LAYER_IDS.map((id) => order.indexOf(id)));
+      for (const id of POSITION_LAYER_IDS) expect(order.indexOf(id), `${base} ${id}`).toBeGreaterThan(lastOutline);
+      for (const id of PARCEL_RELATION_LAYER_IDS) {
+        if (order.includes(id)) expect(order.indexOf(id), `${base} ${id}`).toBeGreaterThan(lastOutline);
+      }
+    }
+  });
+
+  it('carries the outlines given and passes the style spec validator', () => {
+    const s = buildStyle(opts({ base: 'hybrid', downloadAreas: areas }));
+    expect(s.sources[DOWNLOAD_AREAS_SOURCE]).toEqual({ type: 'geojson', data: areas });
+    expect(validateStyleMin(s)).toEqual([]);
   });
 });

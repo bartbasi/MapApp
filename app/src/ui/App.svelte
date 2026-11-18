@@ -53,7 +53,8 @@
   import { connectDownloads } from './downloads/connect';
   import { DownloadsUi } from './downloads/downloads-ui.svelte';
 
-  type PanelName = 'layers' | 'details' | 'sources' | 'diagnostics' | 'downloads';
+  import { backStep, type PanelName } from './back';
+  import { DOWNLOAD_AREAS_SOURCE } from '../map/style/download-areas';
 
   // The platform is known at once; the position store needs it before the map exists.
   const platformImpl = detectPlatform();
@@ -161,7 +162,8 @@
 
   onMount(() => {
     let cancelled = false;
-    const cleanups: (() => void)[] = [];
+    // The back press is answered from the start, before the map has loaded.
+    const cleanups: (() => void)[] = [listenForBack()];
     (async () => {
       try {
         platform = platformImpl;
@@ -380,6 +382,31 @@
     panel = name;
   }
 
+  /**
+   * The system back gesture or button, for every panel (back.ts). The Android
+   * shell calls window.mapappBack() and gives the press to the system only
+   * when it returns false; in a browser the Escape key does the same.
+   */
+  function goBack(): boolean {
+    const step = backStep(panel, downloadsUi.mode);
+    if (step.kind === 'downloads-list') downloadsUi.mode = 'list';
+    else if (step.kind === 'open') open(step.panel);
+    else if (step.kind === 'close') close();
+    return step.kind !== 'system';
+  }
+
+  function listenForBack(): () => void {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && goBack()) e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    Object.assign(window, { mapappBack: goBack });
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      if ((window as { mapappBack?: unknown }).mapappBack === goBack) delete (window as { mapappBack?: unknown }).mapappBack;
+    };
+  }
+
   function close() {
     if (panel === 'downloads') downloadsUi.mode = 'list';
     panel = null;
@@ -468,7 +495,14 @@
     </div>
 
     {#if downloads && mapRef}
-      <AreaOverlay map={mapRef} ui={downloadsUi} service={downloads} active={panel === 'downloads'} />
+      <AreaOverlay
+        map={mapRef}
+        ui={downloadsUi}
+        service={downloads}
+        active={panel === 'downloads'}
+        marker={pos.on && pos.fix ? { lng: pos.fix.lng, lat: pos.fix.lat, accuracyM: pos.fix.accuracyM } : null}
+        setOutlines={(f) => mapView?.setLiveData(DOWNLOAD_AREAS_SOURCE, f)}
+      />
       <DownloadInvite map={mapRef} {installed} service={downloads} hidden={panel === 'downloads' || frameRunning} onOpen={() => open('downloads')} />
     {/if}
 
@@ -515,6 +549,7 @@
           service={downloads}
           ui={downloadsUi}
           {layersOn}
+          linesWith={countiesWithLines}
           onShowArea={(b) => void showArea(b)}
           onZoom={(d) => (d > 0 ? mapView?.map.zoomIn() : mapView?.map.zoomOut())}
         />
