@@ -22,9 +22,9 @@ export async function connectDownloads(platform: Platform): Promise<DownloadServ
     if (options) return createFakeDownloadService(options);
   }
   if (!platform.downloads) return null;
-  // TO CONNECT: create the real manager here, from platform.downloads, once
-  // it exports createDownloadService. For example:
-  //   const { createDownloadService } = await import('../../downloads/manager');
-  //   return createDownloadService(platform.downloads);
-  return null;
+  const { createDownloadService } = await import('../../downloads/service');
+  const manager = createDownloadService(platform.downloads);
+  // The list of areas and the network state, which need no connection.
+  await manager.ready;
+  return manager;
 }

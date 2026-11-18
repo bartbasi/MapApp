@@ -16,7 +16,7 @@
   import type { Bounds } from '../map/tile-math';
   import type { ArchiveSource } from '../platform/archive-meta';
   import type { Platform } from '../platform/platform';
-  import { loadDataSession, presentPublicLandCategories, type CategoryList, type DataSession } from '../map/data-session';
+  import { loadDataSession, presentPublicLandCategories, reloadDataSession, type CategoryList, type DataSession } from '../map/data-session';
   import { buildTour, runFrameTest, tourArea, type FrameTestResult } from '../map/frame-test';
   import { MapView, registerTileProtocol, tileStats, type MapTap } from '../map/map-view';
   import { PUBLIC_LAND_LAYER, sourcesForSite, type PublicLandSite } from '../map/public-land';
@@ -131,15 +131,47 @@
     };
   }
 
+  /**
+   * A downloaded area became complete or was removed: the map reads the list
+   * of what is on the phone again. The style follows `installed` by itself;
+   * the tiles the map already holds are dropped, because a place that had
+   * nothing a moment ago may have tiles now.
+   *
+   * The parcel source is not rebuilt. Parcel data is not hosted (D33), so a
+   * download cannot add or remove a parcel archive. That must change here
+   * before parcel data is ever offered as a download.
+   */
+  let archiveReload: Promise<void> = Promise.resolve();
+  function archivesChanged(): Promise<void> {
+    archiveReload = archiveReload.then(async () => {
+      const current = session;
+      if (!platform || !current) return;
+      try {
+        const next = await reloadDataSession(platform, current);
+        session = next;
+        await tick();
+        mapView?.reloadTiles();
+        categories = next.installed.has(PUBLIC_LAND_LAYER) ? await presentPublicLandCategories(next) : null;
+      } catch (e) {
+        console.error('the list of maps on this phone could not be read again:', e);
+      }
+    });
+    return archiveReload;
+  }
+
   onMount(() => {
     let cancelled = false;
     const cleanups: (() => void)[] = [];
     (async () => {
       try {
         platform = platformImpl;
-        void connectDownloads(platformImpl).then((d) => {
-          if (!cancelled) downloads = d;
-        });
+        void connectDownloads(platformImpl)
+          .then((d) => {
+            if (cancelled || !d) return;
+            downloads = d;
+            cleanups.push(d.onArchivesChanged(() => void archivesChanged()));
+          })
+          .catch((e) => console.warn('downloads are not available:', e));
         const s = await loadDataSession(platform);
         if (cancelled) return;
         session = s;
