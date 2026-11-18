@@ -1,58 +1,51 @@
 # Status
 
-Last updated: 2026-11-17, Step 3 in progress.
-
-## Step 3 in progress (read this first)
-
-The owner answered on 2026-11-17: the Step 2 screenshots may be pushed (done, `origin/main` at 5c706d9), the location plugin may be replaced (done, D31), and Step 3 may start. `build/location-debug.apk` (new location plugin) is on his phone. He did the Step 2 outdoor check with it on 2026-11-17: the dot was "spot on", accuracy 1 m, a few seconds to the first fix. Walking across a known property line in Macon County has not been done. He wants Champaign County property lines next; that waits on the consortium handing over the data (see `docs/research/county-parcel-terms.md`).
-
-Step 3 is offline downloads. The design is D33. The contract between its parts is `app/src/downloads/contract.ts`.
-
-- Done and committed, not pushed: the extract planner (`app/src/downloads/`), `pipeline/publish.py` (stages archives and writes the catalog; `upload` publishes and needs `--yes-publish`), the test file server `app/scripts/release-test-server.mjs`, the overview map (`pipeline/layers/overview.sh`, built into `data/build/overview/`), the new location plugin (`app/android/.../location/`, evidence in `docs/evidence/step3/location/`).
-- Being built: the download manager (TypeScript), the native Android downloader, the download screens. Then the lead wires them together in `App.svelte`, the qa-tester runs the Step 3 checks, and the step-reviewer reviews.
-- **Nothing is published as a release file.** The owner has been asked to say yes to publishing the six map archives (base map, imagery, public land per county, 383 MB, no parcel data). Until then all tests use the test server on this laptop (`data/publish/data-2026-11-17-test/`).
-- The sections below describe the end of Step 2 and are still true except where this section says otherwise.
+Last updated: 2026-11-17, end of Step 3, waiting for the owner.
 
 ## Where the project stands
 
-**Step 2 (position and property lines) is built, reviewed and tested on the emulator.** The report is `docs/reports/step-2.md`. One check is open: the owner checks the marker outdoors on his phone.
+**Step 3 (offline downloads) is built, tested on the emulator twice, and reviewed.** The report is `docs/reports/step-3.md`. The design is D33. Its three checks pass on the emulator. Nothing in its downloads has run on a real phone.
 
-**Step 2 is not pushed.** `main` is ahead of `origin/main`. The push waits for the owner's answer on the screenshots that show county parcel lines (question 3 of the report). Nothing under `data/` is ever pushed.
+**Step 3 is not pushed.** `main` is ahead of `origin/main` (5c706d9, the end of Step 2). The push waits for the owner's word on the new screenshots, which show Macon County parcel lines and IDs with owners masked (report question 1). His yes on 2026-11-17 named the Step 2 screenshots.
 
-**Step 2 is not the Step 2 of the brief.** The owner said the app's first job is to show the phone's position against the property lines (D26). Offline downloads moved to Step 3. See `docs/STEP_PLAN.md`.
+**Nothing is published as a release file.** `pipeline/publish.py upload` has never been run. It needs the owner's yes and `--yes-publish` (report question 2). The catalog the app reads by default, `catalog/catalog.json` on GitHub, does not exist yet, so a default build can download nothing.
 
-**Macon County has property lines. Champaign County has none.** The Champaign County service answers "Token Required" and was not read. The app says "No property lines for this place yet" there. `pipeline/build.sh parcels il-champaign` stops with the reason.
+**The steps are not the brief's order.** Step 2 was position and property lines (D26). Step 3 was offline downloads. See `docs/STEP_PLAN.md`.
 
-**Both counties allow a stored copy of their parcel data**, by the owner's word (D25). No written grant is in the project. Parcel archives are never committed and never hosted until he says so by name.
+**The location plugin was replaced** (D31, approved 2026-11-17). No closed library is left in the build. The owner checked it outdoors on his phone: the dot was "spot on", accuracy 1 m, a few seconds to the first fix. Nobody has walked across a known property line in Macon County.
+
+**Macon County has property lines. Champaign County has none.** The Champaign County consortium's service needs a token and was not read. The owner wants Champaign County next. He has a plan and a draft email to the consortium (in the conversation of 2026-11-17, and described in the Step 3 report, question 4). The build takes about two hours once a file with outline, parcel ID, acreage and owner arrives. See `docs/research/county-parcel-terms.md`.
+
+**Property lines are not a download.** A parcel archive reaches a phone only inside a build. The app refuses any parcel entry in a catalog (`app/src/downloads/catalog.ts`). No check yet stops a release build from carrying parcel data: that check must exist before Step 5.
 
 ## What exists
 
-- `pipeline/`: scripts that build one layer for one county per run, in WSL. Layers: `basemap`, `aerial`, `publicland`, `parcels`. The archive contract is in `pipeline/README.md`. Parcel checks are in `pipeline/checks/parcels_*.py`.
-- `data/build/<county-id>/`: the built archives. Not in git. `il-macon` has a parcel archive (57,096 records, data date 2026-10-28). Its `parcels.meta.json` carries the county outline as `coverage` (D32); `python3 -I pipeline/layers/parcels.py --update-meta <county>` adds it without asking the county again. `il-champaign` has none. Rebuild with `wsl -d Ubuntu -- bash pipeline/build.sh <layer> <county-id>`.
-- `app/src/position/`: the GPS sources, the position store, heading and follow. `app/src/parcels/`: the parcel source, the nearest line, the readout rule and its words. `app/src/map/style/parcels.ts` and `position.ts`: the layers. `app/src/ui/PositionReadout.svelte` and `ParcelDetails.svelte`: the screens.
-- `npm run check` passes and `npm test` passes with 327 tests. One of them reads the real Macon County archive and skips when it is absent.
-- `build/step2-debug.apk`: the Step 2 test build with real owner names, for the owner's phone. `build/step2-masked-debug.apk`: the same with every owner shown as "OWNER NAME", for screenshots. Step 1's build is still on the owner's phone until he connects it.
-- Evidence: `docs/evidence/step2/`.
+- `pipeline/`: one layer for one county per run, in WSL. Layers `basemap`, `aerial`, `publicland`, `parcels`, and the overview map (`layers/overview.sh`). `publish.py` stages archives and writes the catalog.
+- `data/build/<county-id>/`: the built archives, and `data/build/overview/`. Not in git.
+- `data/publish/data-2026-11-17-test/`: the six archives staged for the test server, catalog base `http://10.0.2.2:8765/dl/` (the emulator). `data/publish/phone-test/`: the same with base `http://localhost:8765/dl/` (a phone on the cable).
+- `app/src/downloads/`: the extract planner, the download manager, the contract (`contract.ts`). `app/src/ui/downloads/`: the screens. `app/android/.../downloads/`: the native downloader and its foreground service. `app/android/.../location/`: the location plugin.
+- `npm run check` passes. Vitest passes with 602 tests. JUnit passes with 73.
+- `build/step3-debug.apk`: real owner names, for the owner's phone, catalog at `http://localhost:8765/catalog.json`. `build/step3-masked-debug.apk`: masked, with the download test hook, catalog at `http://10.0.2.2:8765/catalog.json`. Both carry only the overview map and the Macon County parcel archive.
+- Evidence: `docs/evidence/step3/` (`location`, `downloader`, `screens`, `emulator`, `review-fixes`).
 
 ## How to build and run
 
-- Browser: in `app/`, set `MAPAPP_ARCHIVES=../data/build` and run `npx vite`. In a development build, `window.__mapapp` has the map, `position` (replay a walk) and `maskOwners(true)`. Add `?maskOwners` to the address to start masked.
-- Android: in `app/`, `npm run android:sync`, then in `app/android/` run `gradlew assembleDebug` with `JAVA_HOME` set to `.tools/jdk-21.0.13+9`. Then `gradlew --stop`. For a masked build, set `VITE_MAPAPP_MASK_OWNERS=1` for the `android:sync` command.
+- Browser: in `app/`, `MAPAPP_ARCHIVES=../data/dev-step3 VITE_MAPAPP_CATALOG_URL=http://10.0.2.2:8765/catalog.json npx vite`, with the test server running. Add `?maskOwners` to mask owners and `?fakeDownloads` for the stand-in service that shows every state.
+- Test server: `node app/scripts/release-test-server.mjs data/publish/data-2026-11-17-test --port 8765` (read its header for `--kbps`, `--expire`, `--drop-every`).
+- Android: in `app/`, set `VITE_MAPAPP_CATALOG_URL` and, for a masked build, `VITE_MAPAPP_MASK_OWNERS=1`, then `npm run android:sync`. In `app/android/`, `gradlew assembleDebug` with `JAVA_HOME` at `.tools/jdk-21.0.13+9`, then `gradlew --stop`. Delete `app/android/app/build/outputs/apk` first if the staged archives changed, or the APK keeps dead space. `node scripts/stage-archives.mjs --all` bundles every archive as Step 2 did.
+- **A phone on the cable can download from this laptop:** start the test server on `data/publish/phone-test`, run `adb -s <phone> reverse tcp:8765 tcp:8765`, and use `build/step3-debug.apk`.
 - **Take every kept screenshot from a masked build.** Owner names of private people must not be in the repository.
-- Emulator: send a position with `adb emu geo fix <longitude> <latitude>`. **Check airplane mode first** with `adb shell settings get global airplane_mode_on`. It was left on once and a whole session ran without a network. Turn it off with `adb shell cmd connectivity airplane-mode disable`, then `adb shell svc wifi enable`.
-- Never run the emulator, Gradle and a pipeline job at the same time on this laptop.
-- The owner's phone, when connected by USB, shows in `adb devices` as model `SM_F946U1`. It has two displays, so a screenshot needs `-d <display id>`. Taps can be sent with `adb shell input tap`.
+- **Check the emulator's airplane mode at the start of a session** (`adb shell settings get global airplane_mode_on`). The emulator reports airplane mode on a few seconds before the network is really gone.
+- The owner's phone is serial R3CWA0Q2JQP. Agents pass the emulator's serial on every adb command and never touch the phone.
 
 ## Waiting on the owner
 
-1. **The outdoor check of the marker on his phone.** Install `build/step2-debug.apk` when the phone is connected. The steps are in the Step 2 report.
-2. **How Champaign County will hand over its parcel data:** a file with outline, parcel ID, acreage and owner, or a login the county issues to him. And the grant in writing.
-3. **Whether the Macon County parcel archive may be published on GitHub** for the app to download. Needed in Step 3. "Everything is approved" (2026-11-17) was not taken to cover this. He must say it by name.
-4. **Whether the Step 2 screenshots may be pushed.** About 140 show Macon County parcel lines, parcel IDs and acreages, owners masked. If no, push the code without `docs/evidence/step2/` images (the history must then be rewritten before the push, because the images are already committed locally).
-5. **Whether to replace the location plugin** with one of our own that links no Google library (D31).
-6. Any condition a county put on its grant: a required credit, a limit on passing the data on, or a set way to receive the data.
-7. Whether to ask the Illinois State Geological Survey for the leaf-off imagery, and the Illinois Department of Natural Resources for its hunting table.
-8. Whether 3 m is the right allowance for error in the county's lines (D28).
+1. **Install and try Step 3 on his phone** through the cable (above). The build is ready; the phone was not attached when it was finished.
+2. **May Step 3 be pushed,** screenshots included (report question 1).
+3. **May the six map archives be published** as release files (report question 2). He has been shown the sentence from Microsoft's general terms about personal and non-commercial use, which bears on the two imagery files only. After a yes: stage under a real tag, upload, verify, treat the first release as a test of GitHub's real behaviour, and only then commit `catalog/catalog.json`.
+4. **How property lines reach a phone that is not his** (report question 3; Step 2's question 2).
+5. **Champaign County's parcel data:** a file or a county-issued login, and the grant in writing.
+6. From Step 2: any condition a county put on its grant, the leaf-off imagery and hunting table requests, and whether 3 m is the right allowance (D28).
 
 ## Lesson from Step 1
 
@@ -60,14 +53,24 @@ Read a service's terms before the first request to it, not only the license of t
 
 ## Known defects and open risks
 
+From Step 3 (the full list is in the Step 3 report):
+
+- Nothing in the downloads has run on a real phone: the background service, a long download with the screen off, a real mobile network, gesture navigation, the keyboard on the cover screen.
+- GitHub's real release files and redirect are untested.
+- No guard stops a release build from carrying parcel data.
+- A download waiting for Wi-Fi keeps its notification, and the waiting counts toward Android's six hours a day for this kind of service.
+- The overview map has no minor roads. Outlines of downloads show only while the downloads panel is open.
+
+From Step 2:
+
 - **A phone's GPS and a county's parcel lines are both inexact.** The readout shows the GPS accuracy and says "on or near a property line" when the line is within the accuracy plus 3 m (D28). The 3 m is a judgement.
-- **Nothing in Step 2 has been seen on a real phone.** The emulator reports a perfect 5 m fix. Real GPS under trees is the open question.
+- **Step 2 on a real phone:** the owner checked the marker outdoors once (spot on, 1 m accuracy). Real GPS under trees, and a walk across a known property line, are still open.
 - **The Macon County lines sit about 0.5 m east of the GPS frame** (D29). Not corrected.
 - **On the folded screen an open parcel panel covers the readout card.** The marker and the striped line still show.
 - **After "My position" is switched off and on, the marker takes 3 to 4 s to return.**
 - **A stack of 101 parcels on one outline was not seen on screen**; 14 was. "Acreage not listed" is shown on Android only in the tap panel screenshot `t8_noacre_tap.png`.
 - **Within 25 m inside the county outline, a place in no parcel reads "No property lines for this place yet"** (D32). Cautious, and wrong for a Macon County road on the line.
-- **A position's age is counted from when it arrived, not from its own time stamp.** If a phone re-delivers an old position as new, the stale and 5 minute limits do not see it. The emulator re-sends its last fix every second, which is a GPS that is still reporting. Watch for this on the real phone.
+- A position's age is now counted from the fix's own time on Android (fixed with the new location plugin). The browser source still counts from arrival.
 - **With accuracy unknown the poor-fix title still says "GPS is too weak to place you."**
 - **`real-archive.test.ts` logs one side mismatch** between zoom 15 and zoom 16 at a point where two lines are within 0.05 m of the same distance. Not asserted.
 - **The tapped parcel and a tapped public land site share one yellow outline.**
