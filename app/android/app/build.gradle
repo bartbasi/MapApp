@@ -21,6 +21,10 @@ android {
         // the APK through the asset's file descriptor (see BundledArchives).
         noCompress += ['pmtiles']
     }
+    testOptions {
+        // Plain-Java tests of the downloader call android.util.Log; it does nothing there.
+        unitTests.returnDefaultValues = true
+    }
     buildTypes {
         release {
             minifyEnabled false
@@ -42,6 +46,8 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
+    // The real org.json for tests on the laptop (Android's own is a stub there). Public domain.
+    testImplementation "org.json:json:20240303"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')

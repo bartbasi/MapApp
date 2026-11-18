@@ -7,10 +7,10 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * One place where archives are kept. Step 1 has one: archives bundled inside
- * the APK ({@link BundledArchives}). Step 2 adds a second, archives downloaded
- * into app storage, which {@link ArchiveCatalog} checks first, so a downloaded
- * archive takes precedence over a bundled one of the same county and layer.
+ * One place where archives are kept: archives bundled inside the APK
+ * ({@link BundledArchives}) and the archives of downloaded areas
+ * ({@link AreaArchives}). An area's archives are told apart by the area's ID,
+ * so several areas can each hold the same county and layer, beside a bundled one.
  */
 public interface ArchiveLocation {
 
@@ -25,6 +25,11 @@ public interface ArchiveLocation {
         String county();
 
         String layer();
+
+        /** The downloaded area the archive belongs to, or null for one that came with the app. */
+        default String area() {
+            return null;
+        }
 
         /** The text of the archive's meta.json file. */
         String readMeta() throws IOException;

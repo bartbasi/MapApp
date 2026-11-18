@@ -5,6 +5,7 @@ package io.github.bartbasi.mapapp.archives;
 
 import android.content.Context;
 import android.util.Log;
+import io.github.bartbasi.mapapp.downloads.AreaLayout;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -14,9 +15,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Every installed archive, one per county and layer, and open readers for
- * them. Locations are checked in order and the first one that has a county
- * and layer wins. Step 2 puts the downloaded location before the bundled one.
+ * Every installed archive and open readers for them: one per county and layer
+ * among those that came with the app, and one per area, county and layer among
+ * downloaded areas (see {@link ArchiveIds} for the keys). If two locations had
+ * the same key, the first would win.
  *
  * Only archives in this catalog can be read: a request for anything else is
  * refused by {@link ArchiveRequestHandler}.
@@ -49,7 +51,7 @@ public final class ArchiveCatalog {
     public static synchronized ArchiveCatalog get(Context context) {
         if (instance == null) {
             List<ArchiveLocation> locations = new ArrayList<>();
-            // Step 2: add the downloaded location here, before the bundled one.
+            locations.add(new AreaArchives(AreaLayout.root(context)));
             locations.add(new BundledArchives(context.getApplicationContext().getAssets()));
             instance = new ArchiveCatalog(locations);
             instance.refresh();
@@ -63,7 +65,7 @@ public final class ArchiveCatalog {
         for (ArchiveLocation location : locations) {
             try {
                 for (ArchiveLocation.Archive a : location.list()) {
-                    String key = ArchiveIds.key(a.county(), a.layer());
+                    String key = ArchiveIds.key(a.area(), a.county(), a.layer());
                     if (!next.containsKey(key)) next.put(key, new Entry(location, a));
                 }
             } catch (IOException e) {

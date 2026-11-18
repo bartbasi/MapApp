@@ -1,0 +1,106 @@
+# Check e: pause, resume and remove
+# 2026-11-17, emulator-5554, server --kbps 300. Area d-air (from check d, downloading) and e-pause (10 km box, aerial and basemap).
+# One area downloads at a time: e-pause was queued while d-air ran, and started when d-air was paused.
+
+== d-air still: "downloading 10439816/22707794"
+[{"county":"il-macon","layer":"aerial","headBytes":2108,"ranges":45,"bytes":22707794,"etag":"\"860da2b-1a1da633f8d\""},{"county":"il-macon","layer":"basemap","headBytes":1911,"ranges":29,"bytes":1738061,"etag":"\"412e09-1a1d3429fbe\""}]
+18:10:07 e-pause: "queued 0/24445855" (queued behind d-air?)
+18:10:16 paused d-air
+18:10:22 d-air: "paused 18568276/22707794"  e-pause: "downloading 1885906/24445855"
+18:10:30 d-air: "paused 18568276/22707794"  e-pause: "downloading 4060280/24445855"
+18:10:32 paused e-pause; server log lines: 67
+18:10:35 e-pause: "paused 4256888/24445855"
+18:10:45 e-pause: "paused 4256888/24445855"  (unchanged = stopped); server log lines: 67
+files of e-pause while paused:
+total 4212
+-rw------- 1 u0_a217 u0_a217       7 2026-11-17 18:10 0.ckpt
+-rw------- 1 u0_a217 u0_a217    2108 2026-11-17 18:09 0.head
+-rw------- 1 u0_a217 u0_a217 4256888 2026-11-17 18:10 0.part
+-rw------- 1 u0_a217 u0_a217    1911 2026-11-17 18:09 1.head
+-rw------- 1 u0_a217 u0_a217    4152 2026-11-17 18:09 job.json
+-rw------- 1 u0_a217 u0_a217      19 2026-11-17 18:10 state.json
+{"status":"paused"}
+18:10:47 resumed e-pause
+18:10:55 e-pause: "downloading 6583102/24445855"
+11-17 18:09:35.834  4003  4262 I MapAppDownloads: file 0 (il-macon/aerial): going on from byte 6779710 of 22707794
+11-17 18:10:16.247  4003  4262 I MapAppDownloads: file 0 (il-macon/aerial): going on from byte 0 of 22707794
+11-17 18:10:46.466  4003  4570 I MapAppDownloads: file 0 (il-macon/aerial): going on from byte 4256888 of 22707794
+
+== remove
+18:11:07 areas: "a-box complete 24445855/24445855; a-whole complete 4271625/4271625; b-force complete 22707794/22707794; b-kill complete 22707794/22707794; c-expire complete 22707794/22707794; c-drop complete 26979419/26979419; d-air paused 18568276/22707794; e-pause downloading 9654120/24445855"
+archives listed: "a-box:il-macon/aerial, a-box:il-macon/basemap, a-whole:il-macon/basemap, b-force:il-macon/aerial, b-kill:il-macon/aerial, c-drop:il-macon/aerial, c-drop:il-macon/basemap, c-expire:il-macon/aerial, bundled:il-macon/parcels, bundled:overview/basemap"
+--- directory before (ls -la no_backup/areas and each area):
+total 88
+drwx------ 11 u0_a217 u0_a217 4096 2026-11-17 18:09 .
+drwxrwx--x  3 u0_a217 u0_a217 4096 2026-11-17 17:48 ..
+drwx------  2 u0_a217 u0_a217 4096 2026-11-17 18:09 .staging
+drwx------  3 u0_a217 u0_a217 4096 2026-11-17 17:56 a-box
+drwx------  3 u0_a217 u0_a217 4096 2026-11-17 17:57 a-whole
+drwx------  3 u0_a217 u0_a217 4096 2026-11-17 18:01 b-force
+drwx------  3 u0_a217 u0_a217 4096 2026-11-17 18:04 b-kill
+drwx------  3 u0_a217 u0_a217 4096 2026-11-17 18:07 c-drop
+drwx------  3 u0_a217 u0_a217 4096 2026-11-17 18:06 c-expire
+drwx------  2 u0_a217 u0_a217 4096 2026-11-17 18:10 d-air
+drwx------  2 u0_a217 u0_a217 4096 2026-11-17 18:11 e-pause
+[e-pause]
+no_backup/areas/e-pause:
+total 9728
+-rw------- 1 u0_a217 u0_a217       7 2026-11-17 18:11 0.ckpt
+-rw------- 1 u0_a217 u0_a217    2108 2026-11-17 18:09 0.head
+-rw------- 1 u0_a217 u0_a217 9916264 2026-11-17 18:11 0.part
+-rw------- 1 u0_a217 u0_a217    1911 2026-11-17 18:09 1.head
+-rw------- 1 u0_a217 u0_a217    4152 2026-11-17 18:09 job.json
+[d-air]
+no_backup/areas/d-air:
+total 18176
+-rw------- 1 u0_a217 u0_a217        8 2026-11-17 18:10 0.ckpt
+-rw------- 1 u0_a217 u0_a217     2108 2026-11-17 18:08 0.head
+-rw------- 1 u0_a217 u0_a217 18568276 2026-11-17 18:10 0.part
+-rw------- 1 u0_a217 u0_a217     2293 2026-11-17 18:08 job.json
+-rw------- 1 u0_a217 u0_a217       19 2026-11-17 18:10 state.json
+[a-whole]
+no_backup/areas/a-whole:
+total 20
+-rw------- 1 u0_a217 u0_a217    0 2026-11-17 17:57 complete
+drwx------ 2 u0_a217 u0_a217 4096 2026-11-17 17:57 il-macon
+-rw------- 1 u0_a217 u0_a217 1654 2026-11-17 17:57 job.json
+
+no_backup/areas/a-whole/il-macon:
+total 4184
+-rw------- 1 u0_a217 u0_a217    1182 2026-11-17 17:57 basemap.meta.json
+-rw------- 1 u0_a217 u0_a217 4271625 2026-11-17 17:57 basemap.pmtiles
+18:11:10 removed e-pause while downloading (781 ms including the driver)
+18:11:11 removed d-air (paused)
+18:11:11 removed a-whole (complete)
+areas: "a-box complete 24445855/24445855; b-force complete 22707794/22707794; b-kill complete 22707794/22707794; c-expire complete 22707794/22707794; c-drop complete 26979419/26979419"
+archives listed: "a-box:il-macon/aerial, a-box:il-macon/basemap, b-force:il-macon/aerial, b-kill:il-macon/aerial, c-drop:il-macon/aerial, c-drop:il-macon/basemap, c-expire:il-macon/aerial, bundled:il-macon/parcels, bundled:overview/basemap"
+--- directory after:
+total 64
+drwx------ 8 u0_a217 u0_a217 4096 2026-11-17 18:11 .
+drwxrwx--x 3 u0_a217 u0_a217 4096 2026-11-17 17:48 ..
+drwx------ 2 u0_a217 u0_a217 4096 2026-11-17 18:09 .staging
+drwx------ 3 u0_a217 u0_a217 4096 2026-11-17 17:56 a-box
+drwx------ 3 u0_a217 u0_a217 4096 2026-11-17 18:01 b-force
+drwx------ 3 u0_a217 u0_a217 4096 2026-11-17 18:04 b-kill
+drwx------ 3 u0_a217 u0_a217 4096 2026-11-17 18:07 c-drop
+drwx------ 3 u0_a217 u0_a217 4096 2026-11-17 18:06 c-expire
+ls: no_backup/areas/e-pause: No such file or directory
+ls: no_backup/areas/d-air: No such file or directory
+ls: no_backup/areas/a-whole: No such file or directory
+--- reading a removed area's archive through the shell:
+404
+server log lines 5 s after: 82
+server log lines 10 s after: 82
+11-17 18:11:09.828  4003  4082 I MapAppDownloads: area e-pause removed
+11-17 18:11:10.402  4003  4092 I MapAppDownloads: area d-air removed
+11-17 18:11:11.171  4003  4163 I MapAppDownloads: area a-whole removed
+
+== a paused area stays paused after the app is killed (area p-keep, server --kbps 300)
+18:26:57 paused: "f-box complete 24445855; h-screen2 complete 22707794; p-keep paused 3142776"
+server lines: 20
+18:26:58 force-stop
+18:27:33 reopened: "f-box complete 24445855; h-screen2 complete 22707794; p-keep paused 3142776"
+18:27:44 10 s later: "f-box complete 24445855; h-screen2 complete 22707794; p-keep paused 3142776"; server lines: 20
+download service records: 0
+18:27:50 resumed: "f-box complete 24445855; h-screen2 complete 22707794; p-keep downloading 4944702"
+removed: "f-box complete 24445855; h-screen2 complete 22707794"

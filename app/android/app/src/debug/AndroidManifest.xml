@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MapApp. Copyright 2026 Play, Inc.
+     Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE. -->
+<!-- Debug builds only: lets the downloader reach the test file server on this
+     laptop over plain http (app/scripts/release-test-server.mjs). Release
+     builds have no such entry and allow https only. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:networkSecurityConfig="@xml/network_security_config" />
+</manifest>

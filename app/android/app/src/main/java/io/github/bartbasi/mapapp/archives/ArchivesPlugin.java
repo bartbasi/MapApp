@@ -30,6 +30,7 @@ public class ArchivesPlugin extends Plugin {
                 row.put("county", e.archive.county());
                 row.put("layer", e.archive.layer());
                 row.put("location", e.location.name());
+                if (e.archive.area() != null) row.put("area", e.archive.area());
                 row.put("meta", e.archive.readMeta());
                 rows.put(row);
             } catch (Exception ex) {

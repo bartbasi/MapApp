@@ -25,6 +25,15 @@
 
         </activity>
 
+        <!-- Map area downloads go on with the screen off (DECISIONS D33). dataSync
+             is the type Android gives for moving data to or from the network on
+             the user's request; Android 15 and later limit it to 6 hours a day,
+             after which the download waits until the app is opened. -->
+        <service
+            android:name=".downloads.DownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -46,4 +55,14 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+
+    <!-- Map area downloads (Step 3, DECISIONS D33): the true network state (D12),
+         a foreground service of type dataSync with a progress notification, the
+         notification permission Android 13 and later ask for (downloads run
+         without it), and a wake lock held only while bytes are moving. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 </manifest>

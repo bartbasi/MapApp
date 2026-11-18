@@ -1,0 +1,23 @@
+# Check f: a complete area's archives are listed with area set and draw on the map in airplane mode; an incomplete area is not listed
+# 2026-11-17, emulator-5554, masked build (VITE_MAPAPP_MASK_OWNERS=1).
+
+Bundled in this build: overview/basemap and il-macon/parcels only (stage-archives default). No base map or imagery of Macon County is bundled.
+Area f-box: 10 km box around Decatur, il-macon aerial (22,707,794 bytes) and basemap (1,738,061 bytes).
+
+Archives.list() while f-box was downloading (15,857,460 bytes done): bundled:il-macon/parcels, bundled:overview/basemap
+Archives.list() once complete: f-box:il-macon/aerial, f-box:il-macon/basemap, bundled:il-macon/parcels, bundled:overview/basemap
+(Check e shows the same for a paused area and for areas removed.)
+
+Then: am force-stop; airplane mode on (airplane_mode_on=1); NetworkState.get() = {online:false}; GPS set to -88.9815, 39.8540; app started; position button tapped.
+02_area_basemap_airplane_mode.png: streets and labels from f-box's base map at about zoom 18. 03_area_aerial_airplane_mode.png: Aerial, imagery from f-box. Plane icon in the status bar in both.
+
+Reads through the area path and refusals (from the WebView, check a session):
+/_tiles/_area/a-box/il-macon/aerial.pmtiles?o=0&n=7 -> 200 "PMTiles"
+/_tiles/_area/a-box/il-macon/basemap.pmtiles?o=0&n=7 -> 200 "PMTiles"
+/_tiles/_area/nope/il-macon/aerial.pmtiles -> 404 (no such area)
+/_tiles/_area/a-box/il-macon/aerial.meta.json -> 404 (not an archive path)
+/_tiles/il-macon/aerial.pmtiles -> 404 (not bundled)
+/_tiles/il-macon/parcels.pmtiles -> 200 "PMTiles" (bundled)
+
+An earlier screenshot of this check (not kept) showed a garbled copyright sign in the credit line. The cause was the test script, which read catalog.json
+in the Windows code page and so sent garbled metadata text. With the script fixed the credit reads correctly (02, 03).

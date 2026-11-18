@@ -1,0 +1,177 @@
+# Check a: an extract and a whole file finish, byte-identical, and pass pmtiles verify
+# 2026-11-17T17:59:01-06:00, emulator-5554, server: release-test-server.mjs --port 8765 (signed addresses 20 s, full speed)
+
+## Area a-box: 10 km box of Macon County, bounds -89.039958 39.809084 -88.922942 39.898916, full detail
+[{"county":"il-macon","layer":"aerial","headBytes":2108,"ranges":45,"bytes":22707794,"etag":"\"860da2b-1a1da633f8d\""},{"county":"il-macon","layer":"basemap","headBytes":1911,"ranges":29,"bytes":1738061,"etag":"\"412e09-1a1d3429fbe\""}]
+
+## Area a-whole: il-macon.basemap.pmtiles whole, sha256 from the catalog
+
+## Events (time ms, area, status, bytesDone)
+1794959806564 a-box queued 0 24445855
+1794959806569 a-box downloading 0 24445855
+1794959807686 a-box downloading 3275 24445855
+1794959808682 a-box downloading 2506644 24445855
+1794959809688 a-box downloading 6348702 24445855
+1794959810689 a-box downloading 9695112 24445855
+1794959811714 a-box downloading 13470184 24445855
+1794959812708 a-box downloading 17275412 24445855
+1794959813711 a-box downloading 20901450 24445855
+1794959814712 a-box downloading 23176234 24445855
+1794959815748 a-box downloading 24066373 24445855
+1794959816131 a-box complete 24445855 24445855
+1794959858318 a-whole queued 0 4271625
+1794959858329 a-whole downloading 0 4271625
+1794959859327 a-whole downloading 1167121 4271625
+1794959860493 a-whole complete 4271625 4271625
+
+## Files on the emulator (run-as ls -lR no_backup/areas)
+no_backup/areas:
+total 16
+drwx------ 3 u0_a217 u0_a217 4096 2026-11-17 17:56 a-box
+drwx------ 3 u0_a217 u0_a217 4096 2026-11-17 17:57 a-whole
+
+no_backup/areas/a-box:
+total 24
+-rw------- 1 u0_a217 u0_a217    0 2026-11-17 17:56 complete
+drwx------ 2 u0_a217 u0_a217 4096 2026-11-17 17:56 il-macon
+-rw------- 1 u0_a217 u0_a217 4146 2026-11-17 17:56 job.json
+
+no_backup/areas/a-box/il-macon:
+total 23904
+-rw------- 1 u0_a217 u0_a217     1220 2026-11-17 17:56 aerial.meta.json
+-rw------- 1 u0_a217 u0_a217 22707794 2026-11-17 17:56 aerial.pmtiles
+-rw------- 1 u0_a217 u0_a217     1191 2026-11-17 17:56 basemap.meta.json
+-rw------- 1 u0_a217 u0_a217  1738061 2026-11-17 17:56 basemap.pmtiles
+
+no_backup/areas/a-whole:
+total 20
+-rw------- 1 u0_a217 u0_a217    0 2026-11-17 17:57 complete
+drwx------ 2 u0_a217 u0_a217 4096 2026-11-17 17:57 il-macon
+-rw------- 1 u0_a217 u0_a217 1654 2026-11-17 17:57 job.json
+
+no_backup/areas/a-whole/il-macon:
+total 4184
+-rw------- 1 u0_a217 u0_a217    1182 2026-11-17 17:57 basemap.meta.json
+-rw------- 1 u0_a217 u0_a217 4271625 2026-11-17 17:57 basemap.pmtiles
+
+## SHA-256
+30b82ea441b2dab908a4afec6108abf89bb19babb5090a8f1d7e7f6db7b78169 *pulled/a-box_il-macon_aerial.pmtiles
+6b10b7e216c761f0abcbc7951e405acb871de1ece1ffb378fddd09b022e0f055 *pulled/a-box_il-macon_basemap.pmtiles
+12a1def389e29a134d5106a688b7d1a57b03d7ea1d9b4f6c3f63d35eeeac8568 *pulled/a-whole_il-macon_basemap.pmtiles
+30b82ea441b2dab908a4afec6108abf89bb19babb5090a8f1d7e7f6db7b78169 *ref2-aerial.pmtiles
+6b10b7e216c761f0abcbc7951e405acb871de1ece1ffb378fddd09b022e0f055 *ref2-basemap.pmtiles
+0346dd9d9d4f4a98f502b2c9ce71df19d10379a8449da3dec4bedeac7716eff6 *ref-macon-aerial-box.pmtiles
+20e08808a5e52816661f5320d42b66204c444636aa09af816e7076e23461fd0a *ref-macon-basemap-box.pmtiles
+12a1def389e29a134d5106a688b7d1a57b03d7ea1d9b4f6c3f63d35eeeac8568 *data/publish/data-2026-11-17-test/il-macon.basemap.pmtiles
+
+## Comparisons
+a-box aerial: identical to assemble() of the WebView's plan on the staged hosted file
+a-box aerial against a plan made in Node: 1 byte differs (offset 136, the gzip header's OS byte of the root directory; ranges identical)
+a-box basemap: identical to assemble() of the WebView's plan on the staged hosted file
+a-box basemap against a plan made in Node: 1 byte differs (offset 136, the gzip header's OS byte of the root directory; ranges identical)
+a-whole basemap: identical to the staged hosted file
+
+## pmtiles verify
+a-box_il-macon_aerial.pmtiles: verify.go:169: Completed verify in 5.5199ms.
+a-box_il-macon_basemap.pmtiles: verify.go:169: Completed verify in 1.3843ms.
+a-whole_il-macon_basemap.pmtiles: verify.go:169: Completed verify in 1.6556ms.
+
+## Server log
+serving C:\bart\MapApp\data\publish\data-2026-11-17-test on port 8765; signed addresses last 20 s
+302 GET /dl/il-macon.basemap.pmtiles bytes=0-15 sent=0
+206 GET /signed/cc107009b6320953ef0edbad/il-macon.basemap.pmtiles bytes=0-15 sent=16 signed
+302 GET /dl/il-macon.aerial.pmtiles bytes=0-16383 sent=0
+206 GET /signed/94653db9f58753bf882d0e67/il-macon.aerial.pmtiles bytes=0-16383 sent=16384 signed
+302 GET /dl/il-macon.aerial.pmtiles bytes=294-21846 sent=0
+206 GET /signed/40fab6782906811eec5d395f/il-macon.aerial.pmtiles bytes=294-21846 sent=21553 signed
+302 GET /dl/il-macon.basemap.pmtiles bytes=0-16383 sent=0
+206 GET /signed/9520af088ebe2a797867e0f6/il-macon.basemap.pmtiles bytes=0-16383 sent=16384 signed
+302 GET /dl/il-macon.aerial.pmtiles bytes=21847-24520 sent=0
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=21847-24520 sent=2674 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=27207-31608 sent=4402 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=38183-50410 sent=12228 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=70867-111712 sent=40846 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=217271-303346 sent=86076 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=664973-938702 sent=273730 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=2220065-2350062 sent=129998 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=2456289-2526080 sent=69792 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=2563115-2817116 sent=254002 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=2914137-3037254 sent=123118 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=7459855-7941050 sent=481196 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=8401029-8544620 sent=143592 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=8692645-9571486 sent=878842 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=9917399-10360962 sent=443564 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=25089087-26692096 sent=1603010 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=28315745-28462414 sent=146670 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=28538579-28608702 sent=70124 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=28643715-28666392 sent=22678 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=29163267-29171146 sent=7880 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=29192115-29209214 sent=17100 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=29236373-31275736 sent=2039364 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=31377355-31471574 sent=94220 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=31522609-31800020 sent=277412 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=31886289-31927288 sent=41000 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=33180595-33285032 sent=104438 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=33424081-34142388 sent=718308 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=34220565-34278844 sent=58280 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=34405691-34536902 sent=131212 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=85411821-89606124 sent=4194304 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=89606125-89990310 sent=384186 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=95064297-95481722 sent=417426 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=95694435-95889678 sent=195244 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=95995333-96073000 sent=77668 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=97825385-97861356 sent=35972 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=97937697-97994156 sent=56460 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=98084623-102278926 sent=4194304 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=102278927-103884732 sent=1605806 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=104174343-104434034 sent=259692 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=104594001-105192104 sent=598104 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=105270823-105329440 sent=58618 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=105672885-105724774 sent=51890 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=109621693-109701326 sent=79634 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=109761233-109826352 sent=65120 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=110302883-110375272 sent=72390 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=110449339-112139770 sent=1690432 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=112442509-112503234 sent=60726 signed
+206 GET /signed/7127410f947f7a2abf24e228/il-macon.aerial.pmtiles bytes=112993897-113325850 sent=331954 signed
+302 GET /dl/il-macon.basemap.pmtiles bytes=6415-470336 sent=0
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=6415-470336 sent=463922 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=513732-544094 sent=30363 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=572493-605628 sent=33136 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=641198-693453 sent=52256 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=777960-822695 sent=44736 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=959593-1062688 sent=103096 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=1289169-1331302 sent=42134 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=1351868-1359382 sent=7515 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=1362954-1434166 sent=71213 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=1453054-1489575 sent=36522 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=1934274-2025499 sent=91226 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=2063368-2072659 sent=9292 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=2081505-2221264 sent=139760 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=2254703-2323119 sent=68417 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=2494913-2494984 sent=72 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=3189690-3389567 sent=199878 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=3466447-3470345 sent=3899 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=3474656-3479065 sent=4410 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=3482026-3483631 sent=1606 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=3505616-3505801 sent=186 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=3507926-3509590 sent=1665 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=3511645-3690836 sent=179192 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=3698934-3705823 sent=6890 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=3710866-3745940 sent=35075 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=3754380-3757862 sent=3483 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=3827577-3835040 sent=7464 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=3845268-3922109 sent=76842 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=3930255-3941711 sent=11457 signed
+206 GET /signed/449e962cd27df1feb0fcf697/il-macon.basemap.pmtiles bytes=3946050-3956492 sent=10443 signed
+302 GET /dl/il-macon.basemap.pmtiles bytes=0-15 sent=0
+206 GET /signed/94db30ce05a2e72a20a8da7e/il-macon.basemap.pmtiles bytes=0-15 sent=16 signed
+302 GET /dl/il-macon.basemap.pmtiles bytes=0-4194303 sent=0
+206 GET /signed/b5a2b7b1cf8cb2d983ceddeb/il-macon.basemap.pmtiles bytes=0-4194303 sent=4194304 signed
+206 GET /signed/b5a2b7b1cf8cb2d983ceddeb/il-macon.basemap.pmtiles bytes=4194304-4271624 sent=77321 signed
+302 GET /dl/il-macon.aerial.pmtiles bytes=0-16383 sent=0
+206 GET /signed/68fb3860d53cdcda16de25d6/il-macon.aerial.pmtiles bytes=0-16383 sent=16384 signed
+302 GET /dl/il-macon.aerial.pmtiles bytes=294-21846 sent=0
+206 GET /signed/65a91b266f20fd19345bdea2/il-macon.aerial.pmtiles bytes=294-21846 sent=21553 signed
+302 GET /dl/il-macon.basemap.pmtiles bytes=0-16383 sent=0
+206 GET /signed/3ad8a24ae8c7f867a1b4feb1/il-macon.basemap.pmtiles bytes=0-16383 sent=16384 signed

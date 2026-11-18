@@ -15,8 +15,8 @@ import java.nio.channels.FileChannel;
  *
  * For an archive bundled in the APK the underlying file is the APK itself, and
  * the window is where the uncompressed asset sits inside it, so the archive is
- * read in place and never copied. A downloaded archive (Step 2) is a whole
- * file, a window starting at 0.
+ * read in place and never copied. A downloaded archive is a whole file, a
+ * window starting at 0.
  *
  * Positional channel reads do not move a shared file position, so concurrent
  * tile requests do not interfere.
@@ -43,6 +43,13 @@ final class ChannelArchiveReader implements ArchiveReader {
         }
         AssetFileDescriptor.AutoCloseInputStream stream = new AssetFileDescriptor.AutoCloseInputStream(afd);
         return new ChannelArchiveReader(stream.getChannel(), afd.getStartOffset(), afd.getLength(), stream);
+    }
+
+    /** A whole file in app storage. */
+    static ChannelArchiveReader forFile(java.io.File file) throws IOException {
+        java.io.FileInputStream stream = new java.io.FileInputStream(file);
+        FileChannel channel = stream.getChannel();
+        return new ChannelArchiveReader(channel, 0, channel.size(), stream);
     }
 
     @Override

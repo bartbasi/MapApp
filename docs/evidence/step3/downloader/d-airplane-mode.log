@@ -1,0 +1,90 @@
+# Check d: airplane mode on mid-download gives waiting; off again, it goes on by itself
+# 2026-11-17, emulator-5554, server --kbps 300, build with the network fixes (see the end of this file)
+# Area d-air2: 10 km box of il-macon aerial, 22,707,794 bytes. Each line: status, bytesDone, and NetworkState.get().
+
+[{"county":"il-macon","layer":"aerial","headBytes":2108,"ranges":45,"bytes":22707794,"etag":"\"860da2b-1a1da633f8d\""}]
+18:19:19.302 before: "downloading 6124350 {\"online\":true,\"metered\":false}"
+18:19:19.757 airplane mode on
+18:19:21.862 +2s: "waiting 6255422 {\"online\":false,\"metered\":false}"
+18:19:24.289 +4s: "waiting 6255422 {\"online\":false,\"metered\":false}"
+18:19:30.716 +10s: "waiting 6255422 {\"online\":false,\"metered\":false}"
+18:19:41.116 +20s: "waiting 6255422 {\"online\":false,\"metered\":false}"
+18:19:51.532 +30s: "waiting 6255422 {\"online\":false,\"metered\":false}"
+airplane_mode_on=1
+18:19:52.052 airplane mode off
+18:19:55.142 +3s: "downloading 6845246 {\"online\":true,\"metered\":true}"
+18:19:58.511 +6s: "downloading 7894352 {\"online\":true,\"metered\":false}"
+18:20:02.898 +10s: "downloading 9326440 {\"online\":true,\"metered\":false}"
+18:20:13.368 +20s: "downloading 12341096 {\"online\":true,\"metered\":false}"
+
+Result: complete; the pulled file is identical (cmp) to assemble() of the WebView's plan.
+30b82ea441b2dab908a4afec6108abf89bb19babb5090a8f1d7e7f6db7b78169 *data/spike/step3-dl/pulled/d-air2.pmtiles
+pmtiles verify: verify.go:169: Completed verify in 528µs.
+
+## Server log
+serving C:\bart\MapApp\data\publish\data-2026-11-17-test on port 8765; signed addresses last 20 s
+302 GET /dl/il-macon.aerial.pmtiles bytes=0-16383 sent=0
+206 GET /signed/738d85f9b77742a99c31d18c/il-macon.aerial.pmtiles bytes=0-16383 sent=16384 signed
+302 GET /dl/il-macon.aerial.pmtiles bytes=294-21846 sent=0
+206 GET /signed/bdb71ed6b8aa9e4bc73e3c47/il-macon.aerial.pmtiles bytes=294-21846 sent=21553 signed
+302 GET /dl/il-macon.aerial.pmtiles bytes=21847-24520 sent=0
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=21847-24520 sent=2674 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=27207-31608 sent=4402 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=38183-50410 sent=12228 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=70867-111712 sent=40846 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=217271-303346 sent=86076 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=664973-938702 sent=273730 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=2220065-2350062 sent=129998 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=2456289-2526080 sent=69792 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=2563115-2817116 sent=254002 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=2914137-3037254 sent=123118 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=7459855-7941050 sent=481196 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=8401029-8544620 sent=143592 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=8692645-9571486 sent=878842 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=9917399-10360962 sent=443564 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=25089087-26692096 sent=1603010 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=28315745-28462414 sent=146670 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=28538579-28608702 sent=70124 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=29163267-29171146 sent=7880 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=28643715-28666392 sent=22678 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=29192115-29209214 sent=17100 signed
+206 GET /signed/99c43113224d792fc9e56e0d/il-macon.aerial.pmtiles bytes=29236373-31275736 sent=2039364 signed
+302 GET /dl/il-macon.aerial.pmtiles bytes=30678165-31275736 sent=0
+206 GET /signed/618634d127368bd2827e4559/il-macon.aerial.pmtiles bytes=30678165-31275736 sent=597572 signed
+206 GET /signed/618634d127368bd2827e4559/il-macon.aerial.pmtiles bytes=31377355-31471574 sent=94220 signed
+206 GET /signed/618634d127368bd2827e4559/il-macon.aerial.pmtiles bytes=31522609-31800020 sent=277412 signed
+206 GET /signed/618634d127368bd2827e4559/il-macon.aerial.pmtiles bytes=31886289-31927288 sent=41000 signed
+206 GET /signed/618634d127368bd2827e4559/il-macon.aerial.pmtiles bytes=33180595-33285032 sent=104438 signed
+206 GET /signed/618634d127368bd2827e4559/il-macon.aerial.pmtiles bytes=33424081-34142388 sent=718308 signed
+206 GET /signed/618634d127368bd2827e4559/il-macon.aerial.pmtiles bytes=34220565-34278844 sent=58280 signed
+206 GET /signed/618634d127368bd2827e4559/il-macon.aerial.pmtiles bytes=34405691-34536902 sent=131212 signed
+206 GET /signed/618634d127368bd2827e4559/il-macon.aerial.pmtiles bytes=85411821-89606124 sent=4194304 signed
+403 GET /signed/618634d127368bd2827e4559/il-macon.aerial.pmtiles bytes=89606125-89990310 sent=0 expired
+302 GET /dl/il-macon.aerial.pmtiles bytes=89606125-89990310 sent=0
+206 GET /signed/1e9d1eca17fd7eeece537ff8/il-macon.aerial.pmtiles bytes=89606125-89990310 sent=384186 signed
+206 GET /signed/1e9d1eca17fd7eeece537ff8/il-macon.aerial.pmtiles bytes=95064297-95481722 sent=417426 signed
+206 GET /signed/1e9d1eca17fd7eeece537ff8/il-macon.aerial.pmtiles bytes=95694435-95889678 sent=195244 signed
+206 GET /signed/1e9d1eca17fd7eeece537ff8/il-macon.aerial.pmtiles bytes=95995333-96073000 sent=77668 signed
+206 GET /signed/1e9d1eca17fd7eeece537ff8/il-macon.aerial.pmtiles bytes=97825385-97861356 sent=35972 signed
+206 GET /signed/1e9d1eca17fd7eeece537ff8/il-macon.aerial.pmtiles bytes=97937697-97994156 sent=56460 signed
+206 GET /signed/1e9d1eca17fd7eeece537ff8/il-macon.aerial.pmtiles bytes=98084623-102278926 sent=4194304 signed
+206 GET /signed/1e9d1eca17fd7eeece537ff8/il-macon.aerial.pmtiles bytes=102278927-103884732 sent=1605806 signed
+403 GET /signed/1e9d1eca17fd7eeece537ff8/il-macon.aerial.pmtiles bytes=104174343-104434034 sent=0 expired
+302 GET /dl/il-macon.aerial.pmtiles bytes=104174343-104434034 sent=0
+206 GET /signed/49a9896c015bced77c77fda7/il-macon.aerial.pmtiles bytes=104174343-104434034 sent=259692 signed
+206 GET /signed/49a9896c015bced77c77fda7/il-macon.aerial.pmtiles bytes=104594001-105192104 sent=598104 signed
+206 GET /signed/49a9896c015bced77c77fda7/il-macon.aerial.pmtiles bytes=105672885-105724774 sent=51890 signed
+206 GET /signed/49a9896c015bced77c77fda7/il-macon.aerial.pmtiles bytes=105270823-105329440 sent=58618 signed
+206 GET /signed/49a9896c015bced77c77fda7/il-macon.aerial.pmtiles bytes=109621693-109701326 sent=79634 signed
+206 GET /signed/49a9896c015bced77c77fda7/il-macon.aerial.pmtiles bytes=109761233-109826352 sent=65120 signed
+206 GET /signed/49a9896c015bced77c77fda7/il-macon.aerial.pmtiles bytes=110302883-110375272 sent=72390 signed
+206 GET /signed/49a9896c015bced77c77fda7/il-macon.aerial.pmtiles bytes=110449339-112139770 sent=1690432 signed
+206 GET /signed/49a9896c015bced77c77fda7/il-macon.aerial.pmtiles bytes=112442509-112503234 sent=60726 signed
+206 GET /signed/49a9896c015bced77c77fda7/il-macon.aerial.pmtiles bytes=112993897-113325850 sent=331954 signed
+
+## The first run of this check, on the build before the fixes (18:08 to 18:09)
+Airplane mode on at 18:08:27: the download stopped and showed waiting after three failed tries (18:08:34),
+but NetworkState still said online: onLost asked Android for the active network and got the one being torn down.
+Airplane mode off at 18:09:02: the download stayed waiting for 20 s and more, because the wait between tries
+ended only on a change of the 'usable' flag, which never changed. Both were fixed (NetworkWatch.onLost reports
+offline; any network change ends the wait; losing the network cuts the open connection at once) and the check run again above.

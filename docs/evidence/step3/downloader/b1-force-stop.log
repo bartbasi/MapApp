@@ -1,0 +1,90 @@
+# Check b1: am force-stop mid-download, app reopened, download goes on from the checkpoint
+# 2026-11-17, emulator-5554, server --kbps 200 (signed addresses 20 s)
+
+Area b-force: 10 km box of il-macon aerial, 22,707,794 bytes, 45 ranges (same plan as check a).
+Started 17:59:36. At 18:00:18 the app reported downloading 8,277,724 of 22,707,794; am force-stop then.
+After the kill: 0.part 8,343,400 bytes, 0.ckpt = 8277864 (bytes after the checkpoint are cut off on resume).
+Reopened 18:00:36 with am start only. Logcat (MapAppDownloads):
+11-17 17:59:36.809  1978  2262 I MapAppDownloads: area b-force stored: 1 files, 22707794 bytes
+11-17 17:59:36.833  1978  3681 I MapAppDownloads: file 0 (il-macon/aerial): going on from byte 0 of 22707794
+11-17 17:59:59.411  1978  3681 I MapAppDownloads: signed address answered 403; asking the original address again
+11-17 18:00:41.989  3786  3786 I MapAppDownloads: loaded 3 areas from /data/user/0/io.github.bartbasi.mapapp/no_backup/areas
+11-17 18:00:42.016  3786  3852 I MapAppDownloads: file 0 (il-macon/aerial): going on from byte 8277864 of 22707794
+11-17 18:01:04.169  3786  3852 I MapAppDownloads: signed address answered 403; asking the original address again
+11-17 18:01:31.094  3786  3852 I MapAppDownloads: signed address answered 403; asking the original address again
+11-17 18:01:53.542  3786  3852 I MapAppDownloads: signed address answered 403; asking the original address again
+11-17 18:01:56.441  3786  3852 I MapAppDownloads: file 0 (il-macon/aerial) complete, 22707794 bytes
+11-17 18:01:56.455  3786  3852 I MapAppDownloads: area b-force complete, 22707794 bytes
+
+Checkpoint 8,277,864 maps to hosted byte 85411821 (head 2,108 bytes, then the plan's ranges).
+The first request after the reopening is server log line 37 below, at exactly that byte. No request after line 36 reads the start of the file again.
+(The request cut by the kill is not printed: the test server prints a line only when an answer ends.)
+
+Result: complete; the pulled file is identical (cmp) to assemble() of the WebView's plan:
+30b82ea441b2dab908a4afec6108abf89bb19babb5090a8f1d7e7f6db7b78169 *data/spike/step3-dl/pulled/b-force.pmtiles
+30b82ea441b2dab908a4afec6108abf89bb19babb5090a8f1d7e7f6db7b78169 *data/spike/step3-dl/ref2-aerial.pmtiles
+pmtiles verify: verify.go:169: Completed verify in 547.5µs.
+
+## Server log (numbered)
+1:serving C:\bart\MapApp\data\publish\data-2026-11-17-test on port 8765; signed addresses last 20 s
+2:302 GET /dl/il-macon.aerial.pmtiles bytes=0-16383 sent=0
+3:206 GET /signed/1d27c32fffe3d29549aa2973/il-macon.aerial.pmtiles bytes=0-16383 sent=16384 signed
+4:302 GET /dl/il-macon.aerial.pmtiles bytes=294-21846 sent=0
+5:206 GET /signed/dd7e757b0b94f5de4d776b7b/il-macon.aerial.pmtiles bytes=294-21846 sent=21553 signed
+6:302 GET /dl/il-macon.aerial.pmtiles bytes=21847-24520 sent=0
+7:206 GET /signed/afc10eafca5a1dfa66fc9023/il-macon.aerial.pmtiles bytes=21847-24520 sent=2674 signed
+8:206 GET /signed/afc10eafca5a1dfa66fc9023/il-macon.aerial.pmtiles bytes=27207-31608 sent=4402 signed
+9:206 GET /signed/afc10eafca5a1dfa66fc9023/il-macon.aerial.pmtiles bytes=38183-50410 sent=12228 signed
+10:206 GET /signed/afc10eafca5a1dfa66fc9023/il-macon.aerial.pmtiles bytes=70867-111712 sent=40846 signed
+11:206 GET /signed/afc10eafca5a1dfa66fc9023/il-macon.aerial.pmtiles bytes=217271-303346 sent=86076 signed
+12:206 GET /signed/afc10eafca5a1dfa66fc9023/il-macon.aerial.pmtiles bytes=664973-938702 sent=273730 signed
+13:206 GET /signed/afc10eafca5a1dfa66fc9023/il-macon.aerial.pmtiles bytes=2220065-2350062 sent=129998 signed
+14:206 GET /signed/afc10eafca5a1dfa66fc9023/il-macon.aerial.pmtiles bytes=2456289-2526080 sent=69792 signed
+15:206 GET /signed/afc10eafca5a1dfa66fc9023/il-macon.aerial.pmtiles bytes=2563115-2817116 sent=254002 signed
+16:206 GET /signed/afc10eafca5a1dfa66fc9023/il-macon.aerial.pmtiles bytes=2914137-3037254 sent=123118 signed
+17:206 GET /signed/afc10eafca5a1dfa66fc9023/il-macon.aerial.pmtiles bytes=7459855-7941050 sent=481196 signed
+18:206 GET /signed/afc10eafca5a1dfa66fc9023/il-macon.aerial.pmtiles bytes=8401029-8544620 sent=143592 signed
+19:206 GET /signed/afc10eafca5a1dfa66fc9023/il-macon.aerial.pmtiles bytes=8692645-9571486 sent=878842 signed
+20:206 GET /signed/afc10eafca5a1dfa66fc9023/il-macon.aerial.pmtiles bytes=9917399-10360962 sent=443564 signed
+21:206 GET /signed/afc10eafca5a1dfa66fc9023/il-macon.aerial.pmtiles bytes=25089087-26692096 sent=1603010 signed
+22:403 GET /signed/afc10eafca5a1dfa66fc9023/il-macon.aerial.pmtiles bytes=28315745-28462414 sent=0 expired
+23:302 GET /dl/il-macon.aerial.pmtiles bytes=28315745-28462414 sent=0
+24:206 GET /signed/0d237ae86f621c15381c0e38/il-macon.aerial.pmtiles bytes=28315745-28462414 sent=146670 signed
+25:206 GET /signed/0d237ae86f621c15381c0e38/il-macon.aerial.pmtiles bytes=28538579-28608702 sent=70124 signed
+26:206 GET /signed/0d237ae86f621c15381c0e38/il-macon.aerial.pmtiles bytes=29163267-29171146 sent=7880 signed
+27:206 GET /signed/0d237ae86f621c15381c0e38/il-macon.aerial.pmtiles bytes=28643715-28666392 sent=22678 signed
+28:206 GET /signed/0d237ae86f621c15381c0e38/il-macon.aerial.pmtiles bytes=29192115-29209214 sent=17100 signed
+29:206 GET /signed/0d237ae86f621c15381c0e38/il-macon.aerial.pmtiles bytes=29236373-31275736 sent=2039364 signed
+30:206 GET /signed/0d237ae86f621c15381c0e38/il-macon.aerial.pmtiles bytes=31377355-31471574 sent=94220 signed
+31:206 GET /signed/0d237ae86f621c15381c0e38/il-macon.aerial.pmtiles bytes=31522609-31800020 sent=277412 signed
+32:206 GET /signed/0d237ae86f621c15381c0e38/il-macon.aerial.pmtiles bytes=31886289-31927288 sent=41000 signed
+33:206 GET /signed/0d237ae86f621c15381c0e38/il-macon.aerial.pmtiles bytes=33180595-33285032 sent=104438 signed
+34:206 GET /signed/0d237ae86f621c15381c0e38/il-macon.aerial.pmtiles bytes=33424081-34142388 sent=718308 signed
+35:206 GET /signed/0d237ae86f621c15381c0e38/il-macon.aerial.pmtiles bytes=34220565-34278844 sent=58280 signed
+36:206 GET /signed/0d237ae86f621c15381c0e38/il-macon.aerial.pmtiles bytes=34405691-34536902 sent=131212 signed
+37:302 GET /dl/il-macon.aerial.pmtiles bytes=85411821-89606124 sent=0
+38:206 GET /signed/63ec22de18de2dad32694bb9/il-macon.aerial.pmtiles bytes=85411821-89606124 sent=4194304 signed
+39:403 GET /signed/63ec22de18de2dad32694bb9/il-macon.aerial.pmtiles bytes=89606125-89990310 sent=0 expired
+40:302 GET /dl/il-macon.aerial.pmtiles bytes=89606125-89990310 sent=0
+41:206 GET /signed/77f2e554d80861d04b4d52bd/il-macon.aerial.pmtiles bytes=89606125-89990310 sent=384186 signed
+42:206 GET /signed/77f2e554d80861d04b4d52bd/il-macon.aerial.pmtiles bytes=95064297-95481722 sent=417426 signed
+43:206 GET /signed/77f2e554d80861d04b4d52bd/il-macon.aerial.pmtiles bytes=95694435-95889678 sent=195244 signed
+44:206 GET /signed/77f2e554d80861d04b4d52bd/il-macon.aerial.pmtiles bytes=95995333-96073000 sent=77668 signed
+45:206 GET /signed/77f2e554d80861d04b4d52bd/il-macon.aerial.pmtiles bytes=97825385-97861356 sent=35972 signed
+46:206 GET /signed/77f2e554d80861d04b4d52bd/il-macon.aerial.pmtiles bytes=97937697-97994156 sent=56460 signed
+47:206 GET /signed/77f2e554d80861d04b4d52bd/il-macon.aerial.pmtiles bytes=98084623-102278926 sent=4194304 signed
+48:403 GET /signed/77f2e554d80861d04b4d52bd/il-macon.aerial.pmtiles bytes=102278927-103884732 sent=0 expired
+49:302 GET /dl/il-macon.aerial.pmtiles bytes=102278927-103884732 sent=0
+50:206 GET /signed/d38ff3dc205b2c39d28ecde1/il-macon.aerial.pmtiles bytes=102278927-103884732 sent=1605806 signed
+51:206 GET /signed/d38ff3dc205b2c39d28ecde1/il-macon.aerial.pmtiles bytes=104174343-104434034 sent=259692 signed
+52:206 GET /signed/d38ff3dc205b2c39d28ecde1/il-macon.aerial.pmtiles bytes=104594001-105192104 sent=598104 signed
+53:206 GET /signed/d38ff3dc205b2c39d28ecde1/il-macon.aerial.pmtiles bytes=105270823-105329440 sent=58618 signed
+54:206 GET /signed/d38ff3dc205b2c39d28ecde1/il-macon.aerial.pmtiles bytes=105672885-105724774 sent=51890 signed
+55:206 GET /signed/d38ff3dc205b2c39d28ecde1/il-macon.aerial.pmtiles bytes=109621693-109701326 sent=79634 signed
+56:206 GET /signed/d38ff3dc205b2c39d28ecde1/il-macon.aerial.pmtiles bytes=109761233-109826352 sent=65120 signed
+57:206 GET /signed/d38ff3dc205b2c39d28ecde1/il-macon.aerial.pmtiles bytes=110302883-110375272 sent=72390 signed
+58:206 GET /signed/d38ff3dc205b2c39d28ecde1/il-macon.aerial.pmtiles bytes=110449339-112139770 sent=1690432 signed
+59:403 GET /signed/d38ff3dc205b2c39d28ecde1/il-macon.aerial.pmtiles bytes=112442509-112503234 sent=0 expired
+60:302 GET /dl/il-macon.aerial.pmtiles bytes=112442509-112503234 sent=0
+61:206 GET /signed/7cee0d8e84466005ad384ac1/il-macon.aerial.pmtiles bytes=112442509-112503234 sent=60726 signed
+62:206 GET /signed/7cee0d8e84466005ad384ac1/il-macon.aerial.pmtiles bytes=112993897-113325850 sent=331954 signed

@@ -1,0 +1,38 @@
+# Check g: network state (online, metered) as the emulator is toggled
+# 2026-11-17, emulator-5554. 'plugin says' is NetworkState.get() from the WebView. Event times are UTC (local 18:xx).
+
+18:20:50.864 start (Wi-Fi and mobile data on): plugin says "{\"online\":true,\"metered\":false}"; navigator.onLine=true
+18:20:59.579 Wi-Fi off, mobile data only: plugin says "{\"online\":true,\"metered\":true}"; navigator.onLine=true
+18:21:12.288 Wi-Fi on again: plugin says "{\"online\":true,\"metered\":false}"; navigator.onLine=true
+18:21:18.009 airplane mode on: plugin says "{\"online\":false,\"metered\":false}"; navigator.onLine=false
+18:21:30.722 airplane mode off: plugin says "{\"online\":true,\"metered\":false}"; navigator.onLine=true
+
+Events received by the web app (window.__mapappDownloads.network, since check d):
+00:19:19.713 {"online":false,"metered":false}
+00:19:52.971 {"online":false,"metered":true}
+00:19:53.076 {"online":true,"metered":true}
+00:19:56.334 {"online":true,"metered":false}
+00:20:51.554 {"online":false,"metered":false}
+00:20:51.595 {"online":true,"metered":true}
+00:21:04.271 {"online":true,"metered":false}
+00:21:12.721 {"online":false,"metered":false}
+00:21:19.519 {"online":false,"metered":true}
+00:21:19.620 {"online":true,"metered":true}
+00:21:22.800 {"online":true,"metered":false}
+
+Native log:
+11-17 18:19:19.704  2107  2357 I MapAppNetwork: network: online=false metered=false usable=false
+11-17 18:19:52.956  2107  2357 I MapAppNetwork: network: online=false metered=true usable=true
+11-17 18:19:53.066  2107  2357 I MapAppNetwork: network: online=true metered=true usable=true
+11-17 18:19:56.329  2107  2357 I MapAppNetwork: network: online=true metered=false usable=true
+11-17 18:20:51.550  2107  2357 I MapAppNetwork: network: online=false metered=false usable=false
+11-17 18:20:51.590  2107  2357 I MapAppNetwork: network: online=true metered=true usable=true
+11-17 18:21:04.267  2107  2357 I MapAppNetwork: network: online=true metered=false usable=true
+11-17 18:21:12.720  2107  2357 I MapAppNetwork: network: online=false metered=false usable=false
+11-17 18:21:19.515  2107  2357 I MapAppNetwork: network: online=false metered=true usable=true
+11-17 18:21:19.619  2107  2357 I MapAppNetwork: network: online=true metered=true usable=true
+11-17 18:21:22.798  2107  2357 I MapAppNetwork: network: online=true metered=false usable=true
+
+Notes: switching Wi-Fi off gives about 40 ms of offline while Android moves the default network to mobile data, then online and metered.
+Mobile data reports online=false for about 100 ms until Android has checked it reaches the internet (validated).
+In this session navigator.onLine followed airplane mode too; D12 saw it stay true in an earlier test, so the app still uses the shell's state.
