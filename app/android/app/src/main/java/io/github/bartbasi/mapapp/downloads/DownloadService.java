@@ -171,7 +171,12 @@ public final class DownloadService extends Service implements DownloadEngine.Ser
         return b.build();
     }
 
-    private static String mb(long bytes) {
-        return String.format(Locale.US, "%.1f MB", bytes / 1_000_000.0);
+    /** A size as the screens write it (formatSize in app/src/ui/format.ts): 1 MB is 1,000,000 bytes. */
+    static String mb(long bytes) {
+        if (bytes <= 0) return "0 MB";
+        if (bytes < 50_000L) return "less than 0.1 MB";
+        if (bytes < 100_000_000L) return String.format(Locale.US, "%.1f MB", bytes / 1_000_000.0);
+        if (bytes < 1_000_000_000L) return String.format(Locale.US, "%d MB", Math.round(bytes / 1_000_000.0));
+        return String.format(Locale.US, bytes < 10_000_000_000L ? "%.2f GB" : "%.1f GB", bytes / 1_000_000_000.0);
     }
 }

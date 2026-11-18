@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
+import androidx.activity.OnBackPressedCallback;
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
@@ -20,6 +21,9 @@ import io.github.bartbasi.mapapp.settings.SystemSettingsPlugin;
 
 public class MainActivity extends BridgeActivity {
 
+    private static final String ASK_WEB_APP_TO_GO_BACK =
+        "(function(){try{return !!(window.mapappBack&&window.mapappBack());}catch(e){return false;}})()";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(ArchivesPlugin.class);
@@ -30,6 +34,38 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         ArchiveRequestHandler archives = new ArchiveRequestHandler(ArchiveCatalog.get(this));
         bridge.setWebViewClient(new MapAppWebViewClient(bridge, archives));
+        getOnBackPressedDispatcher().addCallback(this, new BackToWebApp());
+    }
+
+    /**
+     * The back button and the back gesture go to the web app first
+     * (window.mapappBack in ui/App.svelte), which closes a panel or steps back
+     * inside one. Only when it answers that nothing is open does the press go
+     * on to the system, which leaves the app.
+     */
+    private final class BackToWebApp extends OnBackPressedCallback {
+
+        BackToWebApp() {
+            super(true);
+        }
+
+        @Override
+        public void handleOnBackPressed() {
+            WebView web = bridge == null ? null : bridge.getWebView();
+            if (web == null) {
+                passOn();
+                return;
+            }
+            web.evaluateJavascript(ASK_WEB_APP_TO_GO_BACK, answer -> {
+                if (!"true".equals(answer)) passOn();
+            });
+        }
+
+        private void passOn() {
+            setEnabled(false);
+            getOnBackPressedDispatcher().onBackPressed();
+            setEnabled(true);
+        }
     }
 
     /** Capacitor's own client, plus the archive reads under /_tiles/. */
