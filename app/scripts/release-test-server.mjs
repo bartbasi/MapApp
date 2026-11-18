@@ -23,7 +23,7 @@
 //   --drop-every K   cuts the connection in the middle of every Kth file
 //                    response, after --drop-after bytes.
 //
-// Every request is printed as one line: status, method, path, range, bytes sent.
+// Every request is printed as one line: time (UTC), status, method, path, range, bytes sent.
 
 import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -139,7 +139,7 @@ function finish(req, res, status, note) {
 }
 
 function log(req, status, note, sent) {
-  console.log(`${status} ${req.method} ${req.url} ${req.headers.range ?? '-'} sent=${sent}${note ? ` ${note}` : ''}`);
+  console.log(`${new Date().toISOString()} ${status} ${req.method} ${req.url} ${req.headers.range ?? '-'} sent=${sent}${note ? ` ${note}` : ''}`);
 }
 
 createServer((req, res) => {

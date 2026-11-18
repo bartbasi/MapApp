@@ -181,6 +181,16 @@ def staged_catalog(tag):
     return md.read_json(path)
 
 
+def check_staged(tag, catalog):
+    """Every staged file still has the size and checksum the catalog gives.
+    The staged files may be hard links to data/build, so a rebuild since
+    staging could have changed them under the catalog."""
+    for e in catalog["archives"]:
+        path = os.path.join(stage_dir(tag), e["file"])
+        if os.path.getsize(path) != e["bytes"] or sha256(path) != e["sha256"]:
+            raise md.PipelineError(f"{e['file']} changed since it was staged. Stage again under a new folder.")
+
+
 def read_back(url, length):
     """(the first `length` bytes, the whole file's size) from a public address."""
     req = urllib.request.Request(url, headers={"Range": f"bytes=0-{length - 1}", "User-Agent": md.USER_AGENT})
@@ -218,6 +228,7 @@ def upload(tag, yes):
     refuse_parcels(os.listdir(out))
     if "github.com/" not in catalog["base"]:
         raise md.PipelineError("this staging was made with --base for a test server. Stage again without --base.")
+    check_staged(tag, catalog)
     files = [os.path.join(out, e["file"]) for e in catalog["archives"]] + [os.path.join(out, "catalog.json")]
     subprocess.run(
         ["gh", "release", "create", tag, "--repo", repo_slug(), "--title", f"Map data {tag[5:]}",
