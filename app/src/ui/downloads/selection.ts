@@ -7,6 +7,7 @@
 // when it is in use; other layers that are off can be added.
 
 import type { AreaView, CountyOffer } from '../../downloads/contract';
+import { listLayers } from './text';
 
 export const BASE_LAYER = 'basemap';
 export const IMAGERY_LAYER = 'aerial';
@@ -64,12 +65,37 @@ export function countyImageryMaxzoom(offer: CountyOffer): number {
   return offer.layers.find((l) => l.layer === IMAGERY_LAYER)?.maxzoom ?? 16;
 }
 
+/** Where a layer of a county stands: on the phone, or in a download not finished yet. */
+export type Holding = 'on-phone' | 'coming';
+
 /**
- * A download of this county that is already on the phone or on its way,
- * if it holds every layer asked for. Then a new download would only repeat it.
+ * Each layer of a whole county that the phone already has, or will have once
+ * a download goes on: from every whole-county download of it, whatever else
+ * that download holds. A stopped download counts as nothing, since it may
+ * never finish. Picked areas do not count: they hold a part of the county.
  */
-export function countyAlreadyHas(areas: readonly AreaView[], county: string, layers: readonly string[]): AreaView | null {
-  return (
-    areas.find((a) => a.record.county === county && a.status !== 'failed' && layers.every((l) => a.record.layers.includes(l))) ?? null
-  );
+export function countyHoldings(areas: readonly AreaView[], county: string): Map<string, Holding> {
+  const out = new Map<string, Holding>();
+  for (const a of areas) {
+    if (a.record.county !== county || a.status === 'failed') continue;
+    for (const layer of a.record.layers) {
+      if (a.status === 'complete') out.set(layer, 'on-phone');
+      else if (!out.has(layer)) out.set(layer, 'coming');
+    }
+  }
+  return out;
+}
+
+/** The layers asked for that the phone neither has nor is getting: all a new download should fetch. */
+export function missingLayers(layers: readonly string[], holdings: ReadonlyMap<string, Holding>): string[] {
+  return layers.filter((l) => !holdings.has(l));
+}
+
+/**
+ * The name of a new whole-county download: the county's name, or with what
+ * it adds when the county already has a download, so the two read apart in
+ * the list ("Macon County, aerial imagery").
+ */
+export function countyDownloadName(countyName: string, adding: readonly string[], holdings: ReadonlyMap<string, Holding>): string {
+  return holdings.size === 0 ? countyName : `${countyName}, ${listLayers(adding).toLowerCase()}`;
 }

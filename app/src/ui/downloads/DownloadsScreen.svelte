@@ -130,18 +130,43 @@
 
   async function startCounty(request: AreaRequest, name: string) {
     const id = await service.start(request, name);
+    markStarted();
     ui.shown = id;
   }
 
   function started(id: string) {
+    markStarted();
     ui.shown = id;
     ui.mode = 'list';
+  }
+
+  // Android asks for leave to show notifications at the first download. Until
+  // a first download has started, a sentence under each Download button says
+  // so first. Kept in this browser's storage; if that is gone the sentence
+  // shows again, which does no harm.
+  const STARTED_KEY = 'mapapp.downloads.started';
+  function readStarted(): boolean {
+    try {
+      return localStorage.getItem(STARTED_KEY) === '1';
+    } catch {
+      return false;
+    }
+  }
+  let everStarted = $state(readStarted());
+  const notifyNote = $derived(!everStarted && areas.length === 0);
+  function markStarted() {
+    everStarted = true;
+    try {
+      localStorage.setItem(STARTED_KEY, '1');
+    } catch {
+      // Storage may be blocked; the sentence then shows again next time.
+    }
   }
 </script>
 
 <div bind:this={root}>
   {#if ui.mode === 'pick'}
-    <AreaPicker {service} {ui} offers={ui.offers ?? []} {areas} {layersOn} {linesWith} {network} {freeBytes} {onZoom} onStarted={started} />
+    <AreaPicker {service} {ui} offers={ui.offers ?? []} {areas} {layersOn} {linesWith} {network} {freeBytes} {notifyNote} {onZoom} onStarted={started} />
   {:else}
     <NetworkNote {network} />
 
@@ -178,7 +203,7 @@
       {#if network.online}<DlButton icon="retry" label="Try again" onclick={() => void loadOffers()} />{/if}
     {:else}
       {#each ui.offers as offer (offer.county)}
-        <CountyCard {offer} {layersOn} {linesWith} {areas} {network} {freeBytes} onStart={startCounty} />
+        <CountyCard {offer} {layersOn} {linesWith} {areas} {network} {freeBytes} {notifyNote} onStart={startCounty} />
       {/each}
     {/if}
 

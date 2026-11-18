@@ -3,28 +3,70 @@
   Free software under the GNU GPL v3 with additional terms: see LICENSE and NOTICE.
 -->
 <!--
-  A short card at the top of the map when the user has zoomed in on a place
-  that has no detail on this phone: only the overview map is there, so the
-  map would be nearly blank. It says why, and opens the downloads.
-  It sits under the top controls, away from the position readout.
+  A short card at the top of the map when the map is bare and the user would
+  not know why: the Aerial or Hybrid view where no imagery is on the phone,
+  or close in where only the overview map is. It says why, and opens the
+  downloads (or, for imagery, switches back to the Map view). Where no
+  county on offer covers the place, it says that nothing can be downloaded
+  there. It sits under the top controls, away from the position readout, and
+  it never covers the position marker: where the whole card would, it
+  shrinks to a small pill, and where even the pill would, it steps away.
 -->
 <script lang="ts">
   import type { Map as MapLibreMap } from 'maplibre-gl';
   import type { AreaView, DownloadService } from '../../downloads/contract';
   import type { InstalledLayers } from '../../map/installed';
   import Icon from '../Icon.svelte';
-  import { detailedAreas, needsDownload } from './coverage';
+  import type { Bounds } from '../../map/tile-math';
+  import { detailedAreas, imageryAreas, inviteFor } from './coverage';
+  import { cardMode, markerHole, metersPerPixel, type ScreenRect } from './frame';
 
   interface Props {
     map: MapLibreMap;
     installed: InstalledLayers;
     service: DownloadService;
+    /** The base view on screen. */
+    view: 'map' | 'aerial' | 'hybrid';
+    /** The counties on offer, or null before the list has been fetched. */
+    offered: readonly Bounds[] | null;
     /** Kept out of the way, for example while the downloads panel is open. */
     hidden: boolean;
     onOpen: () => void;
+    onShowMap: () => void;
+    /** The phone's position, when it is shown on the map. */
+    marker: { lng: number; lat: number; accuracyM: number } | null;
   }
 
-  let { map, installed, service, hidden, onOpen }: Props = $props();
+  let { map, installed, service, view, offered, hidden, onOpen, onShowMap, marker }: Props = $props();
+
+  // ---------------------------------------------------------------- keeping off the marker
+  let card = $state<HTMLElement | null>(null);
+  let hole = $state.raw<{ x: number; y: number; r: number } | null>(null);
+  let fullRect = $state.raw<ScreenRect | null>(null);
+  let pillRect = $state.raw<ScreenRect | null>(null);
+  function placeHole() {
+    const m = marker;
+    hole = m ? markerHole(map.project([m.lng, m.lat]), m.accuracyM / metersPerPixel(m.lat, map.getZoom())) : null;
+  }
+  $effect(() => {
+    void marker;
+    placeHole();
+  });
+  $effect(() => {
+    const m = map;
+    m.on('move', placeHole);
+    return () => m.off('move', placeHole);
+  });
+  const mode = $derived(cardMode(hole, fullRect, pillRect));
+  // The card's place on the map, measured each time it is drawn in a shape.
+  $effect(() => {
+    void mode;
+    const el = card;
+    if (!el) return;
+    const r = { left: el.offsetLeft, top: el.offsetTop, right: el.offsetLeft + el.offsetWidth, bottom: el.offsetTop + el.offsetHeight };
+    if (mode === 'full') fullRect = r;
+    else if (mode === 'pill') pillRect = r;
+  });
 
   let areas = $state.raw<readonly AreaView[]>([]);
   $effect(() => {
@@ -45,8 +87,10 @@
     return () => m.off('moveend', onMoveEnd);
   });
 
-  const detailed = $derived(detailedAreas(installed, areas));
-  const show = $derived(!hidden && needsDownload(zoom, center, detailed));
+  const invite = $derived(
+    hidden ? null : inviteFor({ zoom, center, view, detailed: detailedAreas(installed, areas), imagery: imageryAreas(installed, areas), offered }),
+  );
+  const show = $derived(invite !== null);
 
   // Below the base view switch, when it shows.
   let top = $state(0);
@@ -57,13 +101,36 @@
   });
 </script>
 
-{#if show}
-  <div class="invite" style:--below={`${top}px`} role="status">
-    <Icon name="download" size={28} />
+{#if invite && mode === 'pill'}
+  <button class="invite pill" bind:this={card} style:--below={`${top}px`} onclick={invite.offered ? onOpen : onShowMap}>
+    <Icon name={invite.kind === 'imagery' ? 'aerial' : 'download'} size={22} />
+    <span>{invite.kind === 'imagery' ? 'No imagery here' : 'Only a rough map here'}</span>
+  </button>
+{:else if invite && mode === 'full'}
+  <div class="invite" bind:this={card} style:--below={`${top}px`} role="status">
+    <Icon name={invite.kind === 'imagery' ? 'aerial' : 'download'} size={28} />
     <div class="text">
-      <p class="title">Only a rough map here</p>
-      <p class="body">Download this place to see it in detail, with or without a signal.</p>
-      <button onclick={onOpen}>Download maps</button>
+      {#if invite.kind === 'imagery'}
+        <p class="title">No imagery here on this phone</p>
+        {#if invite.offered}
+          <p class="body">The Aerial and Hybrid views show only imagery you have downloaded.</p>
+          <div class="buttons">
+            <button onclick={onOpen}>Download imagery</button>
+            <button class="plain" onclick={onShowMap}>Show the map</button>
+          </div>
+        {:else}
+          <p class="body">Imagery is offered for Champaign County and Macon County only.</p>
+          <div class="buttons"><button class="plain" onclick={onShowMap}>Show the map</button></div>
+        {/if}
+      {:else}
+        <p class="title">Only a rough map here</p>
+        {#if invite.offered}
+          <p class="body">Download this place to see it in detail, with or without a signal.</p>
+          <div class="buttons"><button onclick={onOpen}>Download maps</button></div>
+        {:else}
+          <p class="body">Detailed maps are offered for Champaign County and Macon County only.</p>
+        {/if}
+      {/if}
     </div>
   </div>
 {/if}
@@ -108,8 +175,30 @@
     color: var(--text-muted);
   }
 
-  button {
+  /* The small form: one line, one tap, still 48 px tall. */
+  .invite.pill {
+    right: auto;
+    min-height: 48px;
+    margin: 0;
+    padding: 0 14px 0 10px;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    color: var(--text);
+    border: 0;
+    border-left: 5px solid var(--accent);
+    cursor: pointer;
+  }
+
+  .buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
     margin-top: 10px;
+  }
+
+  .buttons button {
+    white-space: nowrap;
     min-height: 48px;
     padding: 0 18px;
     border: 0;
@@ -120,7 +209,21 @@
     cursor: pointer;
   }
 
-  button:active {
+  .buttons button:active {
     background: #163a22;
+  }
+
+  .pill:active {
+    background: var(--surface-alt);
+  }
+
+  .buttons button.plain {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: inset 0 0 0 2px var(--line-strong);
+  }
+
+  .buttons button.plain:active {
+    background: var(--surface-alt);
   }
 </style>

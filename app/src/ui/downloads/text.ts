@@ -247,6 +247,14 @@ export function startErrorText(code: string | undefined, space?: { neededBytes?:
   }
 }
 
+// ---------------------------------------------------------------- before the first download
+
+/**
+ * Said under the Download button until a first download has started, because
+ * Android asks for leave to show notifications at that first tap.
+ */
+export const NOTIFY_NOTE = 'Android may ask about notifications. They only show progress, and the download works either way.';
+
 // ---------------------------------------------------------------- space on the phone
 
 /**

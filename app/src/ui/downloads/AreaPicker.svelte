@@ -15,9 +15,9 @@
   import DlButton from './DlButton.svelte';
   import type { DownloadsUi } from './downloads-ui.svelte';
   import { EstimateRunner, errorCode, type EstimateState } from './estimate-runner';
-  import { boundsCenter, boundsSizeKm, suggestName } from './frame';
+  import { boundsSizeKm, suggestName } from './frame';
   import { IMAGERY_LAYER, chosenLayers, layerChoices, offeredLayers } from './selection';
-  import { DETAIL_TEXT, formatSize, hasRoom, layerLabel, listLayers, notEnoughSpaceText, propertyLinesNote, spanText, startErrorText, type DetailLevel } from './text';
+  import { DETAIL_TEXT, NOTIFY_NOTE, formatSize, hasRoom, layerLabel, listLayers, notEnoughSpaceText, propertyLinesNote, spanText, startErrorText, type DetailLevel } from './text';
 
   interface Props {
     service: DownloadService;
@@ -29,11 +29,13 @@
     linesWith: readonly string[];
     network: NetworkState;
     freeBytes: number | undefined;
+    /** Show the sentence about Android's notification question (until a first download has started). */
+    notifyNote: boolean;
     onZoom: (direction: 1 | -1) => void;
     onStarted: (id: string) => void;
   }
 
-  let { service, ui, offers, areas, layersOn, linesWith, network, freeBytes, onZoom, onStarted }: Props = $props();
+  let { service, ui, offers, areas, layersOn, linesWith, network, freeBytes, notifyNote, onZoom, onStarted }: Props = $props();
 
   const LEVELS: (DetailLevel | 0)[] = [0, 14, 15, 16];
 
@@ -57,13 +59,31 @@
   $effect(() => runner.setOnline(network.online));
   $effect(() => runner.request(request));
 
-  // The name: suggested from where the frame is, until the user types one.
+  // The name: suggested from the counties the frame touches, until the user
+  // types one. It sits in the foot with the Download button, so it shows on
+  // the cover screen; Change opens a field there, in place of the size, so
+  // the field stays in view above the keyboard.
   let name = $state('');
   let nameEdited = $state(false);
-  const suggested = $derived(
-    ui.pickBounds ? suggestName(boundsCenter(ui.pickBounds), offers, areas.map((a) => a.record.name)) : 'Area 1',
-  );
-  const shownName = $derived(nameEdited ? name : suggested);
+  const suggested = $derived(ui.pickBounds ? suggestName(ui.pickBounds, offers, areas.map((a) => a.record.name)) : 'Area 1');
+  const shownName = $derived(nameEdited && name.trim() ? name.trim() : suggested);
+
+  function startNaming() {
+    if (!nameEdited) name = suggested;
+    ui.naming = true;
+  }
+
+  function endNaming() {
+    nameEdited = name.trim() !== '' && name.trim() !== suggested;
+    ui.naming = false;
+  }
+
+  /** Puts the cursor in the field as it opens, at the end of the name. */
+  function focusAtEnd(el: HTMLInputElement) {
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }
+  onDestroy(() => (ui.naming = false));
 
   const span = $derived(ui.pickBounds ? boundsSizeKm(ui.pickBounds) : null);
   /** The estimate's bytes per layer, added up across counties, in the order the layers are listed. */
@@ -150,14 +170,21 @@
   <p class="lines"><Icon name="parcel" size={20} /> <span>{propertyLinesNote(linesWith)}</span></p>
 {/if}
 
-<label class="name">
-  <span>Name</span>
-  <input type="text" value={shownName} maxlength="60" autocomplete="off" enterkeyhint="done"
-    oninput={(e) => { name = e.currentTarget.value; nameEdited = true; }} />
-</label>
-
-<!-- The size and the Download button stay in view at the foot of the panel while the choices above scroll. -->
+<!-- The name, the size and the Download button stay in view at the foot of the panel while the choices above scroll. -->
 <div class="foot">
+{#if ui.naming}
+  <form class="naming" onsubmit={(e) => { e.preventDefault(); endNaming(); }}>
+    <label for="area-name">Name of this area</label>
+    <div class="name-row">
+      <input id="area-name" type="text" bind:value={name} maxlength="60" autocomplete="off" enterkeyhint="done" use:focusAtEnd />
+      <DlButton kind="primary" label="Done" onclick={endNaming} />
+    </div>
+  </form>
+{:else}
+<div class="name-line">
+  <p><span class="muted">Name:</span> <strong>{shownName}</strong></p>
+  <DlButton kind="quiet" label="Change" ariaLabel="Change the name, {shownName}" onclick={startNaming} />
+</div>
 <div class="size" aria-live="polite">
   {#if est.kind === 'none' || est.kind === 'working'}
     <p class="working"><span class="spinner" aria-hidden="true"></span> Working out the size</p>
@@ -183,6 +210,7 @@
     <p class="problem"><Icon name="caution" size={22} /> <span><strong>Not enough space.</strong> {notEnoughSpaceText(bytes, freeBytes ?? 0, false)}</span></p>
   {/if}
 </div>
+{/if}
 
 {#if confirming}
   <div class="confirm" role="group" aria-label="Download on mobile data">
@@ -200,6 +228,9 @@
 {#if startFailed}
   <p class="problem start-failed" role="alert"><Icon name="caution" size={22} /> <span>{startFailed}</span></p>
 {/if}
+{#if notifyNote && !ui.naming}
+  <p class="notify">{NOTIFY_NOTE}</p>
+{/if}
 </div>
 
 <style>
@@ -208,7 +239,7 @@
      would change and the size would be asked for again, without end. */
   @media (max-width: 599px) {
     :global(aside.panel:has(.area-picker)) {
-      height: min(62%, 500px);
+      height: min(62%, 540px);
     }
   }
 
@@ -334,15 +365,52 @@
     color: var(--text-muted);
   }
 
-  .name {
+  .name-line {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-top: 10px;
+    justify-content: space-between;
+    gap: 8px;
+    margin: -4px 0 6px;
+  }
+
+  .name-line p {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
+  }
+
+  .name-line :global(button) {
+    flex: none;
+    min-height: 48px;
+  }
+
+  .muted {
+    color: var(--text-muted);
+  }
+
+  .naming {
+    margin: 0 0 10px;
+  }
+
+  .naming label {
+    display: block;
+    margin-bottom: 4px;
     font-weight: 700;
   }
 
-  .name input {
+  .name-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .notify {
+    margin: 8px 0 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .name-row input {
     flex: 1;
     min-width: 0;
     min-height: 48px;

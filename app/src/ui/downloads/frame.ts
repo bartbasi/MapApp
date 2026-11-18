@@ -111,13 +111,21 @@ export function contains(b: Bounds, p: { lng: number; lat: number }): boolean {
   return p.lng >= b[0] && p.lng <= b[2] && p.lat >= b[1] && p.lat <= b[3];
 }
 
+/** True when two rectangles share some ground. */
+export function overlaps(a: Bounds, b: Bounds): boolean {
+  return a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+}
+
 /**
- * A name for a new area: "Macon County area 2", after the county its middle
- * is in, numbered past the areas that already have that kind of name.
+ * A name for a new area, numbered past the areas that already have that kind
+ * of name: "Macon County area 2" for an area in one county, "Champaign and
+ * Macon area 1" for one that reaches into both, "Area 3" for one in neither.
  */
-export function suggestName(center: { lng: number; lat: number }, counties: readonly { countyName: string; bounds: Bounds }[], existing: readonly string[]): string {
-  const county = counties.find((c) => contains(c.bounds, center));
-  const stem = county ? `${county.countyName.replace(/, Illinois$/, '')} area` : 'Area';
+export function suggestName(area: Bounds, counties: readonly { countyName: string; bounds: Bounds }[], existing: readonly string[]): string {
+  const touched = counties.filter((c) => overlaps(c.bounds, area)).map((c) => c.countyName.replace(/, Illinois$/, ''));
+  const short = touched.map((n) => n.replace(/ County$/, '')).sort();
+  const stem =
+    touched.length === 1 ? `${touched[0]} area` : touched.length > 1 ? `${short.slice(0, -1).join(', ')} and ${short[short.length - 1]} area` : 'Area';
   const taken = new Set(existing.map((n) => n.trim().toLowerCase()));
   for (let i = 1; ; i++) {
     const name = `${stem} ${i}`;
@@ -155,4 +163,33 @@ export function circleMeetsRect(c: { x: number; y: number; r: number }, r: Scree
   const nx = Math.min(Math.max(c.x, r.left), r.right);
   const ny = Math.min(Math.max(c.y, r.top), r.bottom);
   return (c.x - nx) ** 2 + (c.y - ny) ** 2 < c.r ** 2;
+}
+
+// ---------------------------------------------------------------- Bigger area and Smaller area
+
+/** The closest and farthest the picker's buttons go: about 300 m and about 160 km across the folded frame. */
+export const FRAME_ZOOM_MIN = 8;
+export const FRAME_ZOOM_MAX = 17;
+
+/**
+ * The zoom one tap of Bigger area (-1) or Smaller area (+1) goes to: exactly
+ * one step from where the last tap was going, so each tap doubles or halves
+ * the width of the ground in the frame, however fast the taps come and
+ * whatever the zoom was.
+ */
+export function steppedZoom(current: number, pending: number | null, direction: 1 | -1): number {
+  const base = pending ?? current;
+  return Math.min(FRAME_ZOOM_MAX, Math.max(FRAME_ZOOM_MIN, base + direction));
+}
+
+/**
+ * How a card at the top of the map shows, so it never covers the position
+ * marker (D26): whole; as a small pill when the whole card would cover the
+ * marker; not at all when even the pill would. Rects are in the map's own
+ * pixels; a rect not measured yet counts as clear.
+ */
+export function cardMode(hole: { x: number; y: number; r: number } | null, full: ScreenRect | null, pill: ScreenRect | null): 'full' | 'pill' | 'hidden' {
+  if (!hole || !full || !circleMeetsRect(hole, full)) return 'full';
+  if (!pill || !circleMeetsRect(hole, pill)) return 'pill';
+  return 'hidden';
 }

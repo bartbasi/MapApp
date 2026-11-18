@@ -99,10 +99,15 @@
     raf = requestAnimationFrame(() => {
       raf = 0;
       if (picking && frame) {
+        ui.frameCenter = { x: (frame.left + frame.right) / 2, y: (frame.top + frame.bottom) / 2 };
+      }
+      if (picking && frame && !ui.naming) {
         const corners = frameCorners(frame).map(([x, y]) => map.unproject([x, y]));
         const b = boundsOfPoints(corners);
         const next = b ? roundBounds(b) : null;
         if (!sameBounds(next, ui.pickBounds)) ui.pickBounds = next;
+      }
+      if (picking && frame) {
         const m = marker;
         hole = m ? markerHole(map.project([m.lng, m.lat]), m.accuracyM / metersPerPixel(m.lat, map.getZoom())) : null;
       } else {
@@ -126,9 +131,10 @@
     setOutlines(NO_OUTLINES);
   });
 
-  // A new fix moves the clear circle.
+  // A new fix moves the clear circle; the end of naming takes the frame's ground again.
   $effect(() => {
     void marker;
+    void ui.naming;
     redraw();
   });
 
@@ -152,7 +158,8 @@
       const resized = w !== lastW || h !== lastH;
       lastW = w;
       lastH = h;
-      const keep = picking && resized ? ui.pickBounds : null;
+      // A fold or unfold keeps the ground; the keyboard coming up for the name does not move the map at all.
+      const keep = picking && resized && !ui.naming ? ui.pickBounds : null;
       measure();
       if (keep && frame) keepGround(keep, frame);
     });

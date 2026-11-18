@@ -23,14 +23,22 @@ describe('groupSources', () => {
     const groups = groupSources(entries, new Map([['a1', 'North timber'], ['a2', 'Macon County']]));
     expect(groups.map((g) => g.layer)).toEqual(['basemap', 'publicland']);
     const base = groups[0]!;
-    expect(base.places.map((p) => p.where)).toEqual([
-      'Macon County, downloaded as North timber',
-      'Macon County, downloaded',
-      'Overview map of the whole region, with the app',
-    ]);
-    expect(new Set(base.places.map((p) => p.key)).size).toBe(3);
+    // What came with the app first, then a county's downloads on one line (tester F8).
+    expect(base.places.map((p) => p.where)).toEqual(['Overview map of the whole region, with the app', 'Macon County, in 2 downloads']);
+    expect(base.places[1]).toMatchObject({ count: 2, bytes: 2048 });
     expect(base.sources).toHaveLength(1);
     expect(groups[1]!.places[0]!.where).toBe('Macon County, with the app');
+  });
+
+  it("names a county's only download", () => {
+    expect(groupSources([entry('il-macon', 'Macon County', 'basemap', 'a1')], new Map([['a1', 'North timber']]))[0]!.places[0]!.where).toBe('Macon County, downloaded as North timber');
+    expect(groupSources([entry('il-macon', 'Macon County', 'basemap', 'a1')], new Map([['a1', 'Macon County']]))[0]!.places[0]!.where).toBe('Macon County, downloaded');
+  });
+
+  it('keeps one line per county however many downloads it has', () => {
+    const many = Array.from({ length: 6 }, (_, i) => entry('il-macon', 'Macon County', 'aerial', `a${i}`));
+    const g = groupSources([...many, entry('il-champaign', 'Champaign County', 'aerial', 'b1')])[0]!;
+    expect(g.places.map((p) => p.where)).toEqual(['Macon County, in 6 downloads', 'Champaign County, downloaded']);
   });
 
   it('keeps sources that differ in any part', () => {

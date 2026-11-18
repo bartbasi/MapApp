@@ -33,3 +33,40 @@ export function needsDownload(zoom: number, center: { lng: number; lat: number }
   if (zoom < DETAIL_FROM_ZOOM) return false;
   return !detailed.some((b) => contains(b, center));
 }
+
+/** Imagery has no overview: outside downloaded imagery the Aerial and Hybrid views are bare from this zoom on. */
+export const IMAGERY_FROM_ZOOM = 11;
+
+/** Rectangles with imagery on the phone: installed imagery, and complete downloads that hold it. */
+export function imageryAreas(installed: InstalledLayers, areas: readonly AreaView[]): Bounds[] {
+  const out: Bounds[] = (installed.get('aerial')?.archives ?? []).map((a) => a.meta.bounds);
+  for (const a of areas) if (a.status === 'complete' && a.record.layers.includes('aerial')) out.push(a.record.bounds);
+  return out;
+}
+
+export interface Invite {
+  /** 'imagery': the Aerial or Hybrid view has no imagery here. 'map': only the overview map is here. */
+  kind: 'imagery' | 'map';
+  /** False when no county on offer covers the place, so there is nothing to download for it. */
+  offered: boolean;
+}
+
+/**
+ * Which card, if any, the map shows to explain a bare map: imagery first in
+ * the Aerial and Hybrid views, then the map itself. `offered` is the
+ * counties on offer, or null before the list has been fetched (then a
+ * download is assumed possible).
+ */
+export function inviteFor(o: {
+  zoom: number;
+  center: { lng: number; lat: number };
+  view: 'map' | 'aerial' | 'hybrid';
+  detailed: readonly Bounds[];
+  imagery: readonly Bounds[];
+  offered: readonly Bounds[] | null;
+}): Invite | null {
+  const offered = o.offered === null || o.offered.some((b) => contains(b, o.center));
+  if (o.view !== 'map' && o.zoom >= IMAGERY_FROM_ZOOM && !o.imagery.some((b) => contains(b, o.center))) return { kind: 'imagery', offered };
+  if (needsDownload(o.zoom, o.center, o.detailed)) return { kind: 'map', offered };
+  return null;
+}

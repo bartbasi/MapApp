@@ -35,7 +35,7 @@
     <h3>{group.title}</h3>
     <ul class="places">
       {#each group.places as place (place.key)}
-        <li class="muted">{place.where}. Built {formatDate(place.buildDate)}, {formatBytes(place.bytes)}.</li>
+        <li class="muted">{place.where}. Built {formatDate(place.buildDate)}, {formatBytes(place.bytes)}{place.count > 1 ? ' in all' : ''}.</li>
       {/each}
     </ul>
     {#each group.sources as source, i (i)}

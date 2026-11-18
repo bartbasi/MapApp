@@ -23,6 +23,14 @@ export class DownloadsUi {
    * to the list and picking again does not undo the choice.
    */
   detail = $state<number | null>(null);
+  /**
+   * The user is typing the area's name. The keyboard takes half the screen
+   * and squeezes the map; while it is up the frame keeps the ground it held,
+   * so the size does not change under the user's typing.
+   */
+  naming = $state(false);
+  /** The middle of the picker's frame on the screen, for Bigger area and Smaller area to zoom about. */
+  frameCenter = $state.raw<{ x: number; y: number } | null>(null);
   /** The counties on offer, once fetched. Kept so the panel does not fetch them each time it opens. */
   offers = $state.raw<CountyOffer[] | null>(null);
 }

@@ -10,6 +10,7 @@
 //   ?fakeDownloads            nothing downloaded yet
 //   ?fakeDownloads=states     one download in each status and each error
 //   ?fakeDownloads=county     Macon County downloaded and complete
+//   ?fakeDownloads=county-map Macon County's map and public land, without imagery
 //   &fakeNet=offline|metered  the network the screens see
 //   &fakeFree=<MB>            free space on the phone
 //   &fakeSpeed=<MB a second>  how fast a download moves (default 2)
@@ -72,7 +73,7 @@ const RELEASE = 'data-2026-11-17';
 const DENSITY: Readonly<Record<string, number>> = { basemap: 0.017, publicland: 0.0012 };
 const IMAGERY_DENSITY: Readonly<Record<number, number>> = { 16: 0.227, 15: 0.081, 14: 0.029 };
 
-export type FakeScenario = 'none' | 'states' | 'county';
+export type FakeScenario = 'none' | 'states' | 'county' | 'county-map';
 
 export interface FakeOptions {
   scenario?: FakeScenario;
@@ -449,6 +450,11 @@ export class FakeDownloadService implements DownloadService {
       });
     };
     const all = ['basemap', 'publicland', 'aerial'];
+    if (scenario === 'county-map') {
+      // Macon County's map and public land, without imagery (the tester's F4).
+      add('Macon County', { where: { county: 'il-macon' }, layers: ['basemap', 'publicland'], aerialMaxzoom: 16 }, 'complete', 1, '2026-11-10T07:00:00Z');
+      return;
+    }
     add('Macon County', { where: { county: 'il-macon' }, layers: all, aerialMaxzoom: 16 }, 'complete', 1, '2026-11-10T07:00:00Z');
     if (scenario === 'county') return;
     // Small areas in Macon County, around Warrensburg and Lake Decatur.
@@ -487,7 +493,7 @@ export function fakeOptionsFrom(search: string): FakeOptions | null {
   const free = q.get('fakeFree');
   const speed = q.get('fakeSpeed');
   return {
-    scenario: scenario === 'states' || scenario === 'county' ? scenario : 'none',
+    scenario: scenario === 'states' || scenario === 'county' || scenario === 'county-map' ? scenario : 'none',
     network: net === 'offline' ? { online: false, metered: false } : net === 'metered' ? { online: true, metered: true } : { online: true, metered: false },
     ...(free !== null ? { freeBytes: Number(free) * MB } : {}),
     ...(speed !== null ? { speed: Number(speed) * MB } : {}),

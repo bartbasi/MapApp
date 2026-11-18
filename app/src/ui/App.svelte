@@ -52,6 +52,7 @@
   import DownloadsScreen from './downloads/DownloadsScreen.svelte';
   import { connectDownloads } from './downloads/connect';
   import { DownloadsUi } from './downloads/downloads-ui.svelte';
+  import { zoomFrame } from './downloads/frame-zoom';
 
   import { backStep, type PanelName } from './back';
   import { DOWNLOAD_AREAS_SOURCE } from '../map/style/download-areas';
@@ -503,7 +504,17 @@
         marker={pos.on && pos.fix ? { lng: pos.fix.lng, lat: pos.fix.lat, accuracyM: pos.fix.accuracyM } : null}
         setOutlines={(f) => mapView?.setLiveData(DOWNLOAD_AREAS_SOURCE, f)}
       />
-      <DownloadInvite map={mapRef} {installed} service={downloads} hidden={panel === 'downloads' || frameRunning} onOpen={() => open('downloads')} />
+      <DownloadInvite
+        map={mapRef}
+        {installed}
+        service={downloads}
+        view={shownView}
+        offered={downloadsUi.offers?.map((o) => o.bounds) ?? null}
+        hidden={panel === 'downloads' || frameRunning}
+        onOpen={() => open('downloads')}
+        onShowMap={() => (baseView = 'map')}
+        marker={pos.on && pos.fix ? { lng: pos.fix.lng, lat: pos.fix.lat, accuracyM: pos.fix.accuracyM } : null}
+      />
     {/if}
 
     {#if loadError}
@@ -551,7 +562,7 @@
           {layersOn}
           linesWith={countiesWithLines}
           onShowArea={(b) => void showArea(b)}
-          onZoom={(d) => (d > 0 ? mapView?.map.zoomIn() : mapView?.map.zoomOut())}
+          onZoom={(d) => mapRef && zoomFrame(mapRef, downloadsUi, d)}
         />
       {:else if panel === 'sources'}
         <SourcesScreen entries={session?.entries ?? []} areaNames={new Map((downloads?.areas() ?? []).map((a) => [a.record.id, a.record.name]))} onOpenDiagnostics={() => open('diagnostics')} />

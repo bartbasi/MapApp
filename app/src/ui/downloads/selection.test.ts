@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AreaView } from '../../downloads/contract';
 import { FAKE_OFFERS } from '../../downloads/fake-service';
-import { chosenLayers, countyAlreadyHas, countyBytes, countyImageryMaxzoom, layerChoices, offeredLayers } from './selection';
+import { chosenLayers, countyBytes, countyDownloadName, countyHoldings, countyImageryMaxzoom, layerChoices, missingLayers, offeredLayers } from './selection';
 
 const macon = FAKE_OFFERS[1]!;
 
@@ -46,9 +46,21 @@ describe('county sizes', () => {
       bytesDone: 0,
       bytesTotal: 1,
     });
-    expect(countyAlreadyHas([view(['basemap', 'publicland'], 'complete')], 'il-macon', ['basemap'])).not.toBeNull();
-    expect(countyAlreadyHas([view(['basemap', 'publicland'], 'complete')], 'il-macon', ['basemap', 'aerial'])).toBeNull();
-    expect(countyAlreadyHas([view(['basemap'], 'failed')], 'il-macon', ['basemap'])).toBeNull();
-    expect(countyAlreadyHas([view(['basemap'], 'complete')], 'il-champaign', ['basemap'])).toBeNull();
+    // A map-only download, then imagery wanted: only imagery is missing (tester's F4).
+    const mapOnly = countyHoldings([view(['basemap', 'publicland'], 'complete')], 'il-macon');
+    expect([...mapOnly]).toEqual([['basemap', 'on-phone'], ['publicland', 'on-phone']]);
+    expect(missingLayers(['basemap', 'publicland', 'aerial'], mapOnly)).toEqual(['aerial']);
+    expect(countyDownloadName('Macon County', ['aerial'], mapOnly)).toBe('Macon County, aerial imagery');
+    // Imagery first, then public land turned on.
+    const withImagery = countyHoldings([view(['basemap', 'aerial'], 'complete')], 'il-macon');
+    expect(missingLayers(['basemap', 'publicland', 'aerial'], withImagery)).toEqual(['publicland']);
+    // Nothing yet: the plain county name.
+    expect(countyDownloadName('Macon County', ['basemap'], new Map())).toBe('Macon County');
+    // A download on its way counts; a stopped one does not; another county does not.
+    expect(countyHoldings([view(['basemap'], 'downloading')], 'il-macon').get('basemap')).toBe('coming');
+    expect(countyHoldings([view(['basemap'], 'failed')], 'il-macon').size).toBe(0);
+    expect(countyHoldings([view(['basemap'], 'complete')], 'il-champaign').size).toBe(0);
+    // On the phone wins over on its way.
+    expect(countyHoldings([view(['basemap'], 'queued'), { ...view(['basemap'], 'complete') }], 'il-macon').get('basemap')).toBe('on-phone');
   });
 });

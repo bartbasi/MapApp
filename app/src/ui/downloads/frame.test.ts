@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { Bounds } from '../../map/tile-math';
-import { FRAME_MARGIN, FRAME_MIN, MARKER_HOLE_MARGIN, MARKER_HOLE_MAX, MARKER_HOLE_MIN, boundsOfPoints, circleMeetsRect, markerHole, metersPerPixel, boundsSizeKm, frameCorners, frameRect, roundBounds, sameBounds, suggestName } from './frame';
+import { cardMode, FRAME_MARGIN, FRAME_MIN, FRAME_ZOOM_MAX, FRAME_ZOOM_MIN, steppedZoom, MARKER_HOLE_MARGIN, MARKER_HOLE_MAX, MARKER_HOLE_MIN, boundsOfPoints, circleMeetsRect, markerHole, metersPerPixel, boundsSizeKm, frameCorners, frameRect, roundBounds, sameBounds, suggestName } from './frame';
 
 describe('frameRect', () => {
   it('fills what shows of the map, less a margin', () => {
@@ -82,14 +82,20 @@ describe('suggestName', () => {
     { countyName: 'Champaign County, Illinois', bounds: [-88.4637, 39.879, -87.9287, 40.4007] as Bounds },
   ];
 
+  const box = (lng: number, lat: number): Bounds => [lng - 0.02, lat - 0.02, lng + 0.02, lat + 0.02];
+
   it('names an area after its county and numbers it past the names taken', () => {
-    expect(suggestName({ lng: -89.0, lat: 39.9 }, counties, [])).toBe('Macon County area 1');
-    expect(suggestName({ lng: -89.0, lat: 39.9 }, counties, ['Macon County area 1', 'macon county area 2'])).toBe('Macon County area 3');
-    expect(suggestName({ lng: -88.2, lat: 40.1 }, counties, [])).toBe('Champaign County area 1');
+    expect(suggestName(box(-89.0, 39.9), counties, [])).toBe('Macon County area 1');
+    expect(suggestName(box(-89.0, 39.9), counties, ['Macon County area 1', 'macon county area 2'])).toBe('Macon County area 3');
+    expect(suggestName(box(-88.2, 40.1), counties, [])).toBe('Champaign County area 1');
+  });
+
+  it('names an area reaching into both counties after both (tester F9)', () => {
+    expect(suggestName([-89.5, 39.5, -87.5, 40.6], counties, [])).toBe('Champaign and Macon area 1');
   });
 
   it('falls back to "Area" outside the counties', () => {
-    expect(suggestName({ lng: -90, lat: 41 }, counties, ['Area 1'])).toBe('Area 2');
+    expect(suggestName(box(-90, 41), counties, ['Area 1'])).toBe('Area 2');
   });
 });
 
@@ -113,5 +119,31 @@ describe('the clear circle around the position marker', () => {
     const tag = { left: 20, top: 100, right: 300, bottom: 148 };
     expect(circleMeetsRect({ x: 150, y: 160, r: 20 }, tag)).toBe(true);
     expect(circleMeetsRect({ x: 150, y: 200, r: 20 }, tag)).toBe(false);
+  });
+});
+
+describe('steppedZoom', () => {
+  it('moves exactly one step from where the last tap was going (tester F9)', () => {
+    expect(steppedZoom(12.6, null, -1)).toBeCloseTo(11.6);
+    // A second quick tap, while the map is still moving at 12.1: from the target, not from 12.1.
+    expect(steppedZoom(12.1, 11.6, -1)).toBeCloseTo(10.6);
+    expect(steppedZoom(12.6, null, 1)).toBeCloseTo(13.6);
+  });
+
+  it('stops at its nearest and farthest', () => {
+    expect(steppedZoom(FRAME_ZOOM_MIN + 0.3, null, -1)).toBe(FRAME_ZOOM_MIN);
+    expect(steppedZoom(FRAME_ZOOM_MAX, null, 1)).toBe(FRAME_ZOOM_MAX);
+  });
+});
+
+describe('cardMode', () => {
+  const full = { left: 12, top: 80, right: 392, bottom: 285 };
+  const pill = { left: 12, top: 80, right: 220, bottom: 128 };
+  it('shows the whole card unless it would cover the marker', () => {
+    expect(cardMode(null, full, pill)).toBe('full');
+    expect(cardMode({ x: 500, y: 400, r: 24 }, full, pill)).toBe('full');
+    expect(cardMode({ x: 380, y: 200, r: 24 }, full, null)).toBe('pill');
+    expect(cardMode({ x: 380, y: 200, r: 24 }, full, pill)).toBe('pill');
+    expect(cardMode({ x: 100, y: 100, r: 24 }, full, pill)).toBe('hidden');
   });
 });

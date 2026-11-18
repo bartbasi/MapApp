@@ -6,14 +6,19 @@
   A whole county, one tap: each layer with its size, the total, and the
   Download button. Layers that are on now are always included; imagery and
   layers that are off can be left out or added.
+
+  Each layer says truthfully whether it is on the phone already (from an
+  earlier download of this county), on its way, or not. A new download asks
+  only for what is missing, so adding imagery later fetches the imagery and
+  not the map again.
 -->
 <script lang="ts">
   import type { AreaRequest, AreaView, CountyOffer, NetworkState } from '../../downloads/contract';
   import Icon from '../Icon.svelte';
   import DlButton from './DlButton.svelte';
-  import { chosenLayers, countyAlreadyHas, countyBytes, countyImageryMaxzoom, layerChoices } from './selection';
+  import { chosenLayers, countyBytes, countyDownloadName, countyHoldings, countyImageryMaxzoom, layerChoices, missingLayers } from './selection';
   import { errorCode } from './estimate-runner';
-  import { formatSize, hasRoom, layerLabel, layerNote, notEnoughSpaceText, propertyLinesNote, startErrorText, statusText } from './text';
+  import { NOTIFY_NOTE, formatSize, hasRoom, layerLabel, layerNote, notEnoughSpaceText, propertyLinesNote, startErrorText } from './text';
 
   interface Props {
     offer: CountyOffer;
@@ -23,10 +28,12 @@
     areas: readonly AreaView[];
     network: NetworkState;
     freeBytes: number | undefined;
+    /** Show the sentence about Android's notification question (until a first download has started). */
+    notifyNote: boolean;
     onStart: (request: AreaRequest, name: string) => Promise<void>;
   }
 
-  let { offer, layersOn, linesWith, areas, network, freeBytes, onStart }: Props = $props();
+  let { offer, layersOn, linesWith, areas, network, freeBytes, notifyNote, onStart }: Props = $props();
 
   const name = $derived(offer.countyName.replace(/, Illinois$/, ''));
   const choices = $derived(layerChoices(offer.layers.map((l) => l.layer), layersOn));
@@ -41,8 +48,12 @@
     picked = new Set(choices.filter((c) => c.chosen && c.rule === 'optional').map((c) => c.layer));
   });
   const layers = $derived(chosenLayers(choices, picked));
-  const total = $derived(countyBytes(offer, layers));
-  const existing = $derived(countyAlreadyHas(areas, offer.county, layers));
+  /** Each layer of this county already on the phone or on its way. */
+  const holdings = $derived(countyHoldings(areas, offer.county));
+  /** What a new download fetches: the chosen layers the phone neither has nor is getting. */
+  const missing = $derived(missingLayers(layers, holdings));
+  const total = $derived(countyBytes(offer, missing));
+  const anyComing = $derived(layers.some((l) => holdings.get(l) === 'coming'));
   // The same rule as the download service: the download and the room it keeps spare.
   const tooBig = $derived(!hasRoom(total, freeBytes));
   let confirming = $state(false);
@@ -70,7 +81,7 @@
     starting = true;
     failed = '';
     try {
-      await onStart({ where: { county: offer.county }, layers, aerialMaxzoom: countyImageryMaxzoom(offer) }, name);
+      await onStart({ where: { county: offer.county }, layers: missing, aerialMaxzoom: countyImageryMaxzoom(offer) }, countyDownloadName(name, missing, holdings));
     } catch (e) {
       console.warn('the county download could not start:', e);
       failed = startErrorText(errorCode(e), e as object);
@@ -85,8 +96,18 @@
   <ul>
     {#each choices as c (c.layer)}
       {@const title = layerLabel(c.layer, offer.layers.find((l) => l.layer === c.layer)?.title)}
+      {@const held = holdings.get(c.layer)}
       <li>
-        {#if c.rule === 'optional'}
+        {#if held}
+          <div class="row held">
+            <span class="have-mark" aria-hidden="true"><Icon name={held === 'on-phone' ? 'check' : 'download'} size={26} /></span>
+            <span class="text">
+              <span class="label">{title}</span>
+              <span class="note">{held === 'on-phone' ? 'On this phone.' : 'In your downloads, not finished yet.'}</span>
+            </span>
+            <span class="size muted">{formatSize(sizeOf(c.layer))}</span>
+          </div>
+        {:else if c.rule === 'optional'}
           <label class="row optional">
             <input type="checkbox" checked={picked.has(c.layer)} onchange={(e) => toggle(c.layer, e.currentTarget.checked)} />
             <span class="box" aria-hidden="true"></span>
@@ -111,10 +132,13 @@
   {/if}
 
   <div class="foot">
-    <p class="total"><span>Total</span> <strong>{formatSize(total)}</strong></p>
-    {#if existing}
-      {@const st = statusText(existing)}
-      <p class="have"><Icon name={existing.status === 'complete' ? 'check' : 'download'} size={22} /> <span>{existing.status === 'complete' ? 'On this phone.' : `In your downloads: ${st.title.toLowerCase()}.`}</span></p>
+    {#if missing.length === 0}
+      <p class="have"><Icon name={anyComing ? 'download' : 'check'} size={22} /> <span>{anyComing ? 'All of these are in your downloads.' : 'All of these are on this phone.'}</span></p>
+    {:else}
+      <p class="total"><span>{holdings.size ? 'To download' : 'Total'}</span> <strong>{formatSize(total)}</strong></p>
+    {/if}
+    {#if missing.length === 0}
+      <!-- Nothing to fetch. -->
     {:else if !network.online}
       <p class="why">Downloading needs a connection.</p>
     {:else if tooBig}
@@ -129,6 +153,9 @@
       </div>
     {:else}
       <DlButton kind="primary" icon="download" label={starting ? 'Starting' : 'Download'} disabled={starting} ariaLabel="Download {name}, {formatSize(total)}" onclick={start} />
+      {#if notifyNote}
+        <p class="why notify">{NOTIFY_NOTE}</p>
+      {/if}
     {/if}
     {#if failed}
       <p class="why problem" role="alert">{failed}</p>
@@ -277,6 +304,24 @@
 
   .total strong {
     font-size: 1.2rem;
+  }
+
+  .held .note {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .have-mark {
+    flex: none;
+    width: 30px;
+    display: grid;
+    place-items: center;
+    color: var(--accent);
+  }
+
+  .size.muted {
+    color: var(--text-muted);
+    font-weight: 500;
   }
 
   .have {
