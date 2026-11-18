@@ -40,6 +40,11 @@ export async function checkExtract(source: Source, extract: Source, plan: Extrac
   expect(header.minZoom).toBe(plan.minzoom);
   expect(header.maxZoom).toBe(plan.maxzoom);
   expect(header.clustered).toBe(plan.clustered);
+  // What readers check of a header: a centre zoom inside the range and an area above zero.
+  expect(header.centerZoom).toBeGreaterThanOrEqual(header.minZoom);
+  expect(header.centerZoom).toBeLessThanOrEqual(header.maxZoom);
+  expect(Math.round(header.minLon * 1e7)).toBeLessThan(Math.round(header.maxLon * 1e7));
+  expect(Math.round(header.minLat * 1e7)).toBeLessThan(Math.round(header.maxLat * 1e7));
 
   // The metadata is the source's, byte for byte.
   const bytesAt = async (s: Source, offset: number, length: number) => new Uint8Array((await s.getBytes(offset, length)).data, 0, length);
@@ -66,6 +71,15 @@ export async function checkExtract(source: Source, extract: Source, plan: Extrac
     }
   }
   expect(addressed).toBe(plan.addressedTiles);
+  // The header's zoom range is exactly that of the tiles held, and no entry
+  // runs from one zoom into the next.
+  const first = entries[0];
+  const last = entries[entries.length - 1];
+  if (first && last) {
+    expect(tileIdToZxy(first.tileId)[0]).toBe(header.minZoom);
+    expect(tileIdToZxy(last.tileId)[0]).toBe(header.maxZoom);
+  }
+  for (const e of entries) expect(tileIdToZxy(e.tileId)[0]).toBe(tileIdToZxy(e.tileId + e.runLength - 1)[0]);
   expect(entries.length).toBe(plan.tileEntries);
   expect(offsets.size).toBe(plan.tileContents);
 
@@ -79,7 +93,10 @@ export async function checkExtract(source: Source, extract: Source, plan: Extrac
   const out = new PMTiles(extract, undefined, raw);
   let wantedTiles = 0;
   let presentTiles = 0;
-  for (let z = plan.minzoom; z <= plan.maxzoom; z++) {
+  // Every zoom that was asked for, not only the range the extract says it
+  // holds, so a tile wrongly left out at an end zoom would be caught.
+  const askedMax = Math.min(sourceHeader.maxZoom, request.maxzoom ?? sourceHeader.maxZoom);
+  for (let z = sourceHeader.minZoom; z <= askedMax; z++) {
     const r = tileRect(request.bounds, z);
     for (let x = r.minX; x <= r.maxX; x++) {
       for (let y = r.minY; y <= r.maxY; y++) {

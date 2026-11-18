@@ -10,28 +10,25 @@
 // PMTiles command line tool is present, it verifies the extract and cuts the
 // same area for comparison.
 
+import { tileIdToZxy, zxyToTileId } from 'pmtiles';
 import { describe, expect, it } from 'vitest';
-import type { Bounds } from '../map/tile-math';
+import { tileBounds, type Bounds } from '../map/tile-math';
+import { parseArchiveMeta } from '../platform/archive-meta';
 import { assembleTo } from './assemble';
 import { rangeReport } from './download-plan';
 import { checkExtract } from './extract-check';
 import { planExtract, type ExtractRequest } from './extract-planner';
-import { diskSource, fileWriter, fs, joinPath, localPath, makeTempDir, run } from './test-node';
+import { extractMeta } from './request-plan';
+import { allTileEntries } from './test-archive';
+import { tileRect } from './tile-cover';
+import { diskSource, fileWriter, fs, joinPath, localPath, makeTempDir, pmtilesTool, run } from './test-node';
 
 const COUNTIES = ['il-macon', 'il-champaign'];
 /** Never 'parcels'. */
 const LAYERS = ['basemap', 'publicland', 'aerial'] as const;
 
-const tool = localPath('../../../.tools/pmtiles/pmtiles.exe');
-const haveTool = !!tool && !!fs?.existsSync(tool) && !!childProcessReady();
-
-function childProcessReady(): boolean {
-  try {
-    return run(tool!, ['version']).status === 0;
-  } catch {
-    return false;
-  }
-}
+const tool = pmtilesTool;
+const haveTool = tool !== undefined;
 
 /** A square of `km` kilometres around a point. */
 function box(lng: number, lat: number, km: number): Bounds {
@@ -98,7 +95,7 @@ for (const county of COUNTIES) {
             const report = rangeReport(plan);
             const trade = report.tradeoff.map((t) => `${kb(t.gap)} gap: ${t.requests} (+${kb(t.extraBytes)})`).join(', ');
             const lines = [
-              `${county} ${layer}, ${area.name}, zoom ${plan.minzoom}-${plan.maxzoom}: final ${plan.bytes} bytes (${mb(plan.bytes)}), head ${plan.head.length} bytes, ` +
+              `${county} ${layer}, ${area.name}, tiles at zoom ${plan.minzoom}-${plan.maxzoom}: final ${plan.bytes} bytes (${mb(plan.bytes)}), head ${plan.head.length} bytes, ` +
                 `${report.requests} ranges (smallest ${report.smallestRange}, median ${report.medianRange}, largest ${report.largestRange} bytes), ` +
                 `${plan.sourceReads} directory reads (${joined.sourceReads} with a 64 KB leaf read gap), ` +
                 `${plan.addressedTiles} tiles (${checked.wantedTiles} in the area), ${plan.tileContents} contents, ${plan.leafDirectories} leaves, clustered ${plan.clustered}`,
@@ -133,3 +130,82 @@ for (const county of COUNTIES) {
     });
   }
 }
+
+// Public land is sparse: a small box away from any public land can hold tiles
+// at middle zooms only. These boxes are found from the archive itself: a box
+// of 200 m in the middle of a tile the archive does not have, whose parent it
+// does have. The extract's header must then end at the parent's zoom.
+for (const county of COUNTIES) {
+  const file = localPath(`../../../data/build/${county}/publicland.pmtiles`);
+  const present = !!file && !!fs?.existsSync(file);
+
+  describe.skipIf(!present)(`sparse extracts of the real ${county} public land archive`, () => {
+    for (const parentZoom of [13, 12, 11]) {
+      it(`a box where the archive's tiles stop at zoom ${parentZoom} or below`, async () => {
+        const source = diskSource(file!);
+        const dir = makeTempDir();
+        try {
+          const all = await allTileEntries(source);
+          const held = new Set<number>();
+          for (const e of all.entries) for (let id = e.tileId; id < e.tileId + e.runLength; id++) held.add(id);
+          // The first held tile at the parent zoom with a child the archive lacks.
+          let child: [number, number, number] | null = null;
+          for (const id of [...held].sort((a, b) => a - b)) {
+            const [z, x, y] = tileIdToZxy(id);
+            if (z !== parentZoom) continue;
+            for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]] as const) {
+              if (!held.has(zxyToTileId(z + 1, 2 * x + dx, 2 * y + dy))) child ??= [z + 1, 2 * x + dx, 2 * y + dy];
+            }
+            if (child) break;
+          }
+          expect(child).not.toBeNull();
+          const [cz, cx, cy] = child!;
+          const tb = tileBounds(cz, cx, cy);
+          const request: ExtractRequest = { bounds: box((tb[0] + tb[2]) / 2, (tb[1] + tb[3]) / 2, 0.2) };
+          // The highest zoom of any held tile the box overlaps: what the header must say.
+          let expectedMax = -1;
+          for (let z = all.header.minZoom; z <= all.header.maxZoom; z++) {
+            const r = tileRect(request.bounds, z);
+            for (let x = r.minX; x <= r.maxX; x++) for (let y = r.minY; y <= r.maxY; y++) if (held.has(zxyToTileId(z, x, y))) expectedMax = z;
+          }
+          expect(expectedMax).toBeLessThan(all.header.maxZoom);
+
+          const plan = await planExtract(source, request);
+          expect(plan.addressedTiles).toBeGreaterThan(0);
+          expect(plan.maxzoom).toBe(expectedMax);
+          const out = joinPath(dir, 'extract.pmtiles');
+          const writer = fileWriter(out);
+          try {
+            await assembleTo(plan, source, (c) => writer.write(c));
+          } finally {
+            writer.close();
+          }
+          const extract = diskSource(out);
+          try {
+            await checkExtract(source, extract, plan, request);
+          } finally {
+            extract.close();
+          }
+          // The metadata the download manager writes agrees with the archive and still validates.
+          const sourceMeta = parseArchiveMeta(JSON.parse(fs!.readFileSync(localPath(`../../../data/build/${county}/publicland.meta.json`)!, 'utf8')));
+          const meta = parseArchiveMeta(extractMeta(sourceMeta, plan, null));
+          expect([meta.minzoom, meta.maxzoom]).toEqual([plan.minzoom, plan.maxzoom]);
+          let verified = 'tool not present';
+          if (haveTool) {
+            const verify = run(tool!, ['verify', out]);
+            expect(verify.status, verify.out).toBe(0);
+            verified = 'passed';
+          }
+          console.log(
+            `${county} public land, 200 m box in missing tile ${cz}/${cx}/${cy}: tiles at zoom ${plan.minzoom}-${plan.maxzoom} ` +
+              `(archive ${all.header.minZoom}-${all.header.maxZoom}), ${plan.addressedTiles} tiles, ${plan.bytes} bytes; pmtiles verify: ${verified}`,
+          );
+        } finally {
+          source.close();
+          fs!.rmSync(dir, { recursive: true, force: true });
+        }
+      }, 120000);
+    }
+  });
+}
+

@@ -92,3 +92,31 @@ export function run(cmd: string, args: string[]): { status: number | null; out: 
   if (r.error) throw r.error;
   return { status: r.status, out: `${r.stdout}${r.stderr}` };
 }
+
+/** The PMTiles command line tool, when it is on this machine. */
+export const pmtilesTool: string | undefined = (() => {
+  const exe = localPath('../../../.tools/pmtiles/pmtiles.exe');
+  if (!exe || !fs?.existsSync(exe) || !childProcess) return undefined;
+  try {
+    return run(exe, ['version']).status === 0 ? exe : undefined;
+  } catch {
+    return undefined;
+  }
+})();
+
+/** Runs `pmtiles verify` on archive bytes written to a temporary file. */
+export function verifyBytes(bytes: Uint8Array): { status: number | null; out: string } {
+  const dir = makeTempDir();
+  try {
+    const file = joinPath(dir, 'check.pmtiles');
+    const w = fileWriter(file);
+    try {
+      w.write(bytes);
+    } finally {
+      w.close();
+    }
+    return run(pmtilesTool!, ['verify', file]);
+  } finally {
+    fs!.rmSync(dir, { recursive: true, force: true });
+  }
+}

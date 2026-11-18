@@ -13,14 +13,14 @@
 // offset follows from the plan alone, which is why the directories can be
 // written before any tile is fetched.
 
-import { Compression, type Source } from 'pmtiles';
-import type { Bounds } from '../map/tile-math';
+import { Compression, tileIdToZxy, type Source } from 'pmtiles';
+import { tileBounds, type Bounds } from '../map/tile-math';
 import { HEADER_BYTES, HEAD_READ_BYTES, readHeader, writeHeader, type Header } from './archive-header';
 import { parseDirectory, type Entry } from './directory';
 import { layoutDirectories } from './directory-layout';
 import type { ByteRange, ExtractPlan } from './download-plan';
 import { decompressInternal, supportedInternalCompression } from './internal-compression';
-import { wantedTileIds, type TileIdSet } from './tile-cover';
+import { firstTileId, tileRect, wantedTileIds, type TileIdSet } from './tile-cover';
 
 export interface ExtractRequest {
   /** West, south, east, north in degrees. */
@@ -135,6 +135,27 @@ function groupReads(pending: PendingLeaf[], gap: number): PendingLeaf[][] {
   return groups;
 }
 
+function zoomOf(tileId: number): number {
+  return tileIdToZxy(tileId)[0];
+}
+
+/**
+ * Cuts a run where it crosses from one zoom into the next, so every run lies
+ * in one zoom. A reader that takes an archive's zoom range from the first tile
+ * ID of each entry (as `pmtiles verify` does) then finds the right range.
+ */
+function splitAtZooms(p: Piece): Piece[] {
+  const out: Piece[] = [];
+  let start = p.tileId;
+  const end = p.tileId + p.runLength;
+  while (start < end) {
+    const stop = Math.min(end, firstTileId(zoomOf(start) + 1));
+    out.push({ ...p, tileId: start, runLength: stop - start });
+    start = stop;
+  }
+  return out;
+}
+
 /** Walks the root and every leaf that can hold a wanted tile. Returns the wanted runs in tile ID order. */
 async function collectPieces(
   file: HostedFile,
@@ -164,12 +185,13 @@ async function collectPieces(
     pending = next;
   }
 
-  pieces.sort((a, b) => a.tileId - b.tileId);
+  const split = pieces.flatMap(splitAtZooms).sort((a, b) => a.tileId - b.tileId);
   const runs: Piece[] = [];
-  for (const p of pieces) {
+  for (const p of split) {
     const last = runs[runs.length - 1];
     if (last && p.tileId < last.tileId + last.runLength) throw new Error(`the archive's directories overlap at tile ID ${p.tileId}`);
-    if (last && last.tileId + last.runLength === p.tileId && last.offset === p.offset && last.length === p.length) {
+    const sameZoom = p.tileId !== firstTileId(zoomOf(p.tileId));
+    if (last && sameZoom && last.tileId + last.runLength === p.tileId && last.offset === p.offset && last.length === p.length) {
       last.runLength += p.runLength;
     } else {
       runs.push({ ...p });
@@ -231,6 +253,34 @@ function clipBounds(a: Bounds, b: Bounds): Bounds | null {
   return out[0] <= out[2] && out[1] <= out[3] ? out : null;
 }
 
+/** True if the header would store an area of zero or less (it keeps degrees times 10,000,000). */
+function noArea(b: Bounds): boolean {
+  const e7 = (v: number) => Math.round(v * 1e7);
+  return e7(b[0]) >= e7(b[2]) || e7(b[1]) >= e7(b[3]);
+}
+
+/** The area of the tiles of zoom z that the request overlaps. */
+function tilesArea(request: Bounds, z: number): Bounds {
+  const r = tileRect(request, z);
+  const nw = tileBounds(z, r.minX, r.minY);
+  const se = tileBounds(z, r.maxX, r.maxY);
+  return [nw[0], se[1], se[2], nw[3]];
+}
+
+/**
+ * The area written into the new header: the request clipped to the archive's
+ * own bounds. A request of no width or height (a point, or one that only
+ * touches the archive's edge) would give a header with no area, which readers
+ * reject, so it is widened to the tiles it overlaps at `z`.
+ */
+function headerBounds(request: Bounds, archive: Bounds, z: number): Bounds {
+  const clipped = clipBounds(request, archive) ?? request;
+  if (!noArea(clipped)) return clipped;
+  const tiles = tilesArea(request, z);
+  const inside = clipBounds(tiles, archive);
+  return inside && !noArea(inside) ? inside : tiles;
+}
+
 function join(parts: readonly Uint8Array[]): Uint8Array {
   const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
   let at = 0;
@@ -244,6 +294,7 @@ function join(parts: readonly Uint8Array[]): Uint8Array {
 /**
  * Plans an archive holding every tile of the hosted archive, from its lowest
  * zoom to the chosen detail, that overlaps the area. Tiles are kept whole.
+ * The new header's zoom range is that of the tiles kept.
  */
 export async function planExtract(source: Source, request: ExtractRequest, options: ExtractOptions = {}): Promise<ExtractPlan> {
   const file = new HostedFile(source);
@@ -252,11 +303,11 @@ export async function planExtract(source: Source, request: ExtractRequest, optio
   if (!supportedInternalCompression(header.internalCompression)) {
     throw new Error(`the archive's directories use compression ${Compression[header.internalCompression]}, which cannot be rewritten here`);
   }
-  const { minzoom, maxzoom } = checkRequest(request, header);
+  const asked = checkRequest(request, header);
 
   const rootBytes = await file.read(header.rootDirectoryOffset, header.rootDirectoryLength);
   const root = parseDirectory(await decompressInternal(rootBytes, header.internalCompression));
-  const wanted = wantedTileIds(request.bounds, minzoom, maxzoom);
+  const wanted = wantedTileIds(request.bounds, asked.minzoom, asked.maxzoom);
   const runs = await collectPieces(file, header, root, wanted, options.leafReadGap ?? 0);
 
   const data = layoutTileData(runs, header.tileDataOffset);
@@ -270,8 +321,17 @@ export async function planExtract(source: Source, request: ExtractRequest, optio
   const dirs = await layoutDirectories(entries, header.internalCompression, options.leafSize === undefined ? {} : { leafSize: options.leafSize });
   const metadata = await file.read(header.jsonMetadataOffset, header.jsonMetadataLength);
 
+  // The zoom range is that of the tiles kept. A sparse layer (public land)
+  // may have no tile inside the area at the archive's top zoom, or at its
+  // lowest; the header must not claim zooms it holds no tile for. With no
+  // tile at all, the asked range stands.
+  const firstEntry = entries[0];
+  const lastEntry = entries[entries.length - 1];
+  const minzoom = firstEntry ? zoomOf(firstEntry.tileId) : asked.minzoom;
+  const maxzoom = lastEntry ? zoomOf(lastEntry.tileId + lastEntry.runLength - 1) : asked.maxzoom;
+
   const archiveBounds: Bounds = [header.minLon, header.minLat, header.maxLon, header.maxLat];
-  const bounds = clipBounds(request.bounds, archiveBounds) ?? request.bounds;
+  const bounds = headerBounds(request.bounds, archiveBounds, maxzoom);
   const rootOffset = HEADER_BYTES;
   const metadataOffset = rootOffset + dirs.root.length;
   const leafOffset = metadataOffset + metadata.length;

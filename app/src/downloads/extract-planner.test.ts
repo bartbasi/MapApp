@@ -10,6 +10,7 @@ import { planWholeArchive, rangeReport, type ExtractPlan } from './download-plan
 import { checkExtract } from './extract-check';
 import { planExtract, type ExtractOptions, type ExtractRequest } from './extract-planner';
 import { allTileEntries, memorySource, writeTestArchive, type TestArchiveOptions, type TestTile } from './test-archive';
+import { pmtilesTool, verifyBytes } from './test-node';
 import { rectTileCount, tileRect } from './tile-cover';
 
 /** Every tile of zooms `minzoom` to `maxzoom` inside `bounds`, with contents from `content`. */
@@ -215,6 +216,75 @@ describe('planExtract', () => {
     const tiles = grid(WORLD, 0, 4, unique);
     const { extract } = await extractAndCheck(tiles, { bounds: [0, 0, 90, 60] }, { internalCompression: Compression.None, leafSize: 7 });
     expect(readHeader(extract).internalCompression).toBe(Compression.None);
+  });
+});
+
+/** Runs `pmtiles verify` on an extract when the tool is on this machine. */
+function verifyIfTool(bytes: Uint8Array): void {
+  if (!pmtilesTool) return;
+  const r = verifyBytes(bytes);
+  expect(r.status, r.out).toBe(0);
+}
+
+describe('planExtract on a sparse layer', () => {
+  // Zooms 2 to 5 over a wide area, zoom 6 only in a smaller one: like public
+  // land, where the top zoom has tiles only near the land itself.
+  const wide: Bounds = [-40, -40, 40, 40];
+  const dense: Bounds = [10, 10, 30, 30];
+  const sparse = () => [...grid(wide, 2, 5, unique), ...grid(dense, 6, 6, unique)];
+
+  it('ends the header at the highest zoom that has a tile in the area', async () => {
+    const request: ExtractRequest = { bounds: [-30, -30, -20, -20] };
+    const { plan, extract } = await extractAndCheck(sparse(), request, { centerZoom: 6 });
+    expect([plan.minzoom, plan.maxzoom]).toEqual([2, 5]);
+    const h = readHeader(extract);
+    expect([h.minZoom, h.maxZoom]).toEqual([2, 5]);
+    expect(h.centerZoom).toBe(5);
+    verifyIfTool(extract);
+
+    const inside = await extractAndCheck(sparse(), { bounds: [15, 15, 20, 20] });
+    expect([inside.plan.minzoom, inside.plan.maxzoom]).toEqual([2, 6]);
+    verifyIfTool(inside.extract);
+  });
+
+  it('starts the header at the lowest zoom that has a tile in the area', async () => {
+    const tiles = grid(wide, 3, 5, unique);
+    const { plan, extract } = await extractAndCheck(tiles, { bounds: [0, 0, 10, 10] }, { minzoom: 2, centerZoom: 2 });
+    expect([plan.minzoom, plan.maxzoom]).toEqual([3, 5]);
+    expect(readHeader(extract).centerZoom).toBe(3);
+    verifyIfTool(extract);
+  });
+
+  it('keeps the asked range when no tile is kept', async () => {
+    const { plan } = await extractAndCheck(sparse(), { bounds: [100, 50, 110, 60] });
+    expect(plan.addressedTiles).toBe(0);
+    expect([plan.minzoom, plan.maxzoom]).toEqual([2, 6]);
+  });
+
+  it('cuts a run that crosses from one zoom into the next', async () => {
+    // Zooms 0 to 2 all share one content, so the source holds one run of 21 tiles.
+    const same = Uint8Array.of(5, 5, 5);
+    const tiles = grid(WORLD, 0, 2, () => same);
+    const src = await allTileEntries(memorySource(await writeTestArchive(tiles)));
+    expect(src.entries).toEqual([{ tileId: 0, offset: 0, length: 3, runLength: 21 }]);
+    const { plan, extract } = await extractAndCheck(tiles, { bounds: [-170, -80, 170, 80] });
+    const { entries } = await allTileEntries(memorySource(extract));
+    expect(entries.map((e) => [e.tileId, e.runLength])).toEqual([
+      [0, 1],
+      [1, 4],
+      [5, 16],
+    ]);
+    expect(plan.tileContents).toBe(1);
+    expect([plan.minzoom, plan.maxzoom]).toEqual([0, 2]);
+    verifyIfTool(extract);
+  });
+
+  it('gives a point request a header area above zero', async () => {
+    const { plan, extract } = await extractAndCheck(sparse(), { bounds: [20, 20, 20, 20] });
+    expect(plan.bounds[0]).toBeLessThan(plan.bounds[2]);
+    expect(plan.bounds[1]).toBeLessThan(plan.bounds[3]);
+    expect(plan.maxzoom).toBe(6);
+    verifyIfTool(extract);
   });
 });
 

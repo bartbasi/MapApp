@@ -35,6 +35,12 @@ export interface ExtractPlan extends DownloadPlan {
   tileEntries: number;
   /** Distinct tile contents stored in the new archive. */
   tileContents: number;
+  /**
+   * The lowest and highest zoom of the tiles kept, as the new header says.
+   * For a sparse layer these can be inside the asked range: a small area may
+   * hold no public land tile at the archive's top zoom. With no tile kept,
+   * the asked range.
+   */
   minzoom: number;
   maxzoom: number;
   /** The area written into the new header: the request clipped to the archive's own bounds. */

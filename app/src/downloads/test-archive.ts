@@ -30,6 +30,8 @@ export interface TestArchiveOptions {
   contentOrder?: 'first-use' | 'reverse';
   /** Force leaf directories of this many entries. */
   leafSize?: number;
+  /** Defaults to the lowest zoom. */
+  centerZoom?: number;
 }
 
 function contentKey(b: Uint8Array): string {
@@ -91,7 +93,7 @@ export async function writeTestArchive(tiles: readonly TestTile[], options: Test
     minLat: bounds[1],
     maxLon: bounds[2],
     maxLat: bounds[3],
-    centerZoom: minZoom,
+    centerZoom: options.centerZoom ?? minZoom,
     centerLon: (bounds[0] + bounds[2]) / 2,
     centerLat: (bounds[1] + bounds[3]) / 2,
   };
