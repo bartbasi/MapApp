@@ -117,6 +117,7 @@ function serveFile(req, res, name, note) {
   });
   stream.on('end', () => {
     res.end();
+    if (logged) return;
     logged = true;
     log(req, status, note, sent);
   });
@@ -124,9 +125,9 @@ function serveFile(req, res, name, note) {
   res.on('close', () => {
     stream.destroy();
     // A response the client or the server cut short is printed too.
-    if (!logged && !res.writableFinished) {
+    if (!logged) {
       logged = true;
-      log(req, status, `${note} CLOSED EARLY`, sent);
+      log(req, status, sent < end - start + 1 ? `${note} CLOSED EARLY` : note, sent);
     }
   });
 }
